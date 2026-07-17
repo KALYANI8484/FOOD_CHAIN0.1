@@ -28,7 +28,7 @@
 
 html, body, #root {
   height: 100%;
-  background: var(--bg);
+  background: linear-gradient(175deg, #F8F8FF 0%, #F0F0FA 45%, #EEEEF6 100%);
   color: var(--text);
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 }
@@ -236,3 +236,47 @@ html, body, #root {
 .stagger > *:nth-child(6) { animation-delay: 0.3s; }
 .stagger > *:nth-child(7) { animation-delay: 0.35s; }
 .stagger > *:nth-child(8) { animation-delay: 0.4s; }
+
+/* Magnetic hover effect for buttons */
+.magnetic-hover {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.magnetic-hover:hover {
+  transform: scale(1.04) translateY(-2px);
+}
+
+/* Parallax container */
+.parallax-hero {
+  will-change: transform;
+  transition: transform 0.1s linear;
+}
+
+/* Frosted acrylic card */
+.frosted-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  border: 1px solid rgba(226, 226, 238, 0.5);
+  box-shadow:
+    0 4px 24px -4px rgba(100, 100, 140, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
+
+/* Ambient glow ring for frosted cards */
+.frosted-glow {
+  position: relative;
+}
+.frosted-glow::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(200, 122, 47, 0.12), rgba(160, 160, 208, 0.08));
+  z-index: -1;
+  filter: blur(12px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.frosted-glow:hover::after {
+  opacity: 1;
+}

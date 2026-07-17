@@ -184,6 +184,16 @@ const upgradeRequestSchema = new mongoose.Schema({
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
+const clientSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  name: { type: String, required: true },
+  phone: { type: String, required: true, unique: true },
+  zip_code: { type: String, required: true },
+  landmark: { type: String, default: null },
+  address: { type: String, default: null },
+  created_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
 // Models
 const SubAdmin = mongoose.model('SubAdmin', subAdminSchema, 'sub_admins');
 const Plan = mongoose.model('Plan', planSchema, 'subscription_plans');
@@ -195,6 +205,7 @@ const Guide = mongoose.model('Guide', guideSchema, 'guides');
 const Settings = mongoose.model('Settings', settingsSchema, 'settings');
 const Activity = mongoose.model('Activity', activitySchema, 'activity_log');
 const UpgradeRequest = mongoose.model('UpgradeRequest', upgradeRequestSchema, 'upgrade_requests');
+const ClientProfile = mongoose.model('ClientProfile', clientSchema, 'clients');
 
 const models = {
   sub_admins: SubAdmin,
@@ -206,7 +217,8 @@ const models = {
   guides: Guide,
   settings: Settings,
   activity_log: Activity,
-  upgrade_requests: UpgradeRequest
+  upgrade_requests: UpgradeRequest,
+  clients: ClientProfile
 };
 
 // Order countdown timers tracking

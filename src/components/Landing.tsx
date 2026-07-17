@@ -21,10 +21,12 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
     address: ''
   });
 
+  const [scrollY, setScrollY] = useState(0);
+
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => { setScrolled(window.scrollY > 20); setScrollY(window.scrollY); };
     const onMouse = (e: MouseEvent) => setMousePos({ x: e.clientX, y: e.clientY });
-    window.addEventListener('scroll', onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('mousemove', onMouse);
     return () => {
       window.removeEventListener('scroll', onScroll);
@@ -114,32 +116,32 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="relative pt-44 pb-28 px-6 z-10">
-        {/* Background Image with warm overlay */}
-        <div className="absolute inset-0 z-0">
+      {/* Hero with Parallax */}
+      <section className="relative pt-44 pb-28 px-6 z-10 overflow-hidden">
+        {/* Background Image with parallax scroll + Ghost White gradient overlay */}
+        <div className="absolute inset-0 z-0 parallax-hero" style={{ transform: `translateY(${scrollY * 0.3}px)` }}>
           <img 
             src="https://images.pexels.com/photos/1640772/pexels-photo-1640772.jpeg" 
             alt="Fresh meals background" 
-            className="w-full h-full object-cover"
+            className="w-full h-[120%] object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-bg/95 via-bg/85 to-bg" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#F8F8FF]/95 via-[#F8F8FF]/80 to-[#F8F8FF]" />
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10 text-center">
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[1.05] animate-fade-in-up delay-100 text-white">
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[1.05] animate-fade-in-up delay-100 text-[#111118]">
             Premium Local Meals,<br />
             <span className="gradient-text">Delivered to You</span>
           </h1>
-          <p className="text-lg md:text-xl text-white/80 mt-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
+          <p className="text-lg md:text-xl text-[#52525E] mt-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
             Experience kitchen-fresh catering from verified neighborhood chefs. Fast delivery, dynamic menu planning, and premium quality ingredients.
           </p>
           <div className="flex flex-row items-center justify-center gap-4 mt-10 animate-fade-in-up delay-300">
-            <Button size="lg" onClick={() => onNavigate('client')}>
+            <Button size="lg" className="magnetic-hover" onClick={() => onNavigate('client')}>
               Explore Master Menu
             </Button>
-            <Button size="lg" variant="outline" onClick={() => onNavigate('login')}>
+            <Button size="lg" variant="outline" className="magnetic-hover" onClick={() => onNavigate('login')}>
               Grow Your Business
             </Button>
           </div>
@@ -147,7 +149,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       </section>
 
       {/* Client Experience categories section */}
-      <section id="categories" className="py-24 px-6 relative z-10 bg-surface-2/30 border-y border-border">
+      <section id="categories" className="py-24 px-6 relative z-10 border-y border-border/50">
         <div className="max-w-7xl mx-auto">
 
 
@@ -227,7 +229,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               {/* Benefit Icons */}
               <div className="grid gap-6">
                 {benefits.map((b) => (
-                  <div key={b.title} className="flex gap-4 p-4 rounded-2xl bg-surface border border-border">
+                  <div key={b.title} className="flex gap-4 p-4 rounded-2xl frosted-card frosted-glow">
                     <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
                       <b.icon size={20} className="text-accent" />
                     </div>
@@ -244,7 +246,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 <p className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Subscription Pricing Preview</p>
                 <div className="grid sm:grid-cols-3 gap-4">
                   {plans.map((p) => (
-                    <div key={p.name} className="card p-5 bg-surface border border-border relative hover:border-accent/40 transition-colors">
+                    <div key={p.name} className="p-5 rounded-2xl frosted-card frosted-glow relative hover:border-accent/40 transition-colors">
                       <p className="font-bold text-sm uppercase tracking-wider text-muted">{p.name}</p>
                       <p className="text-2xl font-extrabold text-text mt-2">{p.price}</p>
                       <p className="text-xs text-muted mt-1">{p.validity}</p>
@@ -264,7 +266,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12 px-6 bg-surface-2/40 relative z-10">
+      <footer className="border-t border-border/50 py-12 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center">

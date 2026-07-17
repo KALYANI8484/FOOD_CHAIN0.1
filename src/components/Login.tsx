@@ -16,6 +16,12 @@ interface LoginProps {
 const SUPER_ADMIN_EMAIL = '2711vikram@gmail.com';
 const SUPER_ADMIN_PASSWORD = 'Tatwavivek@271';
 
+const SUB_ADMIN_EMAIL = 'kalyani@123';
+const SUB_ADMIN_PASSWORD = '123456';
+
+const VENDOR_EMAIL = 'vendor@123';
+const VENDOR_PASSWORD = '1234567';
+
 const roles: { id: Role; label: string; desc: string; icon: typeof Shield; color: string; gradient: string }[] = [
   { id: 'super_admin', label: 'Super Admin', desc: 'Full platform control', icon: Shield, color: 'text-orange-400', gradient: 'from-orange-500/20 to-red-500/10 border-orange-500/20' },
   { id: 'sub_admin', label: 'Sub-Admin', desc: 'Vendor management', icon: Users, color: 'text-blue-400', gradient: 'from-blue-500/20 to-cyan-500/10 border-blue-500/20' },
@@ -30,7 +36,7 @@ export function Login({ onLogin, onBack }: LoginProps) {
     <div className="min-h-screen bg-bg noise relative overflow-hidden flex items-center justify-center p-6">
       {/* Back to home */}
       {onBack && (
-        <button onClick={onBack} className="absolute top-6 left-6 text-muted hover:text-white transition-colors text-sm flex items-center gap-1.5 group z-10">
+        <button onClick={onBack} className="absolute top-6 left-6 text-muted hover:text-text transition-colors text-sm flex items-center gap-1.5 group z-10">
           <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Home
         </button>
       )}
@@ -119,24 +125,17 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
         onLogin('super_admin', email.trim());
 
       } else if (role === 'sub_admin') {
-        const { data } = await supabase
-          .from('sub_admins')
-          .select('*')
-          .eq('email', email.trim().toLowerCase())
-          .eq('password', password)
-          .maybeSingle();
-        if (!data) { setError('Invalid email or password'); return; }
-        await supabase.from('sub_admins').update({ last_active: new Date().toISOString() }).eq('id', data.id);
+        if (email.trim().toLowerCase() !== SUB_ADMIN_EMAIL || password !== SUB_ADMIN_PASSWORD) {
+          setError('Invalid email or password');
+          return;
+        }
         onLogin('sub_admin', email.trim());
 
       } else if (role === 'vendor') {
-        const { data } = await supabase
-          .from('vendors')
-          .select('*')
-          .eq('phone', email.trim())
-          .eq('status', 'approved')
-          .maybeSingle();
-        if (!data) { setError('No approved vendor found with this phone number'); return; }
+        if (email.trim().toLowerCase() !== VENDOR_EMAIL || password !== VENDOR_PASSWORD) {
+          setError('Invalid email or password');
+          return;
+        }
         onLogin('vendor', email.trim());
 
       } else if (role === 'client') {
@@ -187,23 +186,23 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
             <>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-                  {role === 'vendor' ? 'Phone Number' : 'Email'}
+                  Email
                 </label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                   <input
-                    type={role === 'vendor' ? 'tel' : 'email'}
+                    type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    placeholder={role === 'vendor' ? '+91 registered phone' : role === 'super_admin' ? 'your-email@gmail.com' : 'your@email.com'}
+                    placeholder={role === 'super_admin' ? 'your-email@gmail.com' : 'your@email.com'}
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
                     autoComplete="username"
                   />
                 </div>
               </div>
 
-              {role !== 'vendor' && (
+              {(
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted uppercase tracking-wider">Password</label>
                   <div className="relative">

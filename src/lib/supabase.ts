@@ -123,6 +123,16 @@ export type UpgradeRequest = {
   created_at: string;
 };
 
+export type ClientProfile = {
+  id: string;
+  name: string;
+  phone: string;
+  zip_code: string;
+  landmark: string | null;
+  address: string | null;
+  created_at: string;
+};
+
 class QueryBuilder {
   private table: string;
   private action: 'select' | 'insert' | 'update' | 'delete' = 'select';
