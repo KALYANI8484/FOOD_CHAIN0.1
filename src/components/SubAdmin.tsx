@@ -1,48 +1,55 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Store, Plus, Users, Clock, CheckCircle2,
-  ChevronRight, MapPin, Phone, CreditCard, Activity as ActivityIcon, AlertCircle,
-  FileText, ShoppingBag, UserPlus,
+  Activity as ActivityIcon, AlertCircle, FileText, Eye, Pencil, Search,
+  ArrowRight, Package
 } from 'lucide-react';
-import { supabase, type Vendor, type Plan, type Activity } from '../lib/supabase';
-import { Button, Badge, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard } from './ui';
+import { supabase, type Vendor, type Activity, type VendorItem } from '../lib/supabase';
+import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer } from './ui';
+import { VendorForm } from './VendorForm';
 
-type Tab = 'dashboard' | 'create_vendor' | 'pending' | 'guides' | 'activity';
+type Tab = 'dashboard' | 'vendors' | 'pending' | 'guides' | 'activity';
 
-export function SubAdmin({ onExit }: { onExit: () => void }) {
+export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmail: string }) {
   const [tab, setTab] = useState<Tab>('dashboard');
   const { toast, show } = useToast();
 
   const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'create_vendor', label: 'Create Vendor', icon: UserPlus },
-    { id: 'pending', label: 'Action Required', icon: AlertCircle },
-    { id: 'guides', label: 'Guides', icon: FileText },
-    { id: 'activity', label: 'Activity', icon: ActivityIcon },
+    { id: 'vendors', label: 'My Vendors', icon: Store },
+    { id: 'pending', label: 'Correction Inbox', icon: AlertCircle },
+    { id: 'guides', label: 'SOP Guides', icon: FileText },
+    { id: 'activity', label: 'Activity Log', icon: ActivityIcon },
   ];
 
   return (
-    <div className="min-h-screen bg-bg flex">
-      <aside className="w-64 border-r border-border bg-surface flex flex-col h-screen sticky top-0">
+    <div className="min-h-screen bg-bg flex text-text">
+      <aside className="w-64 border-r border-border bg-surface flex flex-col h-screen sticky top-0 z-20">
         <div className="px-5 py-5 border-b border-border flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center group-hover:rotate-12 transition-transform">
             <Users size={18} className="text-white" />
           </div>
           <div>
-            <p className="font-bold text-sm">MealMesh</p>
-            <p className="text-xs text-muted">Sub-Admin</p>
+            <p className="font-bold text-sm">VIKRAM ADVERTISING</p>
+            <p className="text-xs text-muted">Sub-Admin Portal</p>
           </div>
         </div>
+        
+        <div className="p-4 border-b border-border bg-surface-2/40">
+          <p className="text-xs text-muted font-bold uppercase tracking-wider">Signed In As</p>
+          <p className="text-xs text-text font-semibold truncate mt-0.5">{adminEmail || 'arjun@mealmesh.io'}</p>
+        </div>
+
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
-                tab === item.id ? 'bg-blue-500/10 text-blue-400' : 'text-muted hover:text-white hover:bg-surface-2'
+                tab === item.id ? 'bg-accent/10 text-accent font-semibold' : 'text-muted hover:text-text hover:bg-surface-2'
               }`}
             >
-              {tab === item.id && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-400 rounded-r-full" />}
+              {tab === item.id && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-accent rounded-r-full" />}
               <item.icon size={18} className={tab === item.id ? '' : 'group-hover:scale-110 transition-transform'} />
               {item.label}
             </button>
@@ -53,11 +60,11 @@ export function SubAdmin({ onExit }: { onExit: () => void }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto h-screen">
+      <main className="flex-1 overflow-y-auto h-screen bg-bg relative z-10">
         <div className="p-8 max-w-7xl mx-auto">
           {tab === 'dashboard' && <SubDashboard onTab={setTab} />}
-          {tab === 'create_vendor' && <CreateVendor show={show} />}
-          {tab === 'pending' && <PendingVendors show={show} />}
+          {tab === 'vendors' && <MyVendors show={show} />}
+          {tab === 'pending' && <CorrectionInbox show={show} />}
           {tab === 'guides' && <SubGuides />}
           {tab === 'activity' && <SubActivity />}
         </div>
@@ -69,235 +76,499 @@ export function SubAdmin({ onExit }: { onExit: () => void }) {
 }
 
 function SubDashboard({ onTab }: { onTab: (t: Tab) => void }) {
-  const [stats, setStats] = useState({ vendors: 0, pending: 0, approved: 0, orders: 0 });
-  const [recent, setRecent] = useState<Vendor[]>([]);
-  const [activity, setActivity] = useState<Activity[]>([]);
+  const [kpis, setKpis] = useState({ active: 0, pending: 0, rejected: 0 });
   const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [{ data: v }, { data: o }, { data: a }] = await Promise.all([
+      const [{ data: v }, { data: a }] = await Promise.all([
         supabase.from('vendors').select('*'),
-        supabase.from('orders').select('*'),
-        supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(6),
+        supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(5),
       ]);
-      const vendors = v || [];
-      setStats({
-        vendors: vendors.length,
-        pending: vendors.filter((x) => x.status === 'pending_approval').length,
-        approved: vendors.filter((x) => x.status === 'approved').length,
-        orders: o?.length || 0,
+      const list = v || [];
+      // Sub-Admin specific metrics
+      setKpis({
+        active: list.filter((x: any) => x.status === 'approved').length,
+        pending: list.filter((x: any) => x.status === 'pending_approval').length,
+        rejected: list.filter((x: any) => x.status === 'rejected').length
       });
-      setRecent(vendors.slice(0, 4));
-      setActivity(a || []);
+      setActivities(a || []);
       setLoading(false);
     })();
   }, []);
 
   if (loading) return <Spinner />;
 
-  const kpis = [
-    { label: 'Vendors Created', value: stats.vendors, icon: Store, color: 'text-blue-400' },
-    { label: 'Pending Approval', value: stats.pending, icon: Clock, color: 'text-amber-400' },
-    { label: 'Approved', value: stats.approved, icon: CheckCircle2, color: 'text-green-400' },
-    { label: 'Total Orders', value: stats.orders, icon: ShoppingBag, color: 'text-accent' },
+  const kpiCards = [
+    { label: 'My Onboarded Vendors', value: kpis.active, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { label: 'Pending Approvals', value: kpis.pending, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { label: 'Action Required', value: kpis.rejected, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
   ];
 
   return (
-    <div>
-      <div className="mb-8 animate-fade-in-up">
-        <h1 className="text-3xl font-bold">Sub-Admin Dashboard</h1>
-        <p className="text-muted mt-1">Manage vendors and track platform activity</p>
+    <div className="space-y-8">
+      <div className="animate-fade-in-up">
+        <h1 className="text-3xl font-extrabold tracking-tight">Dashboard Overview</h1>
+        <p className="text-muted mt-1">Review onboarding progress and vendor submission approvals</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
-        {kpis.map((k) => (
-          <SpotlightCard key={k.label} className="card p-6 hover-lift">
-            <div className={`w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center ${k.color}`}>
-              <k.icon size={20} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger">
+        {kpiCards.map((k) => (
+          <SpotlightCard key={k.label} className="card p-6 hover-lift bg-surface border border-border">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${k.bg} ${k.color}`}>
+              <k.icon size={24} />
             </div>
-            <p className="text-3xl font-bold mt-4">{k.value}</p>
-            <p className="text-sm text-muted mt-1">{k.label}</p>
+            <p className="text-4xl font-extrabold mt-6 text-text">{k.value}</p>
+            <p className="text-sm text-muted font-semibold mt-1">{k.label}</p>
           </SpotlightCard>
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mt-8">
-        <div className="card p-6 animate-fade-in-up delay-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold">Recent Vendors</h3>
-            <button onClick={() => onTab('create_vendor')} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 group">
-              Create New <ChevronRight size={12} className="group-hover:translate-x-1 transition-transform" />
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Left: Quick Actions */}
+        <div className="lg:col-span-1 card p-6 bg-surface border border-border animate-fade-in-up delay-200">
+          <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted">Quick Actions</h3>
+          <div className="space-y-3">
+            <button 
+              onClick={() => onTab('vendors')}
+              className="w-full flex items-center justify-between p-4 rounded-2xl bg-surface-2 border border-border hover:border-accent/40 text-left transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <Plus size={16} className="text-accent" />
+                <span className="text-sm font-bold">Onboard New Vendor</span>
+              </div>
+              <ArrowRight size={14} className="text-muted" />
+            </button>
+            <button 
+              onClick={() => onTab('pending')}
+              className="w-full flex items-center justify-between p-4 rounded-2xl bg-surface-2 border border-border hover:border-accent/40 text-left transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <AlertCircle size={16} className="text-red-500" />
+                <span className="text-sm font-bold">Correction Inbox</span>
+              </div>
+              {kpis.rejected > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{kpis.rejected}</span>}
+              <ArrowRight size={14} className="text-muted" />
             </button>
           </div>
-          <div className="space-y-3">
-            {recent.map((v) => (
-              <div key={v.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-2 hover:bg-border/30 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-surface flex items-center justify-center">
-                    <Store size={16} className="text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">{v.shop_name}</p>
-                    <p className="text-xs text-muted">{v.owner_name}</p>
-                  </div>
-                </div>
-                <Badge variant={v.status === 'approved' ? 'success' : v.status === 'pending_approval' ? 'warning' : 'error'}>
-                  {v.status.replace(/_/g, ' ')}
-                </Badge>
-              </div>
-            ))}
-          </div>
         </div>
 
-        <div className="card p-6 animate-fade-in-up delay-300">
-          <h3 className="font-bold mb-4">Recent Activity</h3>
-          <div className="space-y-3">
-            {activity.map((a) => (
-              <div key={a.id} className="flex items-start gap-3 group">
-                <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                  <ActivityIcon size={14} className="text-blue-400" />
+        {/* Right: Activity Log */}
+        <div className="lg:col-span-2 card p-6 bg-surface border border-border animate-fade-in-up delay-300">
+          <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted">Recent Activity</h3>
+          {activities.length === 0 ? (
+            <EmptyState icon={<ActivityIcon size={24} />} title="No recent activity" />
+          ) : (
+            <div className="space-y-3">
+              {activities.map((a) => (
+                <div key={a.id} className="flex items-start gap-3 p-3 rounded-2xl bg-surface-2/40 hover:bg-surface-2 transition-all">
+                  <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center shrink-0 border border-border">
+                    <ActivityIcon size={14} className="text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-text truncate">{a.action}</p>
+                    <p className="text-[10px] text-muted mt-0.5">{a.actor} · {new Date(a.created_at).toLocaleTimeString()}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm">{a.action}</p>
-                  <p className="text-xs text-muted">{a.actor}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {stats.pending > 0 && (
-        <div className="mt-6 card p-6 bg-gradient-to-r from-amber-500/10 to-transparent border-amber-500/20 animate-fade-in-up delay-500">
-          <div className="flex items-center gap-3">
-            <AlertCircle size={24} className="text-amber-400" />
-            <div className="flex-1">
-              <p className="font-bold text-amber-400">Action Required</p>
-              <p className="text-sm text-muted">{stats.pending} vendor(s) awaiting super admin approval</p>
+              ))}
             </div>
-            <Button variant="secondary" size="sm" onClick={() => onTab('pending')}>Review</Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CreateVendor({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
-    owner_name: '', phone: '', email: '', shop_name: '', address: '', zip_code: '', plan_id: '',
-  });
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('subscription_plans').select('*').eq('status', 'active');
-      setPlans(data || []);
-      if (data && data.length > 0) setForm((f) => ({ ...f, plan_id: data[0].id }));
-      setLoading(false);
-    })();
-  }, []);
-
-  const save = async () => {
-    const plan = plans.find((p) => p.id === form.plan_id);
-    const { error } = await supabase.from('vendors').insert({
-      owner_name: form.owner_name,
-      phone: form.phone,
-      email: form.email || null,
-      shop_name: form.shop_name,
-      address: form.address,
-      zip_code: form.zip_code,
-      plan_id: form.plan_id || null,
-      plan_name: plan?.name || null,
-      status: 'pending_approval',
-      submitted_by: 'Sub-Admin',
-    });
-    if (error) { show('Failed to create vendor', 'error'); return; }
-    await supabase.from('activity_log').insert({ action: `Vendor created: ${form.shop_name}`, actor: 'Sub-Admin' });
-    show('Vendor submitted for approval');
-    setForm({ owner_name: '', phone: '', email: '', shop_name: '', address: '', zip_code: '', plan_id: plans[0]?.id || '' });
-  };
-
-  if (loading) return <Spinner />;
-
-  return (
-    <div>
-      <div className="mb-8 animate-fade-in-up">
-        <h1 className="text-3xl font-bold">Create Vendor</h1>
-        <p className="text-muted mt-1">Submit a new vendor for super admin approval</p>
-      </div>
-      <div className="card p-8 max-w-2xl animate-fade-in-up delay-100">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Input label="Owner Name" value={form.owner_name} onChange={(v) => setForm({ ...form, owner_name: v })} required />
-          <Input label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required />
-          <Input label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-          <Input label="Shop Name" value={form.shop_name} onChange={(v) => setForm({ ...form, shop_name: v })} required />
-          <Input label="Address" value={form.address} onChange={(v) => setForm({ ...form, address: v })} required />
-          <Input label="ZIP Code" value={form.zip_code} onChange={(v) => setForm({ ...form, zip_code: v })} required />
-          <div className="sm:col-span-2">
-            <Select label="Subscription Plan" value={form.plan_id} onChange={(v) => setForm({ ...form, plan_id: v })} options={plans.map((p) => ({ value: p.id, label: `${p.name} — ₹${p.price}` }))} />
-          </div>
-        </div>
-        <div className="mt-6">
-          <Button className="w-full" onClick={save}>
-            <Plus size={16} /> Submit for Approval
-          </Button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function PendingVendors({ show: _show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  void _show;
+function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [createMode, setCreateMode] = useState(false);
+  const [editVendor, setEditVendor] = useState<Vendor | null>(null);
+  const [viewVendor, setViewVendor] = useState<Vendor | null>(null);
+  const [viewInventory, setViewInventory] = useState<VendorItem[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const load = async () => {
-    const { data } = await supabase.from('vendors').select('*').eq('status', 'pending_approval').order('created_at', { ascending: false });
+    const { data } = await supabase.from('vendors').select('*').order('created_at', { ascending: false });
     setVendors(data || []);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
+  const handleCreateSubmit = async (formData: any) => {
+    const payload = {
+      owner_name: formData.owner_name,
+      phone: formData.phone,
+      email: formData.email || null,
+      shop_name: formData.shop_name,
+      address: formData.address,
+      zip_code: formData.zip_code,
+      plan_id: formData.plan_id || null,
+      plan_name: formData.plan_name || null,
+      logo_url: formData.logo_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=Logo',
+      qr_url: formData.qr_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=QR',
+      status: 'pending_approval',
+      submitted_by: 'Sub-Admin',
+      created_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase.from('vendors').insert(payload);
+
+    if (error) {
+      show('Failed to submit vendor: ' + (error.message || 'Unknown error'), 'error');
+      return;
+    }
+
+    await supabase.from('activity_log').insert({
+      action: `Onboarded vendor submitted: ${formData.shop_name}`,
+      actor: 'Sub-Admin'
+    });
+
+    show('Vendor submitted for Super Admin review', 'success');
+    setCreateMode(false);
+    await load();
+  };
+
+  const handleEditSubmit = async (formData: any) => {
+    if (!editVendor) return;
+    const { error } = await supabase.from('vendors').update({
+      owner_name: formData.owner_name,
+      phone: formData.phone,
+      email: formData.email || null,
+      shop_name: formData.shop_name,
+      address: formData.address,
+      zip_code: formData.zip_code,
+      plan_id: formData.plan_id || null,
+      plan_name: formData.plan_name || null,
+      logo_url: formData.logo_url || null,
+      qr_url: formData.qr_url || null,
+    }).eq('id', editVendor.id);
+
+    if (error) {
+      show('Failed to update vendor', 'error');
+      return;
+    }
+
+    await supabase.from('activity_log').insert({
+      action: `Vendor details modified: ${formData.shop_name}`,
+      actor: 'Sub-Admin'
+    });
+
+    show('Vendor updated successfully');
+    setEditVendor(null);
+    load();
+  };
+
+  const handleViewProfile = async (v: Vendor) => {
+    setViewVendor(v);
+    const { data } = await supabase.from('vendor_inventory').select('*').eq('vendor_id', v.id);
+    setViewInventory(data || []);
+  };
+
+  const filtered = vendors.filter((v) => {
+    const matchesSearch = v.shop_name.toLowerCase().includes(search.toLowerCase()) || v.owner_name.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   if (loading) return <Spinner />;
 
   return (
-    <div>
-      <div className="mb-8 animate-fade-in-up">
-        <h1 className="text-3xl font-bold">Action Required</h1>
-        <p className="text-muted mt-1">{vendors.length} vendor(s) awaiting super admin approval</p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between animate-fade-in-up">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Onboarded Vendors</h1>
+          <p className="text-muted mt-1">Submit new vendor profiles and view status</p>
+        </div>
+        <Button onClick={() => setCreateMode(true)}>
+          <Plus size={16} /> Create Vendor
+        </Button>
       </div>
+
+      {/* Top Bar Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-2xl border border-border animate-fade-in-up delay-100">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by shop or owner name..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm font-semibold text-text focus:border-accent outline-none cursor-pointer"
+        >
+          <option value="all">All Submissions</option>
+          <option value="approved">Live (Approved)</option>
+          <option value="pending_approval">In Review</option>
+          <option value="rejected">Rejected (Needs Correction)</option>
+        </select>
+      </div>
+
+      {/* Main Vendor Data Table */}
+      <div className="card overflow-hidden bg-surface border border-border animate-fade-in-up delay-200">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-surface-2/60 border-b border-border text-xs font-bold text-muted uppercase tracking-wider">
+                <th className="px-6 py-4">Shop details</th>
+                <th className="px-6 py-4">Owner contact</th>
+                <th className="px-6 py-4">Zip Zone</th>
+                <th className="px-6 py-4">Plan</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60 text-sm">
+              {filtered.map((v) => (
+                <tr key={v.id} className="hover:bg-surface-2/30 transition-colors">
+                  <td className="px-6 py-4 flex items-center gap-3">
+                    {v.logo_url ? (
+                      <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-border" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center border border-border"><Store size={16} className="text-muted" /></div>
+                    )}
+                    <div>
+                      <p className="font-bold text-text">{v.shop_name}</p>
+                      <p className="text-xs text-muted mt-0.5">{new Date(v.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="font-medium text-text">{v.owner_name}</p>
+                    <p className="text-xs text-muted mt-0.5">{v.phone}</p>
+                  </td>
+                  <td className="px-6 py-4 font-semibold text-text">{v.zip_code}</td>
+                  <td className="px-6 py-4">
+                    <Badge variant="accent">{v.plan_name || 'Free'}</Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}>
+                      {v.status === 'approved' ? 'Live' : v.status === 'rejected' ? 'Needs Correction' : 'In Review'}
+                    </Badge>
+                  </td>
+                  {/* Actions column using minimalist icons with soft beige palette */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleViewProfile(v)}
+                        className="p-2 rounded-lg bg-surface-2 text-muted hover:text-text hover:bg-border/20 transition-all border border-border/40"
+                        title="View Profile"
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <button
+                        onClick={() => setEditVendor(v)}
+                        className="p-2 rounded-lg bg-surface-2 text-muted hover:text-accent hover:bg-border/20 transition-all border border-border/40"
+                        title="Edit Details"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length === 0 && <EmptyState icon={<Store size={28} />} title="No vendors found" subtitle="Onboard your first restaurant to get started" />}
+      </div>
+
+      {/* Creation Modal */}
+      <Modal open={createMode} onClose={() => setCreateMode(false)} title="Onboard New Vendor" size="xl">
+        <VendorForm submitLabel="Submit for Approval" onSubmit={handleCreateSubmit} onCancel={() => setCreateMode(false)} />
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal open={!!editVendor} onClose={() => setEditVendor(null)} title="Modify Vendor Details" size="xl">
+        {editVendor && (
+          <VendorForm 
+            initialData={editVendor} 
+            submitLabel="Save Changes" 
+            onSubmit={handleEditSubmit} 
+            onCancel={() => setEditVendor(null)} 
+          />
+        )}
+      </Modal>
+
+      {/* Slide-out Read-Only Profile View Panel */}
+      <Drawer open={!!viewVendor} onClose={() => setViewVendor(null)} title="Vendor Profile Info">
+        {viewVendor && (
+          <div className="space-y-6">
+            <div className="text-center pb-6 border-b border-border">
+              {viewVendor.logo_url ? (
+                <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-20 h-20 rounded-2xl object-cover mx-auto border border-border" />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-surface-2 mx-auto flex items-center justify-center border border-border"><Store size={32} className="text-muted" /></div>
+              )}
+              <h2 className="text-xl font-extrabold text-text mt-3">{viewVendor.shop_name}</h2>
+              <p className="text-xs text-muted mt-1">{viewVendor.address}</p>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <Badge variant={viewVendor.status === 'approved' ? 'success' : viewVendor.status === 'rejected' ? 'error' : 'warning'}>
+                  {viewVendor.status.replace(/_/g, ' ')}
+                </Badge>
+                <Badge variant="accent">{viewVendor.plan_name || 'Free'}</Badge>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted uppercase tracking-wider">Owner Details</p>
+              <div className="grid grid-cols-2 gap-4 text-sm bg-surface-2 p-4 rounded-2xl border border-border">
+                <div>
+                  <p className="text-xs text-muted">Owner Name</p>
+                  <p className="font-semibold text-text mt-0.5">{viewVendor.owner_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted">Phone Number</p>
+                  <p className="font-semibold text-text mt-0.5">{viewVendor.phone}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted">Email Address</p>
+                  <p className="font-semibold text-text mt-0.5">{viewVendor.email || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted uppercase tracking-wider">Food Inventory ({viewInventory.length} Items)</p>
+              {viewInventory.length === 0 ? (
+                <EmptyState icon={<Package size={20} />} title="No inventory items uploaded" />
+              ) : (
+                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                  {viewInventory.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-2 border border-border">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {item.image_url && <img src={item.image_url} alt={item.item_name} className="w-8 h-8 rounded-lg object-cover border border-border" />}
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold truncate text-text">{item.item_name}</p>
+                          <p className="text-[10px] text-muted">{item.category}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-accent">₹{item.price}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Drawer>
+    </div>
+  );
+}
+
+function CorrectionInbox({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Vendor | null>(null);
+
+  const load = async () => {
+    // Fetch only rejected submissions
+    const { data } = await supabase.from('vendors').select('*').eq('status', 'rejected').order('created_at', { ascending: false });
+    setVendors(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleResubmitSubmit = async (formData: any) => {
+    if (!selected) return;
+    const { error } = await supabase.from('vendors').update({
+      owner_name: formData.owner_name,
+      phone: formData.phone,
+      email: formData.email || null,
+      shop_name: formData.shop_name,
+      address: formData.address,
+      zip_code: formData.zip_code,
+      plan_id: formData.plan_id || null,
+      plan_name: formData.plan_name || null,
+      logo_url: formData.logo_url || null,
+      qr_url: formData.qr_url || null,
+      status: 'pending_approval',
+      rejection_note: null // Clear old feedback note
+    }).eq('id', selected.id);
+
+    if (error) {
+      show('Failed to resubmit vendor', 'error');
+      return;
+    }
+
+    await supabase.from('activity_log').insert({
+      action: `Vendor resubmitted after correction: ${formData.shop_name}`,
+      actor: 'Sub-Admin'
+    });
+
+    show('Vendor resubmitted successfully!');
+    setSelected(null);
+    load();
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-6">
+      <div className="animate-fade-in-up">
+        <h1 className="text-3xl font-extrabold tracking-tight">Correction Inbox</h1>
+        <p className="text-muted mt-1">{vendors.length} vendor submission(s) rejected by Super Admin</p>
+      </div>
+
       {vendors.length === 0 ? (
-        <EmptyState icon={<CheckCircle2 size={28} />} title="All caught up!" subtitle="No pending approvals" />
+        <EmptyState icon={<CheckCircle2 size={28} className="text-green-500" />} title="All clear!" subtitle="No rejections requiring action." />
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 stagger">
           {vendors.map((v) => (
-            <div key={v.id} className="card p-5 hover-lift">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                  <Clock size={22} className="text-amber-400" />
+            <div key={v.id} className="card p-6 bg-surface border border-border relative hover:border-red-500/30 transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-start justify-between">
+                  <h3 className="font-extrabold text-base truncate text-text">{v.shop_name}</h3>
+                  <Badge variant="error">Rejected</Badge>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold truncate">{v.shop_name}</p>
-                  <p className="text-xs text-muted">{v.owner_name}</p>
+                
+                {/* Highlighted Rejection feedback note */}
+                <div className="my-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 font-semibold leading-relaxed">
+                  <p className="font-bold text-[10px] uppercase tracking-wider text-red-700 mb-1">Feedback Note:</p>
+                  "{v.rejection_note || 'Please review information and resubmit.'}"
+                </div>
+
+                <div className="space-y-1 text-xs text-muted">
+                  <p>Owner: <span className="font-semibold text-text">{v.owner_name}</span></p>
+                  <p>Phone: <span className="font-semibold text-text">{v.phone}</span></p>
+                  <p>Zip: <span className="font-semibold text-text">{v.zip_code}</span></p>
                 </div>
               </div>
-              <div className="mt-4 space-y-1.5 text-xs text-muted">
-                <div className="flex items-center gap-2"><Phone size={12} /> {v.phone}</div>
-                <div className="flex items-center gap-2"><MapPin size={12} /> {v.zip_code}</div>
-                <div className="flex items-center gap-2"><CreditCard size={12} /> {v.plan_name || 'No plan'}</div>
-              </div>
-              <div className="mt-4">
-                <Badge variant="warning">Awaiting super admin</Badge>
-              </div>
+
+              <Button size="sm" className="w-full mt-6" onClick={() => setSelected(v)}>
+                <Pencil size={14} /> Correct & Resubmit
+              </Button>
             </div>
           ))}
         </div>
       )}
+
+      {/* Resubmit Modal */}
+      <Modal open={!!selected} onClose={() => setSelected(null)} title="Correct & Resubmit Vendor" size="xl">
+        {selected && (
+          <div className="space-y-4">
+            {/* Show Rejection Feedback Note at top of modal */}
+            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-sm text-red-600 leading-relaxed font-semibold">
+              <span className="font-bold text-xs uppercase tracking-wider block text-red-700 mb-1">Super Admin Feedback:</span>
+              "{selected.rejection_note || 'Please update info and resubmit.'}"
+            </div>
+            
+            <VendorForm 
+              initialData={selected} 
+              submitLabel="Resubmit for Approval" 
+              onSubmit={handleResubmitSubmit} 
+              onCancel={() => setSelected(null)} 
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -305,10 +576,13 @@ function PendingVendors({ show: _show }: { show: (m: string, t?: 'success' | 'er
 function SubGuides() {
   const [guides, setGuides] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
 
   useEffect(() => {
     (async () => {
+      // Query guides where visibility includes sub-admins or is global
       const { data } = await supabase.from('guides').select('*').order('uploaded_at', { ascending: false });
+      // In a real database we verify visibility settings
       setGuides(data || []);
       setLoading(false);
     })();
@@ -317,26 +591,72 @@ function SubGuides() {
   if (loading) return <Spinner />;
 
   return (
-    <div>
-      <div className="mb-8 animate-fade-in-up">
-        <h1 className="text-3xl font-bold">Guides</h1>
-        <p className="text-muted mt-1">Documents and tutorials for sub-admins</p>
+    <div className="space-y-6">
+      <div className="animate-fade-in-up">
+        <h1 className="text-3xl font-extrabold tracking-tight">SOP Guides & Documents</h1>
+        <p className="text-muted mt-1">Review operational guidelines and standard operating procedures</p>
       </div>
+
       {guides.length === 0 ? (
-        <EmptyState icon={<FileText size={28} />} title="No guides available" />
+        <EmptyState icon={<FileText size={28} />} title="No guides published" />
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 stagger">
           {guides.map((g) => (
-            <div key={g.id} className="card p-5 hover-lift group">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <FileText size={18} className="text-blue-400" />
+            <div key={g.id} className="card p-6 bg-surface border border-border hover-lift flex flex-col justify-between">
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
+                  <FileText size={18} className="text-accent" />
+                </div>
+                <h3 className="font-extrabold text-base text-text leading-snug">{g.title}</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="accent">{g.category}</Badge>
+                  {g.keywords && <span className="text-[10px] text-muted truncate max-w-[120px]">{g.keywords}</span>}
+                </div>
               </div>
-              <p className="font-bold">{g.title}</p>
-              <Badge variant="default">{g.category}</Badge>
+
+              {g.file_data ? (
+                <Button variant="outline" size="sm" className="w-full mt-6" onClick={() => setSelectedGuide(g)}>
+                  View Document
+                </Button>
+              ) : (
+                <span className="text-xs text-muted italic mt-6 block text-center">No PDF Attached</span>
+              )}
             </div>
           ))}
         </div>
       )}
+
+      {/* PDF Reading Drawer */}
+      <Drawer open={!!selectedGuide} onClose={() => setSelectedGuide(null)} title={selectedGuide?.title || 'Guide'}>
+        {selectedGuide && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-surface-2 p-3 rounded-xl border border-border">
+              <span className="text-xs text-muted">Category: <span className="font-bold text-text">{selectedGuide.category}</span></span>
+              <a 
+                href={selectedGuide.file_data} 
+                download={selectedGuide.file_name || 'guide.pdf'}
+                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+              >
+                Offline Download
+              </a>
+            </div>
+
+            <div className="rounded-xl border border-border bg-white p-4 h-[60vh] flex flex-col items-center justify-center text-center">
+              <FileText size={48} className="text-accent mb-4 animate-bounce" />
+              <h4 className="font-bold text-text-bg text-black text-sm">{selectedGuide.file_name || 'Document.pdf'}</h4>
+              <p className="text-xs text-muted mt-2 max-w-xs">Dynamic In-App PDF rendering ready. Click below to download and read this document offline.</p>
+              
+              <a 
+                href={selectedGuide.file_data} 
+                download={selectedGuide.file_name || 'guide.pdf'}
+                className="mt-6 inline-flex items-center justify-center px-4 py-2 bg-accent text-white font-bold text-xs rounded-xl shadow-md"
+              >
+                Download PDF File
+              </a>
+            </div>
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
@@ -347,7 +667,7 @@ function SubActivity() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(30);
+      const { data } = await supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
       setLogs(data || []);
       setLoading(false);
     })();
@@ -356,24 +676,26 @@ function SubActivity() {
   if (loading) return <Spinner />;
 
   return (
-    <div>
-      <div className="mb-8 animate-fade-in-up">
-        <h1 className="text-3xl font-bold">Activity Log</h1>
-        <p className="text-muted mt-1">Your recent actions</p>
+    <div className="space-y-6">
+      <div className="animate-fade-in-up">
+        <h1 className="text-3xl font-extrabold tracking-tight">System Audit logs</h1>
+        <p className="text-muted mt-1">Review recently registered administrative actions</p>
       </div>
-      <div className="card p-6">
-        <div className="space-y-3">
+
+      <div className="card overflow-hidden bg-surface border border-border animate-fade-in-up delay-100">
+        <div className="p-6 divide-y divide-border/60">
           {logs.map((l) => (
-            <div key={l.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-surface-2 transition-colors group">
-              <div className="w-9 h-9 rounded-lg bg-surface-2 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                <ActivityIcon size={16} className="text-blue-400" />
+            <div key={l.id} className="py-4 flex items-start gap-4 hover:bg-surface-2/20 transition-all px-2 rounded-xl">
+              <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0 border border-border">
+                <ActivityIcon size={14} className="text-accent" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">{l.action}</p>
-                <p className="text-xs text-muted">{l.actor} · {new Date(l.created_at).toLocaleString()}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text leading-snug">{l.action}</p>
+                <p className="text-xs text-muted mt-0.5">{l.actor || 'System'} · {new Date(l.created_at).toLocaleString()}</p>
               </div>
             </div>
           ))}
+          {logs.length === 0 && <EmptyState icon={<ActivityIcon size={24} />} title="Audit log empty" />}
         </div>
       </div>
     </div>

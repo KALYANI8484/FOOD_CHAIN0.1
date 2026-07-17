@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react';
 import {
-  UtensilsCrossed, ShoppingBag, Shield, Zap, ArrowRight,
-  ChevronRight, MapPin, Clock, TrendingUp, Users, Store, Sparkles, CheckCircle2,
+  UtensilsCrossed, Zap, ArrowRight,
+  Clock, TrendingUp, Store, Lock
 } from 'lucide-react';
-import { Button, Badge, SpotlightCard } from './ui';
+import { Button, Badge, Modal, Input } from './ui';
 
-type Role = 'landing' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
+type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
 export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const [showRegModal, setShowRegModal] = useState(false);
+  
+  // Registration Form State (exactly 4 fields)
+  const [regForm, setRegForm] = useState({
+    name: '',
+    landmark: '',
+    zipCode: '',
+    address: ''
+  });
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -22,84 +32,59 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
     };
   }, []);
 
-  const stats = [
-    { label: 'Active Vendors', value: '2,400+', icon: Store },
-    { label: 'Orders Delivered', value: '1.8M+', icon: ShoppingBag },
-    { label: 'Cities Served', value: '120', icon: MapPin },
-    { label: 'Avg. Delivery', value: '24 min', icon: Clock },
-  ];
-
   const categories = [
-    { name: 'Pizza', img: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg', count: 340 },
-    { name: 'Burgers', img: 'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg', count: 210 },
-    { name: 'Indian', img: 'https://images.pexels.com/photos/7625056/pexels-photo-7625056.jpeg', count: 520 },
-    { name: 'Noodles', img: 'https://images.pexels.com/photos/4518843/pexels-photo-4518843.jpeg', count: 180 },
-    { name: 'Salads', img: 'https://images.pexels.com/photos/1213710/pexels-photo-1213710.jpeg', count: 95 },
-    { name: 'Desserts', img: 'https://images.pexels.com/photos/2069483/pexels-photo-2069483.jpeg', count: 150 },
+    { name: 'Tiffin', img: 'https://images.pexels.com/photos/9585644/pexels-photo-9585644.jpeg', price: '₹99' },
+    { name: 'Breakfast', img: 'https://images.pexels.com/photos/5560700/pexels-photo-5560700.jpeg', price: '₹59' },
+    { name: 'Lunch/Dinner', img: 'https://images.pexels.com/photos/1624487/pexels-photo-1624487.jpeg', price: '₹149' },
+    { name: 'Vegetables', img: 'https://images.pexels.com/photos/1458691/pexels-photo-1458691.jpeg', price: '₹39' },
+    { name: 'Thali', img: 'https://images.pexels.com/photos/9585643/pexels-photo-9585643.jpeg', price: '₹179' },
   ];
 
-  const features = [
-    { icon: Zap, title: 'Lightning Orders', desc: 'Real-time order radar with instant acceptance and OTP-verified delivery.' },
-    { icon: Shield, title: 'Secure Platform', desc: 'Row-level security, encrypted data, and role-based access for every user.' },
-    { icon: TrendingUp, title: 'Vendor Analytics', desc: 'Live KPIs, revenue tracking, and inventory management in one dashboard.' },
-    { icon: Users, title: 'Multi-Role System', desc: 'Super Admin, Sub-Admin, Vendor, and Client — each with a tailored experience.' },
+  const benefits = [
+    { icon: Zap, title: 'Manage Inventory', desc: 'Add, update or remove dishes instantly matching master templates.' },
+    { icon: TrendingUp, title: 'Dynamic Pricing', desc: 'Set custom prices and quantity limits dynamically based on demand.' },
+    { icon: Clock, title: 'Instant Order Notifications', desc: 'Get live sound pings and countdown radars for incoming client orders.' },
   ];
 
-  const roles = [
-    {
-      id: 'super_admin' as Role,
-      title: 'Super Admin',
-      desc: 'Full platform control — manage vendors, plans, inventory, and settings.',
-      icon: Shield,
-      color: 'from-orange-500/20 to-red-500/10',
-      border: 'hover:border-orange-500/40',
-    },
-    {
-      id: 'sub_admin' as Role,
-      title: 'Sub-Admin',
-      desc: 'Create and manage vendors, handle approvals, and track activity.',
-      icon: Users,
-      color: 'from-blue-500/20 to-cyan-500/10',
-      border: 'hover:border-blue-500/40',
-    },
-    {
-      id: 'vendor' as Role,
-      title: 'Vendor',
-      desc: 'Order radar, inventory, KPIs, and plan management for your business.',
-      icon: Store,
-      color: 'from-green-500/20 to-emerald-500/10',
-      border: 'hover:border-green-500/40',
-    },
-    {
-      id: 'client' as Role,
-      title: 'Client',
-      desc: 'Browse restaurants, order food, and track delivery in real-time.',
-      icon: ShoppingBag,
-      color: 'from-purple-500/20 to-pink-500/10',
-      border: 'hover:border-purple-500/40',
-    },
+  const plans = [
+    { name: 'Free', price: '₹0', validity: '30 Days', items: '5 Items', clients: '10 Clients', desc: 'Perfect for trial runs' },
+    { name: 'Starter', price: '₹499', validity: '30 Days', items: '10 Items', clients: '30 Clients', desc: 'For growing local kitchens' },
+    { name: 'Premium', price: '₹1,499', validity: '90 Days', items: '30 Items', clients: '100 Clients', desc: 'Maximum reach and support' },
   ];
+
+  const handleRegisterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regForm.name || !regForm.landmark || !regForm.zipCode || !regForm.address) {
+      alert('All registration fields are required.');
+      return;
+    }
+    // Route to client view passing the Zip Code as location gate
+    setShowRegModal(false);
+    onNavigate('client');
+  };
+
+
 
   return (
-    <div className="min-h-screen bg-bg noise relative overflow-hidden">
-      {/* Animated gradient orbs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+    <div className="min-h-screen bg-bg noise relative overflow-hidden text-text">
+      {/* Ambient glows */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div
-          className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] transition-transform duration-1000"
+          className="absolute w-[600px] h-[600px] rounded-full opacity-10 blur-[130px] transition-transform duration-1000"
           style={{
-            background: 'radial-gradient(circle, #ff6b35, transparent 70%)',
-            transform: `translate(${mousePos.x * 0.02}px, ${mousePos.y * 0.02}px)`,
-            top: '-100px',
-            left: '-100px',
+            background: 'radial-gradient(circle, #A0A0D0, transparent 70%)',
+            transform: `translate(${mousePos.x * 0.01}px, ${mousePos.y * 0.01}px)`,
+            top: '-200px',
+            left: '-200px',
           }}
         />
         <div
-          className="absolute w-[400px] h-[400px] rounded-full opacity-15 blur-[100px] transition-transform duration-1000"
+          className="absolute w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] transition-transform duration-1000"
           style={{
-            background: 'radial-gradient(circle, #ff9f1c, transparent 70%)',
-            transform: `translate(${mousePos.x * -0.03}px, ${mousePos.y * -0.03}px)`,
-            bottom: '0',
-            right: '-50px',
+            background: 'radial-gradient(circle, #8888BB, transparent 70%)',
+            transform: `translate(${mousePos.x * -0.015}px, ${mousePos.y * -0.015}px)`,
+            bottom: '-100px',
+            right: '-100px',
           }}
         />
       </div>
@@ -111,210 +96,243 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
               <UtensilsCrossed size={18} className="text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight">MealMesh</span>
+            <span className="text-xl font-bold tracking-tight text-[#111118]">VIKRAM ADVERTISING</span>
           </div>
-          <div className="hidden md:flex items-center gap-8 text-sm text-muted">
-            <a href="#features" className="hover:text-white transition-colors relative group">
-              Features
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-accent group-hover:w-full transition-all duration-300" />
-            </a>
-            <a href="#categories" className="hover:text-white transition-colors relative group">
-              Categories
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-accent group-hover:w-full transition-all duration-300" />
-            </a>
-            <a href="#roles" className="hover:text-white transition-colors relative group">
-              Roles
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-accent group-hover:w-full transition-all duration-300" />
-            </a>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => onNavigate('vendor')}>For Vendors</Button>
-            <Button size="sm" onClick={() => onNavigate('client')}>
-              Order Now <ArrowRight size={14} />
+          
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => onNavigate('login')}
+              className="text-sm font-semibold text-muted hover:text-text transition-colors flex items-center gap-1.5"
+            >
+              <Lock size={14} className="text-accent" />
+              <span>Team Sign-In</span>
+            </button>
+            <Button size="sm" onClick={() => setShowRegModal(true)}>
+              Start Ordering
             </Button>
           </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative pt-40 pb-24 px-6 grid-bg">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-light mb-6 animate-fade-in-up">
-              <Sparkles size={14} className="text-accent" />
-              <span className="text-xs font-semibold text-muted">The complete food delivery ecosystem</span>
-            </div>
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.05] animate-fade-in-up delay-100">
-              Food delivery,
-              <br />
-              <span className="gradient-text">reimagined</span> for everyone.
-            </h1>
-            <p className="text-lg md:text-xl text-muted mt-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
-              One platform. Four powerful roles. From the super admin managing the entire network to the
-              client ordering dinner — MealMesh connects them all in real-time.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 animate-fade-in-up delay-300">
-              <Button size="lg" onClick={() => onNavigate('client')}>
-                Start Ordering <ArrowRight size={18} />
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => onNavigate('super_admin')}>
-                Explore Dashboard
-              </Button>
-            </div>
-          </div>
+      <section className="relative pt-44 pb-28 px-6 z-10">
+        {/* Background Image with warm overlay */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.pexels.com/photos/1640772/pexels-photo-1640772.jpeg" 
+            alt="Fresh meals background" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-bg/95 via-bg/85 to-bg" />
+        </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-20 stagger">
-            {stats.map((s) => (
-              <SpotlightCard key={s.label} className="card p-6 hover-lift">
-                <s.icon size={20} className="text-accent mb-3" />
-                <p className="text-3xl font-bold">{s.value}</p>
-                <p className="text-sm text-muted mt-1">{s.label}</p>
-              </SpotlightCard>
-            ))}
+        <div className="max-w-7xl mx-auto relative z-10 text-center">
+
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[1.05] animate-fade-in-up delay-100 text-white">
+            Premium Local Meals,<br />
+            <span className="gradient-text">Delivered to You</span>
+          </h1>
+          <p className="text-lg md:text-xl text-white/80 mt-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
+            Experience kitchen-fresh catering from verified neighborhood chefs. Fast delivery, dynamic menu planning, and premium quality ingredients.
+          </p>
+          <div className="flex flex-row items-center justify-center gap-4 mt-10 animate-fade-in-up delay-300">
+            <Button size="lg" onClick={() => onNavigate('client')}>
+              Explore Master Menu
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => onNavigate('login')}>
+              Grow Your Business
+            </Button>
           </div>
         </div>
       </section>
 
-      {/* Categories */}
-      <section id="categories" className="py-24 px-6 relative">
+      {/* Client Experience categories section */}
+      <section id="categories" className="py-24 px-6 relative z-10 bg-surface-2/30 border-y border-border">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-end justify-between mb-12">
-            <div>
-              <Badge variant="accent">Browse</Badge>
-              <h2 className="text-4xl font-bold mt-3">Explore by category</h2>
-            </div>
-            <button className="text-sm text-muted hover:text-white transition-colors flex items-center gap-1 group">
-              View all <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 stagger">
+
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 stagger">
             {categories.map((c) => (
               <div
                 key={c.name}
                 onClick={() => onNavigate('client')}
-                className="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer hover-lift"
+                className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border"
               >
                 <img
                   src={c.img}
                   alt={c.name}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <p className="font-bold text-white">{c.name}</p>
-                  <p className="text-xs text-white/70">{c.count} dishes</p>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <p className="font-bold text-white text-lg">{c.name}</p>
                 </div>
-                <div className="absolute inset-0 border-2 border-accent/0 group-hover:border-accent/40 rounded-2xl transition-all duration-300" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="py-24 px-6 relative">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <Badge variant="accent">Why MealMesh</Badge>
-            <h2 className="text-4xl font-bold mt-3">Built for scale, designed for delight</h2>
-            <p className="text-muted mt-4 max-w-2xl mx-auto">
-              Every interaction is crafted with micro-animations, real-time feedback, and a premium dark UI.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6 stagger">
-            {features.map((f) => (
-              <SpotlightCard key={f.title} className="card p-8 hover-lift group">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <f.icon size={22} className="text-accent" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">{f.title}</h3>
-                    <p className="text-muted leading-relaxed">{f.desc}</p>
-                  </div>
-                </div>
-              </SpotlightCard>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Roles */}
-      <section id="roles" className="py-24 px-6 relative">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <Badge variant="accent">Choose your experience</Badge>
-            <h2 className="text-4xl font-bold mt-3">Four roles. One platform.</h2>
-            <p className="text-muted mt-4">Click any role below to jump straight into its dashboard.</p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 stagger">
-            {roles.map((r) => (
-              <div
-                key={r.id}
-                onClick={() => onNavigate(r.id)}
-                className={`group relative card p-8 cursor-pointer hover-lift bg-gradient-to-br ${r.color} ${r.border} border transition-all duration-300`}
-              >
-                <div className="w-14 h-14 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform duration-300">
-                  <r.icon size={24} className="text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">{r.title}</h3>
-                <p className="text-sm text-muted leading-relaxed">{r.desc}</p>
-                <div className="mt-4 flex items-center gap-1 text-sm font-semibold text-accent opacity-0 group-hover:opacity-100 group-hover:gap-2 transition-all duration-300">
-                  Enter dashboard <ArrowRight size={14} />
+                
+                {/* Interactive Hover Price Overlay */}
+                <div className="absolute inset-0 bg-accent/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
+                  <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Starting Base Price</span>
+                  <p className="text-white text-3xl font-extrabold mt-1">{c.price}</p>
+                  <span className="text-white/90 text-xs mt-3 flex items-center gap-1">Order now <ArrowRight size={10} /></span>
                 </div>
               </div>
             ))}
           </div>
+
+
         </div>
       </section>
 
-      {/* Vendor CTA */}
-      <section className="py-24 px-6">
-        <div className="max-w-5xl mx-auto">
-          <SpotlightCard className="card p-12 md:p-16 text-center relative overflow-hidden">
-            <div className="absolute inset-0 grid-bg opacity-50" />
-            <div className="relative">
-              <Store size={40} className="text-accent mx-auto mb-4" />
-              <h2 className="text-3xl md:text-4xl font-bold">Become a MealMesh Vendor</h2>
-              <p className="text-muted mt-4 max-w-xl mx-auto">
-                Join 2,400+ restaurants. Manage your menu, track orders in real-time, and grow your business
-                with powerful analytics.
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-4 mt-8">
-                {['No setup fee', '30-day trial', 'Cancel anytime'].map((t) => (
-                  <div key={t} className="flex items-center gap-1.5 text-sm text-muted">
-                    <CheckCircle2 size={16} className="text-green-400" /> {t}
+      {/* Vendor Partnership Section */}
+      <section className="py-24 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Left: Mobile Phone mockup displaying dynamic QR */}
+            <div className="lg:col-span-5 flex justify-center animate-fade-in-up">
+              <div className="w-[300px] h-[580px] rounded-[48px] bg-text p-3 shadow-2xl relative border-4 border-muted/20">
+                {/* Speaker */}
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-4 bg-muted rounded-full" />
+                
+                {/* Phone screen */}
+                <div className="w-full h-full rounded-[40px] bg-bg overflow-hidden flex flex-col items-center justify-center p-6 text-center relative border border-muted/10">
+                  <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
+                    <Store size={22} className="text-accent" />
+                  </div>
+                  <h4 className="font-extrabold text-lg">Vendor Portal</h4>
+                  <p className="text-xs text-muted mt-1 px-4">Dynamic Business Tools</p>
+                  
+                  {/* Dynamic QR Code */}
+                  <div className="card p-3 bg-white border border-border rounded-2xl my-6">
+                    <img 
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://vikram-advertising.io/plans" 
+                      alt="Plans QR Code" 
+                      className="w-36 h-36"
+                    />
+                  </div>
+                  
+                  <p className="text-xs font-bold text-accent uppercase tracking-wider">Scan to view our</p>
+                  <p className="text-sm font-extrabold text-text mt-0.5">Vendor Subscription Plans</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Plans & Features */}
+            <div className="lg:col-span-7 space-y-12">
+              <div>
+                <Badge variant="accent">Vendor Partners</Badge>
+                <h2 className="text-4xl font-extrabold mt-3">Partner with VIKRAM ADVERTISING</h2>
+                <p className="text-muted mt-2">Access state-of-the-art tools to expand your tiffin and restaurant business.</p>
+              </div>
+
+              {/* Benefit Icons */}
+              <div className="grid gap-6">
+                {benefits.map((b) => (
+                  <div key={b.title} className="flex gap-4 p-4 rounded-2xl bg-surface border border-border">
+                    <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                      <b.icon size={20} className="text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-text">{b.title}</h3>
+                      <p className="text-sm text-muted mt-1 leading-relaxed">{b.desc}</p>
+                    </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-8">
-                <Button size="lg" onClick={() => onNavigate('vendor')}>
-                  Get Started <ArrowRight size={18} />
-                </Button>
+
+              {/* Plans Preview */}
+              <div>
+                <p className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Subscription Pricing Preview</p>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  {plans.map((p) => (
+                    <div key={p.name} className="card p-5 bg-surface border border-border relative hover:border-accent/40 transition-colors">
+                      <p className="font-bold text-sm uppercase tracking-wider text-muted">{p.name}</p>
+                      <p className="text-2xl font-extrabold text-text mt-2">{p.price}</p>
+                      <p className="text-xs text-muted mt-1">{p.validity}</p>
+                      <div className="border-t border-border/60 my-3" />
+                      <ul className="text-xs space-y-1.5 text-muted">
+                        <li>• {p.items}</li>
+                        <li>• {p.clients}</li>
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </SpotlightCard>
+            
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <footer className="border-t border-border py-12 px-6 bg-surface-2/40 relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center">
               <UtensilsCrossed size={16} className="text-white" />
             </div>
-            <span className="font-bold">MealMesh</span>
+            <span className="font-bold text-text">VIKRAM ADVERTISING</span>
             <span className="text-muted text-sm ml-2">© 2026</span>
           </div>
-          <div className="flex items-center gap-6 text-sm text-muted">
-            <span className="hover:text-white transition-colors cursor-pointer">Privacy</span>
-            <span className="hover:text-white transition-colors cursor-pointer">Terms</span>
-            <span className="hover:text-white transition-colors cursor-pointer">Support</span>
+          
+          <div className="text-center md:text-right text-xs text-muted space-y-1">
+            <p>Email: contact@vikram-advertising.io | Tel: +91 98765 43210</p>
+            <p>12th Main Road, Indiranagar, Bengaluru, KA, India</p>
+          </div>
+
+          <div className="flex items-center gap-6 text-sm">
+            <button 
+              onClick={() => onNavigate('login')}
+              className="text-muted hover:text-text transition-colors flex items-center gap-1"
+            >
+              <Lock size={12} className="text-accent" /> Team Sign-In
+            </button>
           </div>
         </div>
       </footer>
+
+      {/* Client Onboarding Registration Modal */}
+      <Modal open={showRegModal} onClose={() => setShowRegModal(false)} title="Client Registration">
+        <form onSubmit={handleRegisterSubmit} className="space-y-4">
+          <p className="text-sm text-muted">Register to start ordering premium meals near you.</p>
+          
+          <Input 
+            label="Full Name" 
+            value={regForm.name} 
+            onChange={(v) => setRegForm({ ...regForm, name: v })} 
+            required 
+            placeholder="e.g. Vikram Sharma"
+          />
+          <Input 
+            label="ZIP Code" 
+            value={regForm.zipCode} 
+            onChange={(v) => setRegForm({ ...regForm, zipCode: v })} 
+            required 
+            placeholder="e.g. 560038"
+          />
+          <Input 
+            label="Landmark" 
+            value={regForm.landmark} 
+            onChange={(v) => setRegForm({ ...regForm, landmark: v })} 
+            required 
+            placeholder="e.g. Near Indiranagar Metro Station"
+          />
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Full Address</label>
+            <textarea
+              required
+              rows={3}
+              value={regForm.address}
+              onChange={(e) => setRegForm({ ...regForm, address: e.target.value })}
+              placeholder="Enter your flat number, building, street address"
+              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none transition-all text-sm"
+            />
+          </div>
+
+          <Button type="submit" className="w-full mt-2">
+            Confirm & Start Ordering
+          </Button>
+        </form>
+      </Modal>
     </div>
   );
 }

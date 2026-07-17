@@ -9,11 +9,12 @@ import { Button, Spinner } from './ui';
 type Role = 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
 interface LoginProps {
-  onLogin: (role: Role) => void;
+  onLogin: (role: Role, cred?: string) => void;
   onBack?: () => void;
 }
 
-const SUPER_ADMIN_PASSWORD = 'superadmin@123';
+const SUPER_ADMIN_EMAIL = '2711vikram@gmail.com';
+const SUPER_ADMIN_PASSWORD = 'Tatwavivek@271';
 
 const roles: { id: Role; label: string; desc: string; icon: typeof Shield; color: string; gradient: string }[] = [
   { id: 'super_admin', label: 'Super Admin', desc: 'Full platform control', icon: Shield, color: 'text-orange-400', gradient: 'from-orange-500/20 to-red-500/10 border-orange-500/20' },
@@ -36,9 +37,9 @@ export function Login({ onLogin, onBack }: LoginProps) {
       {/* BG orbs */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] top-[-80px] left-[-80px]"
-          style={{ background: 'radial-gradient(circle, #ff6b35, transparent 70%)' }} />
+          style={{ background: 'radial-gradient(circle, #A0A0D0, transparent 70%)' }} />
         <div className="absolute w-[400px] h-[400px] rounded-full opacity-10 blur-[100px] bottom-0 right-0"
-          style={{ background: 'radial-gradient(circle, #ff9f1c, transparent 70%)' }} />
+          style={{ background: 'radial-gradient(circle, #8888BB, transparent 70%)' }} />
       </div>
 
       <div className="relative w-full max-w-4xl">
@@ -48,7 +49,7 @@ export function Login({ onLogin, onBack }: LoginProps) {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center">
               <UtensilsCrossed size={22} className="text-white" />
             </div>
-            <span className="text-3xl font-bold tracking-tight">MealMesh</span>
+            <span className="text-3xl font-bold tracking-tight">VIKRAM ADVERTISING</span>
           </div>
           <p className="text-muted">Sign in to your workspace</p>
         </div>
@@ -92,7 +93,7 @@ function RoleSelector({ onSelect }: { onSelect: (r: Role) => void }) {
   );
 }
 
-function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Role) => void; onBack: () => void }) {
+function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Role, cred?: string) => void; onBack: () => void }) {
   const meta = roles.find((r) => r.id === role)!;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -107,11 +108,15 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
 
     try {
       if (role === 'super_admin') {
-        if (email.trim().toLowerCase() !== 'admin@mealmesh.io' || password !== SUPER_ADMIN_PASSWORD) {
+        if (email.trim().toLowerCase() !== SUPER_ADMIN_EMAIL) {
           setError('Invalid email or password');
           return;
         }
-        onLogin('super_admin');
+        if (password !== SUPER_ADMIN_PASSWORD) {
+          setError('Invalid email or password');
+          return;
+        }
+        onLogin('super_admin', email.trim());
 
       } else if (role === 'sub_admin') {
         const { data } = await supabase
@@ -122,7 +127,7 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
           .maybeSingle();
         if (!data) { setError('Invalid email or password'); return; }
         await supabase.from('sub_admins').update({ last_active: new Date().toISOString() }).eq('id', data.id);
-        onLogin('sub_admin');
+        onLogin('sub_admin', email.trim());
 
       } else if (role === 'vendor') {
         const { data } = await supabase
@@ -132,11 +137,11 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
           .eq('status', 'approved')
           .maybeSingle();
         if (!data) { setError('No approved vendor found with this phone number'); return; }
-        onLogin('vendor');
+        onLogin('vendor', email.trim());
 
       } else if (role === 'client') {
         if (!zip || zip.length < 4) { setError('Please enter a valid ZIP code'); return; }
-        onLogin('client');
+        onLogin('client', zip);
       }
     } finally {
       setLoading(false);
@@ -175,7 +180,7 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
                   />
                 </div>
-                <p className="text-xs text-muted mt-1">Demo: use 560038</p>
+
               </div>
             </>
           ) : (
@@ -191,7 +196,7 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    placeholder={role === 'vendor' ? '+91 registered phone' : role === 'super_admin' ? 'admin@mealmesh.io' : 'your@email.com'}
+                    placeholder={role === 'vendor' ? '+91 registered phone' : role === 'super_admin' ? 'your-email@gmail.com' : 'your@email.com'}
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
                     autoComplete="username"
                   />
@@ -222,12 +227,7 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                 </div>
               )}
 
-              {/* Demo hint */}
-              <div className="text-xs text-muted bg-surface-2 rounded-lg px-3 py-2">
-                {role === 'super_admin' && 'Demo: admin@mealmesh.io / superadmin@123'}
-                {role === 'sub_admin' && 'Demo: arjun@mealmesh.io / admin123'}
-                {role === 'vendor' && 'Demo: +919876543210 (Spice Garden)'}
-              </div>
+
             </>
           )}
 

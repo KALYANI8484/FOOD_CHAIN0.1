@@ -8,17 +8,17 @@
 }
 
 :root {
-  --bg: #0a0a0b;
-  --surface: #131316;
-  --surface-2: #1a1a1f;
-  --border: #26262d;
-  --text: #f4f4f5;
-  --muted: #8b8b93;
-  --accent: #ff6b35;
-  --accent-2: #ff9f1c;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --error: #ef4444;
+  --bg: #F8F8FF; /* Ghost White — pearlish ultra-clean foundation */
+  --surface: #FFFFFF; /* Pure white cards & panels */
+  --surface-2: #F0F0F8; /* Cool pearl gray for inset areas */
+  --border: #E2E2EE; /* Ultra-thin cool-grey border */
+  --text: #111118; /* Sleek near-black for maximum contrast */
+  --muted: #52525E; /* Cool dark-grey for secondary text */
+  --accent: #C87A2F; /* Premium warm orange */
+  --accent-2: #E8A261; /* Soft warm neutral orange */
+  --success: #1E824C; /* Confident green */
+  --warning: #D97706; /* Warm amber */
+  --error: #C0392B; /* Alert red */
 }
 
 * {
@@ -34,14 +34,14 @@ html, body, #root {
 }
 
 ::selection {
-  background: rgba(255, 107, 53, 0.3);
+  background: rgba(200, 122, 47, 0.15);
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2a2a32; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+::-webkit-scrollbar-thumb { background: #C0C0CC; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #A0A0B0; }
 
 /* Animations */
 @keyframes fadeInUp {
@@ -107,7 +107,7 @@ html, body, #root {
 
 /* Shimmer skeleton */
 .shimmer {
-  background: linear-gradient(90deg, #1a1a1f 25%, #2a2a32 50%, #1a1a1f 75%);
+  background: linear-gradient(90deg, #EDEDF5 25%, #DDDDE8 50%, #EDEDF5 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -122,43 +122,46 @@ html, body, #root {
   animation: gradient-shift 4s ease infinite;
 }
 
-/* Glass effect */
+/* Glass effect — frosted white acrylic with cool-toned shadows */
 .glass {
-  background: rgba(19, 19, 22, 0.6);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(248, 248, 255, 0.78);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(200, 200, 220, 0.35);
+  box-shadow: 0 4px 24px -4px rgba(100, 100, 140, 0.08);
 }
 
 .glass-light {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(248, 248, 255, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(200, 200, 220, 0.2);
+  box-shadow: 0 2px 12px -2px rgba(100, 100, 140, 0.06);
 }
 
-/* Hover lift */
+/* Hover lift — cool ambient shadow */
 .hover-lift {
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
 }
 .hover-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 40px -12px rgba(80, 80, 120, 0.15);
 }
 
-/* Glow */
+/* Glow — refined accent glow */
 .glow-accent {
-  box-shadow: 0 0 24px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 0 24px rgba(200, 122, 47, 0.2);
 }
 .glow-accent:hover {
-  box-shadow: 0 0 36px rgba(255, 107, 53, 0.5);
+  box-shadow: 0 0 36px rgba(200, 122, 47, 0.35);
 }
 
-/* Card */
+/* Card — clean surface with cool ambient shadow */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(80, 80, 120, 0.04);
 }
 
 /* Button shine */
@@ -210,14 +213,14 @@ html, body, #root {
 /* Grid background */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(100,100,140,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100,100,140,0.04) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
-/* Spotlight */
+/* Spotlight — cool-toned interactive glow */
 .spotlight {
-  background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 107, 53, 0.08), transparent 40%);
+  background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(200, 122, 47, 0.06), transparent 40%);
 }
 
 /* Stagger children */

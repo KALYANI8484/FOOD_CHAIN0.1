@@ -1,11 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-export const supabase = createClient(url, anonKey, {
-  auth: { persistSession: false },
-});
+// Custom MongoDB-backed mock Supabase Client for VIKRAM ADVERTISING
+// This replicates the supabase-js query builder syntax to avoid breaking existing frontend code.
 
 export type Plan = {
   id: string;
@@ -41,6 +35,7 @@ export type Vendor = {
   plan_name: string | null;
   status: string;
   logo_url: string | null;
+  qr_url: string | null;
   submitted_by: string | null;
   rejection_note: string | null;
   subscription_start: string | null;
@@ -126,4 +121,115 @@ export type UpgradeRequest = {
   payment_status: string;
   status: string;
   created_at: string;
+};
+
+class QueryBuilder {
+  private table: string;
+  private action: 'select' | 'insert' | 'update' | 'delete' = 'select';
+  private data: any = null;
+  private filters: { field: string; op: 'eq' | 'in'; value: any }[] = [];
+  private sorts: { field: string; ascending: boolean }[] = [];
+  private limitCount: number | null = null;
+  private isSingle = false;
+
+  constructor(table: string) {
+    this.table = table;
+  }
+
+  select(_columns?: string) {
+    this.action = 'select';
+    return this;
+  }
+
+  insert(data: any) {
+    this.action = 'insert';
+    this.data = data;
+    return this;
+  }
+
+  update(data: any) {
+    this.action = 'update';
+    this.data = data;
+    return this;
+  }
+
+  delete() {
+    this.action = 'delete';
+    return this;
+  }
+
+  eq(field: string, value: any) {
+    this.filters.push({ field, op: 'eq', value });
+    return this;
+  }
+
+  in(field: string, value: any[]) {
+    this.filters.push({ field, op: 'in', value });
+    return this;
+  }
+
+  order(field: string, options?: { ascending?: boolean }) {
+    this.sorts.push({ field, ascending: options?.ascending ?? true });
+    return this;
+  }
+
+  limit(count: number) {
+    this.limitCount = count;
+    return this;
+  }
+
+  single() {
+    this.isSingle = true;
+    return this;
+  }
+
+  maybeSingle() {
+    this.isSingle = true;
+    return this;
+  }
+
+  async then(onfulfilled?: (value: any) => any) {
+    try {
+      const response = await fetch('/api/db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          table: this.table,
+          action: this.action,
+          data: this.data,
+          filters: this.filters,
+          sorts: this.sorts,
+          limit: this.limitCount,
+          single: this.isSingle,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const errObj = { data: null, error: { message: errData.error || `API error: ${response.statusText}` } };
+        if (onfulfilled) return onfulfilled(errObj);
+        return errObj;
+      }
+      
+      const result = await response.json();
+      if (onfulfilled) {
+        return onfulfilled(result);
+      }
+      return result;
+    } catch (err: any) {
+      const errorObj = { data: null, error: { message: err.message || String(err) } };
+      if (onfulfilled) {
+        return onfulfilled(errorObj);
+      }
+      return errorObj;
+    }
+  }
+}
+
+export const supabase = {
+  from(table: string) {
+    return new QueryBuilder(table);
+  }
 };

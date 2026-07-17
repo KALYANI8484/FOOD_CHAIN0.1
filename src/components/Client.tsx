@@ -1,41 +1,49 @@
 import { useEffect, useState } from 'react';
 import {
-  MapPin, Search, ShoppingBag, Clock, Star, ArrowLeft, ArrowRight,
+  MapPin, Search, ShoppingBag, Clock, ArrowLeft, ArrowRight,
   Plus, Minus, CheckCircle2, KeyRound, Navigation, UtensilsCrossed,
-  Zap, Package,
+  Package, Compass, HeartHandshake, Loader2, ShieldAlert
 } from 'lucide-react';
 import { supabase, type Vendor, type VendorItem, type Order } from '../lib/supabase';
-import { Button, Badge, Drawer, useToast, Toast, Spinner, EmptyState } from './ui';
+import { Button, Badge, Drawer, useToast, Toast, Spinner, EmptyState, Input } from './ui';
 
 type Step = 'location' | 'browse' | 'tracking';
 
 export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?: string }) {
   const [step, setStep] = useState<Step>(initialZip && initialZip.length >= 4 ? 'browse' : 'location');
   const [zip, setZip] = useState(initialZip || '');
+  const [landmark, setLandmark] = useState('');
   const [cart, setCart] = useState<Record<string, { item: VendorItem; qty: number }>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const { toast, show } = useToast();
 
+  const handleLocationSubmit = (selectedZip: string, selectedLandmark: string) => {
+    setZip(selectedZip);
+    setLandmark(selectedLandmark);
+    setStep('browse');
+  };
+
   return (
-    <div className="min-h-screen bg-bg noise relative">
+    <div className="min-h-screen bg-bg noise relative text-text">
       {/* Top bar */}
       <header className="sticky top-0 z-30 glass border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center group-hover:rotate-12 transition-transform">
               <UtensilsCrossed size={18} className="text-white" />
             </div>
-            <span className="font-bold">MealMesh</span>
+            <span className="font-bold text-text">VIKRAM ADVERTISING</span>
           </div>
           {step === 'browse' && (
-            <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-2 text-sm text-muted">
-              <MapPin size={14} className="text-accent" /> {zip}
+            <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2 border border-border text-sm text-muted">
+              <MapPin size={14} className="text-accent" /> 
+              <span>{zip} {landmark ? `· ${landmark}` : ''}</span>
             </div>
           )}
           <div className="flex items-center gap-3">
             {step === 'browse' && Object.keys(cart).length > 0 && (
-              <button onClick={() => setCartOpen(true)} className="relative flex items-center gap-2 px-4 py-2 rounded-xl bg-accent/10 text-accent text-sm font-semibold hover:bg-accent/20 transition-colors">
+              <button onClick={() => setCartOpen(true)} className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent/15 text-accent border border-accent/20 text-sm font-semibold hover:bg-accent/20 transition-all">
                 <ShoppingBag size={16} /> Cart
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-white text-xs flex items-center justify-center font-bold">
                   {Object.values(cart).reduce((s, c) => s + c.qty, 0)}
@@ -47,13 +55,44 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
         </div>
       </header>
 
-      {step === 'location' && <LocationGate zip={zip} setZip={setZip} onNext={() => setStep('browse')} />}
-      {step === 'browse' && <Browse zip={zip} cart={cart} setCart={setCart} show={show} />}
-      {step === 'tracking' && activeOrder && <Tracking order={activeOrder} onBack={() => { setActiveOrder(null); setStep('browse'); }} />}
+      {step === 'location' && (
+        <LocationGate 
+          initialZip={zip} 
+          initialLandmark={landmark} 
+          onSubmit={handleLocationSubmit} 
+        />
+      )}
+      {step === 'browse' && (
+        <Browse 
+          zip={zip} 
+          landmark={landmark} 
+          cart={cart} 
+          setCart={setCart} 
+          setCartOpen={setCartOpen} 
+          show={show} 
+        />
+      )}
+      {step === 'tracking' && activeOrder && (
+        <Tracking 
+          order={activeOrder} 
+          onBack={() => { setActiveOrder(null); setStep('browse'); }} 
+        />
+      )}
 
       {/* Cart drawer */}
-      <Drawer open={cartOpen} onClose={() => setCartOpen(false)} title="Your Cart">
-        <CartView cart={cart} setCart={setCart} onCheckout={(order) => { setCartOpen(false); setActiveOrder(order); setStep('tracking'); }} show={show} />
+      <Drawer open={cartOpen} onClose={() => setCartOpen(false)} title="Confirm & Checkout">
+        <CartView 
+          cart={cart} 
+          setCart={setCart} 
+          clientZip={zip}
+          clientLandmark={landmark}
+          onCheckout={(order) => { 
+            setCartOpen(false); 
+            setActiveOrder(order); 
+            setStep('tracking'); 
+          }} 
+          show={show} 
+        />
       </Drawer>
 
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -61,71 +100,130 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
   );
 }
 
-function LocationGate({ zip, setZip, onNext }: { zip: string; setZip: (v: string) => void; onNext: () => void }) {
+function LocationGate({ 
+  initialZip, 
+  initialLandmark, 
+  onSubmit 
+}: { 
+  initialZip: string; 
+  initialLandmark: string; 
+  onSubmit: (zip: string, landmark: string) => void 
+}) {
+  const [zipInput, setZipInput] = useState(initialZip);
+  const [landmarkInput, setLandmarkInput] = useState(initialLandmark);
+  const [detecting, setDetecting] = useState(false);
+
+  const handleGPSDetect = () => {
+    setDetecting(true);
+    // Simulate GPS Coordinates Fetching
+    setTimeout(() => {
+      setZipInput('560038');
+      setLandmarkInput('Indiranagar Metro Station');
+      setDetecting(false);
+    }, 1200);
+  };
+
+  const handleConfirm = () => {
+    if (zipInput.length >= 4) {
+      onSubmit(zipInput, landmarkInput);
+    }
+  };
+
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6 grid-bg">
-      <div className="max-w-md w-full text-center animate-fade-in-up">
+    <div className="min-h-[calc(100vh-73px)] flex items-center justify-center p-6 grid-bg">
+      <div className="max-w-md w-full text-center card p-8 glass animate-scale-in">
         <div className="relative w-20 h-20 mx-auto mb-8">
           <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center">
-            <Navigation size={36} className="text-white" />
+            <Compass size={36} className="text-white" />
           </div>
           <div className="absolute inset-0 rounded-3xl border-2 border-accent/30 animate-ping" style={{ animationDuration: '2s' }} />
         </div>
-        <h1 className="text-3xl font-bold">What's your ZIP code?</h1>
-        <p className="text-muted mt-3">We'll find the best restaurants near you</p>
-        <div className="mt-8 space-y-4">
+        <h1 className="text-3xl font-extrabold text-text leading-tight">Welcome to <br/>VIKRAM ADVERTISING</h1>
+        <p className="text-muted mt-3 text-sm">Enter your Delivery Location to browse local verified kitchens</p>
+        
+        <div className="mt-8 space-y-4 text-left">
           <div className="relative">
             <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" />
             <input
-              value={zip}
-              onChange={(e) => setZip(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && zip.length >= 4 && onNext()}
-              placeholder="Enter ZIP code"
-              className="w-full pl-12 pr-4 py-4 rounded-2xl bg-surface-2 border border-border text-lg focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
-              autoFocus
+              value={zipInput}
+              onChange={(e) => setZipInput(e.target.value)}
+              placeholder="Zip Code *"
+              className="w-full pl-12 pr-12 py-3.5 rounded-2xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none transition-all text-sm font-semibold"
             />
+            {/* GPS icon button */}
+            <button
+              type="button"
+              onClick={handleGPSDetect}
+              disabled={detecting}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-border/20 text-accent transition-colors cursor-pointer"
+              title="Detect GPS"
+            >
+              {detecting ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} className="rotate-45" />}
+            </button>
           </div>
-          <Button size="lg" className="w-full" onClick={onNext} disabled={zip.length < 4}>
-            Find Restaurants <ArrowRight size={18} />
+          
+          <Input 
+            label="Nearest Landmark"
+            value={landmarkInput}
+            onChange={setLandmarkInput}
+            placeholder="e.g. Near Metro Station"
+          />
+
+          <Button 
+            size="lg" 
+            className="w-full mt-6" 
+            onClick={handleConfirm} 
+            disabled={zipInput.length < 4 || detecting}
+          >
+            Confirm & Browse <ArrowRight size={18} />
           </Button>
         </div>
-        <p className="text-xs text-muted mt-6">Try ZIP 560038 for demo restaurants</p>
+        <p className="text-xs text-muted mt-6">Try GPS button for Indiranagar demo kitchens</p>
       </div>
     </div>
   );
 }
 
-function Browse({ zip, cart, setCart, show }: {
+interface BrowseProps {
   zip: string;
+  landmark: string;
   cart: Record<string, { item: VendorItem; qty: number }>;
   setCart: (c: Record<string, { item: VendorItem; qty: number }>) => void;
+  setCartOpen: (open: boolean) => void;
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
-}) {
+}
+
+function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: BrowseProps) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [items, setItems] = useState<VendorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all');
+  
+  // Selected category in Smart Menu. Default: null (shows Category Grid)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
+      // Fetch approved active vendors
       const { data: v } = await supabase.from('vendors').select('*').eq('status', 'approved');
       setVendors(v || []);
       if (v && v.length > 0) {
-        const { data: i } = await supabase.from('vendor_inventory').select('*').in('vendor_id', v.map((x) => x.id));
+        const { data: i } = await supabase.from('vendor_inventory').select('*').in('vendor_id', v.map((x: any) => x.id));
         setItems(i || []);
       }
       setLoading(false);
     })();
   }, []);
 
-  const categories: string[] = ['all', ...Array.from(new Set(items.map((i) => i.category).filter((c): c is string => !!c)))];
+  const masterCategories = ['Tiffin', 'Breakfast', 'Lunch/Dinner', 'Thali', 'Vegetables'];
 
-  const filtered = items.filter((i) => {
-    const matchSearch = i.item_name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = category === 'all' || i.category === category;
-    return matchSearch && matchCat;
-  });
+  const categoryImages: Record<string, string> = {
+    'Tiffin': 'https://images.pexels.com/photos/9585644/pexels-photo-9585644.jpeg',
+    'Breakfast': 'https://images.pexels.com/photos/5560700/pexels-photo-5560700.jpeg',
+    'Lunch/Dinner': 'https://images.pexels.com/photos/1624487/pexels-photo-1624487.jpeg',
+    'Thali': 'https://images.pexels.com/photos/9585643/pexels-photo-9585643.jpeg',
+    'Vegetables': 'https://images.pexels.com/photos/1458691/pexels-photo-1458691.jpeg',
+  };
 
   const addToCart = (item: VendorItem) => {
     const c = { ...cart };
@@ -133,104 +231,152 @@ function Browse({ zip, cart, setCart, show }: {
     else c[item.id] = { item, qty: 1 };
     setCart(c);
     show(`${item.item_name} added to cart`);
+    setCartOpen(true); // Sleek side-drawer triggered immediately to confirm checkout
   };
 
-  if (loading) return <div className="py-20"><Spinner /></div>;
+  const filteredItems = items.filter((i) => {
+    const matchSearch = i.item_name.toLowerCase().includes(search.toLowerCase());
+    const matchCat = !selectedCategory || i.category === selectedCategory;
+    return matchSearch && matchCat;
+  });
+
+  if (loading) return <div className="py-24"><Spinner /></div>;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
-      {/* Hero banner */}
-      <div className="card p-8 mb-8 relative overflow-hidden animate-fade-in-up">
-        <div className="absolute inset-0 grid-bg opacity-30" />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <Badge variant="accent">Delivering to {zip}</Badge>
-            <h1 className="text-3xl font-bold mt-3">Hungry? We've got you.</h1>
-            <p className="text-muted mt-1">{vendors.length} restaurants · {items.length} dishes available</p>
+      
+      {/* Category Grid view */}
+      {!selectedCategory ? (
+        <div className="space-y-10 animate-fade-in-up">
+          <div className="card p-8 relative overflow-hidden bg-surface border border-border">
+            <div className="absolute inset-0 grid-bg opacity-30" />
+            <div className="relative flex items-center justify-between">
+              <div>
+                <Badge variant="accent">Zip Zone: {zip}</Badge>
+                <h1 className="text-3xl font-extrabold mt-3 text-text">Verify Nearby Verified Kitchens</h1>
+                <p className="text-muted mt-1">{vendors.length} local kitchens operating in your zone</p>
+              </div>
+              <div className="hidden md:flex items-center gap-2 text-sm text-muted">
+                <Clock size={16} className="text-accent" /> 24 min average delivery
+              </div>
+            </div>
           </div>
-          <div className="hidden md:flex items-center gap-2 text-sm text-muted">
-            <Clock size={16} className="text-green-400" /> 24 min avg delivery
+
+          <div>
+            <h2 className="text-xl font-bold uppercase tracking-wider text-muted mb-6">Choose Master Category</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {masterCategories.map((cat) => (
+                <div
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className="group relative aspect-[4/5] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border bg-surface shadow-sm"
+                >
+                  <img
+                    src={categoryImages[cat]}
+                    alt={cat}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5 text-center">
+                    <p className="font-extrabold text-white text-lg">{cat}</p>
+                    <p className="text-xs text-accent-2/90 font-medium mt-1">Tap to browse</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative mb-6 animate-fade-in-up delay-100">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search for dishes..."
-          className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
-        />
-      </div>
-
-      {/* Categories */}
-      <div className="flex gap-2 mb-8 overflow-x-auto pb-2 animate-fade-in-up delay-200">
-        {categories.map((c) => (
-          <button
-            key={c}
-            onClick={() => setCategory(c)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
-              category === c ? 'bg-accent text-white' : 'bg-surface-2 text-muted hover:text-white'
-            }`}
-          >
-            {c === 'all' ? 'All' : c}
-          </button>
-        ))}
-      </div>
-
-      {/* Items grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger">
-        {filtered.map((item) => (
-          <div key={item.id} className="card overflow-hidden hover-lift group">
-            <div className="relative aspect-[4/3] overflow-hidden">
-              {item.image_url ? (
-                <img src={item.image_url} alt={item.item_name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-              ) : (
-                <div className="w-full h-full bg-surface-2 flex items-center justify-center">
-                  <Package size={32} className="text-muted" />
-                </div>
-              )}
-              {item.category && <div className="absolute top-2 left-2"><Badge variant="accent">{item.category}</Badge></div>}
-              {item.quantity > 0 ? (
-                <div className="absolute top-2 right-2"><Badge variant="success">In Stock</Badge></div>
-              ) : (
-                <div className="absolute top-2 right-2"><Badge variant="error">Out</Badge></div>
-              )}
-            </div>
-            <div className="p-4">
-              <p className="font-bold">{item.item_name}</p>
-              <div className="flex items-center gap-1 mt-1">
-                <Star size={12} className="text-accent-2 fill-accent-2" />
-                <span className="text-xs text-muted">4.{Math.floor(Math.random() * 9)} · {Math.floor(Math.random() * 200) + 30} orders</span>
-              </div>
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xl font-bold text-accent">₹{item.price}</span>
-                <Button size="sm" onClick={() => addToCart(item)} disabled={item.quantity === 0}>
-                  <Plus size={14} /> Add
-                </Button>
-              </div>
-            </div>
+      ) : (
+        /* Smart Menu view */
+        <div className="space-y-6 animate-scale-in">
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => setSelectedCategory(null)}
+              className="text-sm font-semibold text-muted hover:text-text transition-colors flex items-center gap-1.5 group"
+            >
+              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> 
+              <span>Back to Categories</span>
+            </button>
+            <Badge variant="accent">{selectedCategory} Menu</Badge>
           </div>
-        ))}
-      </div>
 
-      {filtered.length === 0 && <EmptyState icon={<Search size={28} />} title="No dishes found" subtitle="Try a different search or category" />}
+          <div className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search in ${selectedCategory}...`}
+              className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-surface border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none transition-all text-sm"
+            />
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredItems.map((item) => (
+              <div key={item.id} className="card overflow-hidden bg-surface border border-border hover-lift group">
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  {item.image_url ? (
+                    <img 
+                      src={item.image_url} 
+                      alt={item.item_name} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-surface-2 flex items-center justify-center">
+                      <Package size={32} className="text-muted" />
+                    </div>
+                  )}
+                  
+                  {/* Trust Badge */}
+                  <div className="absolute top-3 left-3">
+                    <Badge variant="success">
+                      <HeartHandshake size={10} /> Verified Kitchen
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="p-5 space-y-3">
+                  <div>
+                    <h3 className="font-extrabold text-base text-text">{item.item_name}</h3>
+                    <p className="text-xs text-muted mt-1 font-medium">Prepared by a local verified vendor</p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                    <span className="text-xl font-extrabold text-accent">₹{item.price}</span>
+                    <Button size="sm" onClick={() => addToCart(item)} disabled={item.quantity === 0}>
+                      <Plus size={14} /> Add to Cart
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredItems.length === 0 && (
+            <EmptyState 
+              icon={<Search size={28} />} 
+              title="No items in this category" 
+              subtitle="All local kitchens are currently preparing other items." 
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function CartView({ cart, setCart, onCheckout, show }: {
+interface CartViewProps {
   cart: Record<string, { item: VendorItem; qty: number }>;
   setCart: (c: Record<string, { item: VendorItem; qty: number }>) => void;
+  clientZip: string;
+  clientLandmark: string;
   onCheckout: (o: Order) => void;
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
-}) {
+}
+
+function CartView({ cart, setCart, clientZip, clientLandmark, onCheckout, show }: CartViewProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [landmark, setLandmark] = useState('');
   const [placing, setPlacing] = useState(false);
 
   const entries = Object.values(cart);
@@ -246,160 +392,230 @@ function CartView({ cart, setCart, onCheckout, show }: {
   };
 
   const placeOrder = async () => {
-    if (!name || !phone || !address) { show('Please fill all required fields', 'error'); return; }
-    if (entries.length === 0) { show('Cart is empty', 'error'); return; }
+    if (!name || !phone || !address) { 
+      show('Please complete name, phone and delivery address', 'error'); 
+      return; 
+    }
+    if (entries.length === 0) { 
+      show('Your cart is empty', 'error'); 
+      return; 
+    }
+    
     setPlacing(true);
-    const otp = String(Math.floor(1000 + Math.random() * 9000));
     const { data, error } = await supabase.from('orders').insert({
       client_name: name,
       client_phone: phone,
-      client_zip: '560038',
-      client_landmark: landmark || null,
+      client_zip: clientZip,
+      client_landmark: clientLandmark || null,
       client_address: address,
-      item_name: entries.map((e) => `${e.item.item_name} x${e.qty}`).join(', '),
+      item_name: entries.map((e) => `${e.item.item_name} (x${e.qty})`).join(', '),
       vendor_id: vendorId,
       price: total,
       quantity: entries.reduce((s, c) => s + c.qty, 0),
       status: 'pending',
-      otp,
-      distance_km: Math.round(Math.random() * 5 * 10) / 10,
     }).select().single();
+    
     setPlacing(false);
-    if (error) { show('Failed to place order', 'error'); return; }
-    await supabase.from('activity_log').insert({ action: `New order placed by ${name}`, actor: 'Client' });
-    show('Order placed successfully!');
+    
+    if (error) { 
+      show('Failed to submit order', 'error'); 
+      return; 
+    }
+    
+    await supabase.from('activity_log').insert({ 
+      action: `New order submitted by client: ${name}`, 
+      actor: 'Client' 
+    });
+    
+    show('Order placed! Waiting for vendor response.');
     setCart({});
     onCheckout(data);
-  }
+  };
 
   if (entries.length === 0) {
-    return <EmptyState icon={<ShoppingBag size={28} />} title="Your cart is empty" subtitle="Add some delicious items!" />;
+    return <EmptyState icon={<ShoppingBag size={28} />} title="Your cart is empty" subtitle="Add items from the menu to start checkout" />;
   }
 
   return (
-    <div className="space-y-5">
-      <div className="space-y-3">
+    <div className="space-y-6 h-full flex flex-col justify-between">
+      <div className="space-y-4 overflow-y-auto max-h-[50vh] pr-1">
+        <p className="text-xs font-bold text-muted uppercase tracking-wider">Item Details</p>
         {entries.map(({ item, qty }) => (
-          <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-2">
+          <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl bg-surface-2 border border-border">
             {item.image_url ? (
-              <img src={item.image_url} alt={item.item_name} className="w-14 h-14 rounded-lg object-cover" />
+              <img src={item.image_url} alt={item.item_name} className="w-12 h-12 rounded-xl object-cover border border-border" />
             ) : (
-              <div className="w-14 h-14 rounded-lg bg-surface flex items-center justify-center"><Package size={18} className="text-muted" /></div>
+              <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center">
+                <Package size={16} className="text-muted" />
+              </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{item.item_name}</p>
-              <p className="text-xs text-muted">₹{item.price}</p>
+              <p className="text-sm font-bold truncate text-text">{item.item_name}</p>
+              <p className="text-xs text-accent font-semibold mt-0.5">₹{item.price}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => updateQty(item.id, -1)} className="w-7 h-7 rounded-lg bg-surface hover:bg-border/30 flex items-center justify-center text-muted hover:text-white transition-colors"><Minus size={14} /></button>
-              <span className="text-sm font-semibold w-6 text-center">{qty}</span>
-              <button onClick={() => updateQty(item.id, 1)} className="w-7 h-7 rounded-lg bg-surface hover:bg-border/30 flex items-center justify-center text-muted hover:text-white transition-colors"><Plus size={14} /></button>
+              <button onClick={() => updateQty(item.id, -1)} className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-2 flex items-center justify-center text-text transition-colors"><Minus size={12} /></button>
+              <span className="text-sm font-bold w-4 text-center">{qty}</span>
+              <button onClick={() => updateQty(item.id, 1)} className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-2 flex items-center justify-center text-text transition-colors"><Plus size={12} /></button>
             </div>
-            <span className="text-sm font-bold w-16 text-right">₹{Number(item.price) * qty}</span>
           </div>
         ))}
       </div>
 
-      <div className="space-y-3 pt-4 border-t border-border">
-        <p className="text-sm font-bold text-muted uppercase tracking-wider">Delivery Details</p>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name *" className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none" />
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number *" className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none" />
-        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Delivery address *" className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none" />
-        <input value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="Landmark (optional)" className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none" />
+      <div className="space-y-4 pt-4 border-t border-border">
+        <p className="text-xs font-bold text-muted uppercase tracking-wider">Confirm Delivery details</p>
+        
+        <Input 
+          label="Your Name *"
+          value={name}
+          onChange={setName}
+          placeholder="Enter full name"
+          required
+        />
+        <Input 
+          label="Phone Number *"
+          value={phone}
+          onChange={setPhone}
+          placeholder="e.g. +91 99999 88888"
+          required
+        />
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Confirm Delivery Address *</label>
+          <textarea
+            required
+            rows={2}
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Complete address (building, flat, floor)"
+            className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none transition-all text-sm"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center justify-between pt-4 border-t border-border">
-        <span className="text-lg font-bold">Total</span>
-        <span className="text-2xl font-bold text-accent">₹{total}</span>
-      </div>
+      <div className="pt-4 border-t border-border space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-muted uppercase tracking-wider">Subtotal</span>
+          <span className="text-2xl font-extrabold text-accent">₹{total}</span>
+        </div>
 
-      <Button size="lg" className="w-full" onClick={placeOrder} disabled={placing}>
-        {placing ? <Spinner /> : <>Place Order <ArrowRight size={18} /></>}
-      </Button>
+        <Button size="lg" className="w-full" onClick={placeOrder} disabled={placing}>
+          {placing ? <Spinner /> : <>Finalize Order <ArrowRight size={18} /></>}
+        </Button>
+      </div>
     </div>
   );
 }
 
 function Tracking({ order, onBack }: { order: Order; onBack: () => void }) {
   const [status, setStatus] = useState(order.status);
+  const [liveOrder, setLiveOrder] = useState<Order>(order);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       const { data } = await supabase.from('orders').select('*').eq('id', order.id).maybeSingle();
-      if (data) setStatus(data.status);
-    }, 3000);
+      if (data) {
+        setStatus(data.status);
+        setLiveOrder(data);
+      }
+    }, 4000);
     return () => clearInterval(interval);
   }, [order.id]);
 
   const stages = [
-    { id: 'pending', label: 'Order Placed', icon: CheckCircle2 },
-    { id: 'accepted', label: 'Accepted by Restaurant', icon: Zap },
-    { id: 'preparing', label: 'Being Prepared', icon: Package },
+    { id: 'pending', label: 'Pending', icon: Clock },
+    { id: 'preparing', label: 'Preparing', icon: Package },
+    { id: 'out_for_delivery', label: 'Out for Delivery', icon: Navigation },
     { id: 'delivered', label: 'Delivered', icon: CheckCircle2 },
   ];
+  
   const currentIdx = stages.findIndex((s) => s.id === status);
 
+  // Graceful Fallback UI ("System Denied" - Order timeout empty state)
+  if (status === 'System Denied') {
+    return (
+      <div className="max-w-md mx-auto px-6 py-16 text-center animate-scale-in">
+        <div className="card p-8 border border-border bg-surface">
+          <div className="w-16 h-16 rounded-2xl bg-warning/10 flex items-center justify-center text-warning mx-auto mb-6">
+            <ShieldAlert size={32} />
+          </div>
+          <h2 className="text-xl font-extrabold text-text">All our local kitchens are currently busy!</h2>
+          <p className="text-muted text-sm mt-3 leading-relaxed">
+            Your order has been placed on standby.
+          </p>
+          <p className="text-xs text-muted/80 mt-2 bg-surface-2 p-3 rounded-xl border border-border">
+            Our team will contact you shortly to assist with your order.
+          </p>
+          <Button className="mt-8 w-full animate-pulse" onClick={onBack}>
+            Return to Browse
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12">
-      <button onClick={onBack} className="flex items-center gap-2 text-muted hover:text-white transition-colors mb-8 group">
+    <div className="max-w-2xl mx-auto px-6 py-12">
+      <button onClick={onBack} className="flex items-center gap-2 text-muted hover:text-text transition-colors mb-8 group">
         <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to browsing
       </button>
 
-      <div className="card p-8 animate-fade-in-up">
+      <div className="card p-8 animate-fade-in-up bg-surface border border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h1 className="text-2xl font-bold">Order Tracking</h1>
-            <p className="text-muted text-sm mt-1">Order #{order.id.slice(0, 8).toUpperCase()}</p>
+            <h1 className="text-2xl font-bold">Live Tracking</h1>
+            <p className="text-muted text-xs mt-1">Order ID: {order.id.slice(0, 8).toUpperCase()}</p>
           </div>
-          <Badge variant={status === 'delivered' ? 'success' : 'accent'}>{status}</Badge>
+          <Badge variant={status === 'delivered' ? 'success' : 'accent'}>
+            {status.replace(/_/g, ' ')}
+          </Badge>
         </div>
 
-        {/* Progress */}
-        <div className="mt-8">
+        {/* Progress Horizontal Timeline */}
+        <div className="mt-10 mb-8">
           <div className="flex items-center justify-between relative">
-            <div className="absolute top-5 left-5 right-5 h-0.5 bg-border" />
+            <div className="absolute top-5 left-5 right-5 h-1 bg-border rounded-full" />
             <div
-              className="absolute top-5 left-5 h-0.5 bg-gradient-to-r from-accent to-accent-2 transition-all duration-500"
-              style={{ width: `calc(${(currentIdx / (stages.length - 1)) * 100}% - ${currentIdx === 0 ? '0px' : '20px'})` }}
+              className="absolute top-5 left-5 h-1 bg-gradient-to-r from-accent to-accent-2 transition-all duration-500 rounded-full"
+              style={{ width: `calc(${(currentIdx / (stages.length - 1)) * 100}% - ${currentIdx === 0 ? '0px' : '15px'})` }}
             />
             {stages.map((s, i) => (
-              <div key={s.id} className="relative z-10 flex flex-col items-center gap-2">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 ${i <= currentIdx ? 'bg-accent text-white' : 'bg-surface-2 text-muted'}`}>
-                  <s.icon size={18} />
+              <div key={s.id} className="relative z-10 flex flex-col items-center gap-2 shrink-0">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 border-2 ${i <= currentIdx ? 'bg-accent border-accent text-white shadow-md' : 'bg-surface-2 border-border text-muted'}`}>
+                  <s.icon size={16} />
                 </div>
-                <p className={`text-xs font-semibold text-center ${i <= currentIdx ? 'text-white' : 'text-muted'}`}>{s.label}</p>
+                <p className={`text-[10px] font-extrabold uppercase tracking-wider text-center ${i <= currentIdx ? 'text-text' : 'text-muted'}`}>{s.label}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Order details */}
-        <div className="mt-8 p-4 rounded-xl bg-surface-2">
-          <p className="text-xs text-muted uppercase tracking-wider mb-2">Order Summary</p>
-          <p className="font-semibold">{order.item_name}</p>
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-sm text-muted">Deliver to: {order.client_address}</span>
-            <span className="text-lg font-bold text-accent">₹{order.price}</span>
-          </div>
-        </div>
-
-        {/* OTP */}
-        {order.otp && (
-          <div className="mt-4 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-            <div className="flex items-center gap-2 mb-2">
-              <KeyRound size={18} className="text-green-400" />
-              <p className="text-sm font-bold text-green-400">Delivery OTP</p>
+        {/* OTP Indicator */}
+        {liveOrder.otp && status !== 'delivered' && (
+          <div className="my-6 p-5 rounded-2xl bg-green-500/10 border border-green-500/20 text-center animate-scale-in">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <KeyRound size={16} className="text-green-500" />
+              <p className="text-xs font-bold text-green-600 uppercase tracking-wider">Delivery OTP</p>
             </div>
-            <p className="text-3xl font-bold tracking-[0.4em] text-green-400">{order.otp}</p>
-            <p className="text-xs text-muted mt-2">Share this OTP with the delivery partner to confirm delivery</p>
+            <p className="text-3xl font-extrabold tracking-[0.3em] text-green-600 my-2">{liveOrder.otp}</p>
+            <p className="text-xs text-muted max-w-sm mx-auto">Provide this code to the verified delivery partner once your food arrives safely.</p>
           </div>
         )}
 
+        {/* Order Details */}
+        <div className="mt-8 p-5 rounded-2xl bg-surface-2 border border-border">
+          <p className="text-xs text-muted uppercase tracking-wider font-bold mb-3">Order Summary</p>
+          <p className="font-bold text-text text-sm">{liveOrder.item_name}</p>
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50 text-sm">
+            <span className="text-muted">Deliver to: <span className="font-semibold text-text">{liveOrder.client_address}</span></span>
+            <span className="text-lg font-extrabold text-accent">₹{liveOrder.price}</span>
+          </div>
+        </div>
+
         {status === 'delivered' && (
-          <div className="mt-4 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center animate-scale-in">
-            <CheckCircle2 size={32} className="text-green-400 mx-auto mb-2" />
-            <p className="font-bold text-green-400">Order Delivered!</p>
-            <p className="text-sm text-muted mt-1">Enjoy your meal!</p>
+          <div className="mt-6 p-6 rounded-2xl bg-green-500/10 border border-green-500/20 text-center animate-scale-in">
+            <CheckCircle2 size={36} className="text-green-500 mx-auto mb-2" />
+            <p className="font-extrabold text-green-600 text-lg">Order Delivered Successfully!</p>
+            <p className="text-sm text-muted mt-1">Thank you for ordering with VIKRAM ADVERTISING.</p>
           </div>
         )}
       </div>

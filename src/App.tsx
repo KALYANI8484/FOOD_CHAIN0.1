@@ -10,13 +10,20 @@ type Screen = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'cl
 
 function App() {
   const [screen, setScreen] = useState<Screen>('landing');
-  const [clientZip] = useState('');
+  const [clientZip, setClientZip] = useState('');
+  const [sessionCred, setSessionCred] = useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [screen]);
 
-  const handleLoginSuccess = (role: 'super_admin' | 'sub_admin' | 'vendor' | 'client') => {
+  const handleLoginSuccess = (role: 'super_admin' | 'sub_admin' | 'vendor' | 'client', cred?: string) => {
+    if (role === 'client' && cred) {
+      setClientZip(cred);
+    }
+    if (cred) {
+      setSessionCred(cred);
+    }
     setScreen(role);
   };
 
@@ -34,8 +41,8 @@ function App() {
         <Login onLogin={handleLoginSuccess} onBack={() => setScreen('landing')} />
       )}
       {screen === 'super_admin' && <SuperAdmin onExit={() => setScreen('landing')} />}
-      {screen === 'sub_admin' && <SubAdmin onExit={() => setScreen('landing')} />}
-      {screen === 'vendor' && <Vendor onExit={() => setScreen('landing')} />}
+      {screen === 'sub_admin' && <SubAdmin onExit={() => setScreen('landing')} adminEmail={sessionCred} />}
+      {screen === 'vendor' && <Vendor onExit={() => setScreen('landing')} vendorPhone={sessionCred} />}
       {screen === 'client' && <Client onExit={() => setScreen('landing')} initialZip={clientZip} />}
     </>
   );
