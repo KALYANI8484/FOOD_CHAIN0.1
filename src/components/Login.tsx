@@ -3,7 +3,6 @@ import {
   UtensilsCrossed, Shield, Users, Store, ShoppingBag,
   Eye, EyeOff, ArrowRight, Lock, Mail, MapPin, ChevronLeft,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { Button, Spinner } from './ui';
 
 type Role = 'super_admin' | 'sub_admin' | 'vendor' | 'client';
@@ -149,7 +148,7 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
 
   return (
     <div className="max-w-md mx-auto animate-scale-in">
-      <button onClick={onBack} className="flex items-center gap-1.5 text-muted hover:text-white transition-colors text-sm mb-6 group">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-muted hover:text-text transition-colors text-sm mb-6 group">
         <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> All roles
       </button>
 
@@ -218,7 +217,7 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                     />
                     <button
                       onClick={() => setShowPw(!showPw)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
                     >
                       {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>

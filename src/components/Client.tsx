@@ -171,7 +171,7 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
       {/* First-Time Client Onboarding Modal */}
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowOnboarding(false)} />
+          <div className="absolute inset-0 bg-[#111118]/25 backdrop-blur-sm" onClick={() => setShowOnboarding(false)} />
           <div className="relative w-full max-w-md card glass max-h-[90vh] overflow-y-auto animate-scale-in">
             <div className="p-6 space-y-5">
               <div className="text-center">
@@ -206,7 +206,7 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
       {/* Returning Client Confirm Modal */}
       {showReturning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowReturning(false)} />
+          <div className="absolute inset-0 bg-[#111118]/25 backdrop-blur-sm" onClick={() => setShowReturning(false)} />
           <div className="relative w-full max-w-sm card glass animate-scale-in">
             <div className="p-6 space-y-5">
               <div className="text-center">

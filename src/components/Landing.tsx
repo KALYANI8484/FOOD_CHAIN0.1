@@ -158,14 +158,14 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <div
                 key={c.name}
                 onClick={() => onNavigate('client')}
-                className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border"
+                className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border/50 frosted-glow"
               >
                 <img
                   src={c.img}
                   alt={c.name}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#111118]/75 via-[#111118]/25 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-5">
                   <p className="font-bold text-white text-lg">{c.name}</p>
                 </div>
@@ -191,9 +191,9 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             
             {/* Left: Mobile Phone mockup displaying dynamic QR */}
             <div className="lg:col-span-5 flex justify-center animate-fade-in-up">
-              <div className="w-[300px] h-[580px] rounded-[48px] bg-text p-3 shadow-2xl relative border-4 border-muted/20">
+              <div className="w-[300px] h-[580px] rounded-[48px] frosted-card p-3 shadow-2xl relative border-4 border-border/30">
                 {/* Speaker */}
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-4 bg-muted rounded-full" />
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-4 bg-border rounded-full" />
                 
                 {/* Phone screen */}
                 <div className="w-full h-full rounded-[40px] bg-bg overflow-hidden flex flex-col items-center justify-center p-6 text-center relative border border-muted/10">

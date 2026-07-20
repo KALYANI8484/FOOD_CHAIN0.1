@@ -30,13 +30,13 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#111118]/30 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative w-full ${sizes[size]} card glass max-h-[90vh] overflow-y-auto animate-scale-in`}>
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 glass z-10">
             <h3 className="text-lg font-bold">{title}</h3>
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-2 transition-colors group">
-              <X size={18} className="text-muted group-hover:text-white transition-colors" />
+              <X size={18} className="text-muted group-hover:text-text transition-colors" />
             </button>
           </div>
         )}
@@ -68,7 +68,7 @@ export function Drawer({
 
   return (
     <div className="fixed inset-0 z-50 animate-fade-in">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#111118]/30 backdrop-blur-sm" onClick={onClose} />
       <div
         className={`absolute top-0 ${side === 'right' ? 'right-0 animate-slide-in-right' : 'left-0 animate-slide-in-left'} h-full w-full max-w-md card glass overflow-y-auto`}
       >
@@ -76,7 +76,7 @@ export function Drawer({
           <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 glass z-10">
             <h3 className="text-lg font-bold">{title}</h3>
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-2 transition-colors group">
-              <X size={18} className="text-muted group-hover:text-white transition-colors" />
+              <X size={18} className="text-muted group-hover:text-text transition-colors" />
             </button>
           </div>
         )}
@@ -142,10 +142,10 @@ export function Button({
 }) {
   const variants = {
     primary: 'bg-gradient-to-r from-accent to-accent-2 text-white glow-accent hover:scale-[1.02]',
-    secondary: 'bg-surface-2 text-white border border-border hover:border-accent/40',
-    ghost: 'text-muted hover:text-white hover:bg-surface-2',
-    danger: 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20',
-    outline: 'border border-border text-white hover:border-accent/40 hover:bg-surface-2',
+    secondary: 'bg-surface-2 text-text border border-border hover:border-accent/40',
+    ghost: 'text-muted hover:text-text hover:bg-surface-2',
+    danger: 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20',
+    outline: 'border border-border text-text hover:border-accent/40 hover:bg-surface-2',
   };
   const sizes = {
     sm: 'px-3 py-1.5 text-sm',
