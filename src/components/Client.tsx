@@ -131,7 +131,7 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
         <LocationGate 
           initialZip={zip} 
           initialLandmark={landmark} 
-          onSubmit={clientProfile ? (z, l) => { setRetForm({ zip_code: z, landmark: l }); setShowReturning(true); } : handleStartOrder} 
+          onSubmit={handleLocationSubmit} 
         />
       )}
       {step === 'browse' && (

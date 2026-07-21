@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   UtensilsCrossed, Shield, Users, Store, ShoppingBag,
-  Eye, EyeOff, ArrowRight, Lock, Mail, MapPin, ChevronLeft,
+  Eye, EyeOff, ArrowRight, Lock, Mail, ChevronLeft,
 } from 'lucide-react';
 import { Button, Spinner } from './ui';
 
@@ -67,7 +67,7 @@ export function Login({ onLogin, onBack, initialRole }: LoginProps) {
         </div>
 
         {!selected ? (
-          <RoleSelector onSelect={setSelected} />
+          <RoleSelector onSelect={(r) => r === 'client' ? onLogin('client') : setSelected(r)} />
         ) : (
           <CredentialForm role={selected} onLogin={onLogin} onBack={() => setSelected(null)} />
         )}
@@ -109,7 +109,6 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
   const meta = roles.find((r) => r.id === role)!;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [zip, setZip] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -143,10 +142,6 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
           return;
         }
         onLogin('vendor', email.trim());
-
-      } else if (role === 'client') {
-        if (!zip || zip.length < 4) { setError('Please enter a valid ZIP code'); return; }
-        onLogin('client', zip);
       }
     } finally {
       setLoading(false);
@@ -171,29 +166,10 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
         </div>
 
         <div className="space-y-4">
-          {role === 'client' ? (
-            <>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted uppercase tracking-wider">Your ZIP Code</label>
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                  <input
-                    value={zip}
-                    onChange={(e) => setZip(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    placeholder="e.g. 560038"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
-                  />
-                </div>
-
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-                  Email
-                </label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider">
+              Email
+            </label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                   <input
@@ -231,10 +207,6 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                   </div>
                 </div>
               )}
-
-
-            </>
-          )}
 
           {error && (
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
