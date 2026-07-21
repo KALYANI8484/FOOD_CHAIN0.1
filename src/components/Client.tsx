@@ -17,15 +17,7 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
   const [cart, setCart] = useState<Record<string, { item: VendorItem; qty: number }>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showReturning, setShowReturning] = useState(false);
-  const [onboardLoading, setOnboardLoading] = useState(false);
   const { toast, show } = useToast();
-
-  // Onboarding form state (first-time clients)
-  const [obForm, setObForm] = useState({ name: '', phone: '', zip_code: '', landmark: '', address: '' });
-  // Returning client confirm state
-  const [retForm, setRetForm] = useState({ zip_code: '', landmark: '' });
 
   const handleLocationSubmit = (selectedZip: string, selectedLandmark: string) => {
     setZip(selectedZip);
@@ -33,68 +25,7 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
     setStep('browse');
   };
 
-  // Check if client exists by phone when they try to order
-  const handleStartOrder = async (selectedZip: string, selectedLandmark: string) => {
-    setZip(selectedZip);
-    setLandmark(selectedLandmark);
-    // Show onboarding modal for first-time, returning modal for existing
-    setObForm(f => ({ ...f, zip_code: selectedZip, landmark: selectedLandmark }));
-    setRetForm({ zip_code: selectedZip, landmark: selectedLandmark });
-    setShowOnboarding(true);
-  };
 
-  // First-time registration
-  const handleOnboardSubmit = async () => {
-    if (!obForm.name || !obForm.phone || !obForm.zip_code) {
-      show('Please fill in Name, Phone and Zip Code', 'error');
-      return;
-    }
-    setOnboardLoading(true);
-    // Check if phone already exists
-    const { data: existing } = await supabase.from('clients').select('*').eq('phone', obForm.phone).maybeSingle();
-    if (existing) {
-      // Already registered — update and proceed
-      await supabase.from('clients').update({ zip_code: obForm.zip_code, landmark: obForm.landmark || null }).eq('id', existing.id);
-      setClientProfile({ ...existing, zip_code: obForm.zip_code, landmark: obForm.landmark });
-      setZip(obForm.zip_code);
-      setLandmark(obForm.landmark);
-      setShowOnboarding(false);
-      setStep('browse');
-      show('Welcome back! Location updated.', 'success');
-    } else {
-      // New client
-      const { data, error } = await supabase.from('clients').insert({
-        name: obForm.name,
-        phone: obForm.phone,
-        zip_code: obForm.zip_code,
-        landmark: obForm.landmark || null,
-        address: obForm.address || null,
-      });
-      if (error) {
-        show('Registration failed: ' + (error.message || 'Unknown error'), 'error');
-      } else {
-        setClientProfile(data);
-        setZip(obForm.zip_code);
-        setLandmark(obForm.landmark);
-        setShowOnboarding(false);
-        setStep('browse');
-        show('Account created! Happy ordering.', 'success');
-      }
-    }
-    setOnboardLoading(false);
-  };
-
-  // Returning client confirm
-  const handleReturningConfirm = async () => {
-    if (clientProfile) {
-      await supabase.from('clients').update({ zip_code: retForm.zip_code, landmark: retForm.landmark || null }).eq('id', clientProfile.id);
-      setClientProfile({ ...clientProfile, zip_code: retForm.zip_code, landmark: retForm.landmark });
-    }
-    setZip(retForm.zip_code);
-    setLandmark(retForm.landmark);
-    setShowReturning(false);
-    setStep('browse');
-  };
 
   return (
     <div className="min-h-screen bg-bg noise relative text-text">
@@ -168,60 +99,7 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
         />
       </Drawer>
 
-      {/* First-Time Client Onboarding Modal */}
-      {showOnboarding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="absolute inset-0 bg-[#111118]/25 backdrop-blur-sm" onClick={() => setShowOnboarding(false)} />
-          <div className="relative w-full max-w-md card glass max-h-[90vh] overflow-y-auto animate-scale-in">
-            <div className="p-6 space-y-5">
-              <div className="text-center">
-                <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
-                  <UtensilsCrossed size={24} className="text-accent" />
-                </div>
-                <h2 className="text-xl font-extrabold text-text">Create Your Account</h2>
-                <p className="text-sm text-muted mt-1">Quick setup to start ordering</p>
-              </div>
-              <Input label="Full Name *" value={obForm.name} onChange={v => setObForm({...obForm, name: v})} placeholder="e.g. Vikram Sharma" required />
-              <Input label="Phone Number *" value={obForm.phone} onChange={v => setObForm({...obForm, phone: v})} placeholder="e.g. +91 99999 88888" required />
-              <Input label="Zip Code *" value={obForm.zip_code} onChange={v => setObForm({...obForm, zip_code: v})} placeholder="e.g. 560038" required />
-              <Input label="Landmark" value={obForm.landmark} onChange={v => setObForm({...obForm, landmark: v})} placeholder="e.g. Near Metro Station" />
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Full Address</label>
-                <textarea
-                  rows={2}
-                  value={obForm.address}
-                  onChange={e => setObForm({...obForm, address: e.target.value})}
-                  placeholder="Building, street, area"
-                  className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none transition-all text-sm"
-                />
-              </div>
-              <Button className="w-full magnetic-hover" size="lg" onClick={handleOnboardSubmit} disabled={onboardLoading}>
-                {onboardLoading ? <Spinner /> : <>Create & Start Ordering <ArrowRight size={16} /></>}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Returning Client Confirm Modal */}
-      {showReturning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="absolute inset-0 bg-[#111118]/25 backdrop-blur-sm" onClick={() => setShowReturning(false)} />
-          <div className="relative w-full max-w-sm card glass animate-scale-in">
-            <div className="p-6 space-y-5">
-              <div className="text-center">
-                <h2 className="text-lg font-extrabold text-text">Welcome Back{clientProfile ? `, ${clientProfile.name}` : ''}!</h2>
-                <p className="text-xs text-muted mt-1">Confirm your delivery location</p>
-              </div>
-              <Input label="Zip Code" value={retForm.zip_code} onChange={v => setRetForm({...retForm, zip_code: v})} placeholder="560038" />
-              <Input label="Landmark" value={retForm.landmark} onChange={v => setRetForm({...retForm, landmark: v})} placeholder="Near Metro Station" />
-              <Button className="w-full" size="lg" onClick={handleReturningConfirm}>
-                Confirm & Browse <ArrowRight size={16} />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {toast && <Toast message={toast.message} type={toast.type} />}
     </div>
@@ -531,6 +409,15 @@ function CartView({ cart, setCart, clientZip, clientLandmark, clientProfile, onC
     }
     
     setPlacing(true);
+
+    // Save client profile silently so they are remembered next time
+    const { data: existingClient } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
+    if (existingClient) {
+      await supabase.from('clients').update({ name, address, zip_code: clientZip, landmark: clientLandmark || null }).eq('id', existingClient.id);
+    } else {
+      await supabase.from('clients').insert({ name, phone, address, zip_code: clientZip, landmark: clientLandmark || null });
+    }
+
     const { data, error } = await supabase.from('orders').insert({
       client_name: name,
       client_phone: phone,

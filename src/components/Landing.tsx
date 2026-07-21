@@ -11,15 +11,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const [showRegModal, setShowRegModal] = useState(false);
-  
-  // Registration Form State (exactly 4 fields)
-  const [regForm, setRegForm] = useState({
-    name: '',
-    landmark: '',
-    zipCode: '',
-    address: ''
-  });
+  // Registration modal removed to streamline flow
 
   const [scrollY, setScrollY] = useState(0);
 
@@ -54,16 +46,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
     { name: 'Premium', price: '₹1,499', validity: '90 Days', items: '30 Items', clients: '100 Clients', desc: 'Maximum reach and support' },
   ];
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regForm.name || !regForm.landmark || !regForm.zipCode || !regForm.address) {
-      alert('All registration fields are required.');
-      return;
-    }
-    // Route to client view passing the Zip Code as location gate
-    setShowRegModal(false);
-    onNavigate('client');
-  };
+  // Removed redundant handleRegisterSubmit
 
 
 
@@ -109,7 +92,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <Lock size={14} className="text-accent" />
               <span>Team Sign-In</span>
             </button>
-            <Button size="sm" onClick={() => setShowRegModal(true)}>
+            <Button size="sm" onClick={() => onNavigate('client')}>
               Start Ordering
             </Button>
           </div>
@@ -292,49 +275,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         </div>
       </footer>
 
-      {/* Client Onboarding Registration Modal */}
-      <Modal open={showRegModal} onClose={() => setShowRegModal(false)} title="Client Registration">
-        <form onSubmit={handleRegisterSubmit} className="space-y-4">
-          <p className="text-sm text-muted">Register to start ordering premium meals near you.</p>
-          
-          <Input 
-            label="Full Name" 
-            value={regForm.name} 
-            onChange={(v) => setRegForm({ ...regForm, name: v })} 
-            required 
-            placeholder="e.g. Vikram Sharma"
-          />
-          <Input 
-            label="ZIP Code" 
-            value={regForm.zipCode} 
-            onChange={(v) => setRegForm({ ...regForm, zipCode: v })} 
-            required 
-            placeholder="e.g. 560038"
-          />
-          <Input 
-            label="Landmark" 
-            value={regForm.landmark} 
-            onChange={(v) => setRegForm({ ...regForm, landmark: v })} 
-            required 
-            placeholder="e.g. Near Indiranagar Metro Station"
-          />
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Full Address</label>
-            <textarea
-              required
-              rows={3}
-              value={regForm.address}
-              onChange={(e) => setRegForm({ ...regForm, address: e.target.value })}
-              placeholder="Enter your flat number, building, street address"
-              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none transition-all text-sm"
-            />
-          </div>
-
-          <Button type="submit" className="w-full mt-2">
-            Confirm & Start Ordering
-          </Button>
-        </form>
-      </Modal>
+      {/* Client Onboarding Registration Modal Removed */}
     </div>
   );
 }

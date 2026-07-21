@@ -31,10 +31,7 @@ function App() {
     <>
       {screen === 'landing' && (
         <Landing
-          onNavigate={(role) => {
-            if (role === 'landing') setScreen('landing');
-            else setScreen('login');
-          }}
+          onNavigate={(role) => setScreen(role)}
         />
       )}
       {screen === 'login' && (
