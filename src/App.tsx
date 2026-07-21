@@ -12,6 +12,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>('landing');
   const [clientZip, setClientZip] = useState('');
   const [sessionCred, setSessionCred] = useState('');
+  const [loginRole, setLoginRole] = useState<Screen | null>(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -27,18 +28,24 @@ function App() {
     setScreen(role);
   };
 
+  const handleNavigate = (role: Screen) => {
+    if (role === 'landing') {
+      setScreen('landing');
+      setLoginRole(null);
+      return;
+    }
+
+    setLoginRole(role);
+    setScreen('login');
+  };
+
   return (
     <>
       {screen === 'landing' && (
-        <Landing
-          onNavigate={(role) => {
-            if (role === 'landing') setScreen('landing');
-            else setScreen('login');
-          }}
-        />
+        <Landing onNavigate={handleNavigate} />
       )}
       {screen === 'login' && (
-        <Login onLogin={handleLoginSuccess} onBack={() => setScreen('landing')} />
+        <Login initialRole={loginRole === 'client' ? 'client' : undefined} onLogin={handleLoginSuccess} onBack={() => setScreen('landing')} />
       )}
       {screen === 'super_admin' && <SuperAdmin onExit={() => setScreen('landing')} />}
       {screen === 'sub_admin' && <SubAdmin onExit={() => setScreen('landing')} adminEmail={sessionCred} />}

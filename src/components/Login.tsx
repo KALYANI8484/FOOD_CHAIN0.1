@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   UtensilsCrossed, Shield, Users, Store, ShoppingBag,
   Eye, EyeOff, ArrowRight, Lock, Mail, MapPin, ChevronLeft,
@@ -10,6 +10,7 @@ type Role = 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 interface LoginProps {
   onLogin: (role: Role, cred?: string) => void;
   onBack?: () => void;
+  initialRole?: Role;
 }
 
 const SUPER_ADMIN_EMAIL = '2711vikram@gmail.com';
@@ -28,8 +29,14 @@ const roles: { id: Role; label: string; desc: string; icon: typeof Shield; color
   { id: 'client', label: 'Client', desc: 'Order your favourite food', icon: ShoppingBag, color: 'text-purple-400', gradient: 'from-purple-500/20 to-pink-500/10 border-purple-500/20' },
 ];
 
-export function Login({ onLogin, onBack }: LoginProps) {
-  const [selected, setSelected] = useState<Role | null>(null);
+export function Login({ onLogin, onBack, initialRole }: LoginProps) {
+  const [selected, setSelected] = useState<Role | null>(initialRole ?? null);
+
+  useEffect(() => {
+    if (initialRole) {
+      setSelected(initialRole);
+    }
+  }, [initialRole]);
 
   return (
     <div className="min-h-screen bg-bg noise relative overflow-hidden flex items-center justify-center p-6">
