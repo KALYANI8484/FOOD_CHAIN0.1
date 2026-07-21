@@ -19,7 +19,13 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const { toast, show } = useToast();
 
-  const handleLocationSubmit = (selectedZip: string, selectedLandmark: string) => {
+  const handleLocationSubmit = async (name: string, phone: string, selectedZip: string, selectedLandmark: string) => {
+    const { data } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
+    if (data) {
+      setClientProfile(data);
+    } else {
+      setClientProfile({ id: '', name, phone, zip_code: selectedZip, landmark: selectedLandmark, address: '', created_at: '' } as ClientProfile);
+    }
     setZip(selectedZip);
     setLandmark(selectedLandmark);
     setStep('browse');
@@ -113,11 +119,14 @@ function LocationGate({
 }: { 
   initialZip: string; 
   initialLandmark: string; 
-  onSubmit: (zip: string, landmark: string) => void 
+  onSubmit: (name: string, phone: string, zip: string, landmark: string) => Promise<void> | void 
 }) {
+  const [nameInput, setNameInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
   const [zipInput, setZipInput] = useState(initialZip);
   const [landmarkInput, setLandmarkInput] = useState(initialLandmark);
   const [detecting, setDetecting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleGPSDetect = () => {
     setDetecting(true);
@@ -129,9 +138,10 @@ function LocationGate({
     }, 1200);
   };
 
-  const handleConfirm = () => {
-    if (zipInput.length >= 4) {
-      onSubmit(zipInput, landmarkInput);
+  const handleConfirm = async () => {
+    if (zipInput.length >= 4 && nameInput && phoneInput) {
+      setSubmitting(true);
+      await onSubmit(nameInput, phoneInput, zipInput, landmarkInput);
     }
   };
 
@@ -148,6 +158,18 @@ function LocationGate({
         <p className="text-muted mt-3 text-sm">Enter your Delivery Location to browse local verified kitchens</p>
         
         <div className="mt-8 space-y-4 text-left">
+          <Input 
+            label="Your Name *"
+            value={nameInput}
+            onChange={setNameInput}
+            placeholder="Enter full name"
+          />
+          <Input 
+            label="Phone Number *"
+            value={phoneInput}
+            onChange={setPhoneInput}
+            placeholder="e.g. +91 99999 88888"
+          />
           <div className="relative">
             <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" />
             <input
@@ -179,9 +201,9 @@ function LocationGate({
             size="lg" 
             className="w-full mt-6" 
             onClick={handleConfirm} 
-            disabled={zipInput.length < 4 || detecting}
+            disabled={zipInput.length < 4 || !nameInput || !phoneInput || detecting || submitting}
           >
-            Confirm & Browse <ArrowRight size={18} />
+            {submitting ? <Loader2 size={18} className="animate-spin" /> : <>Confirm & Browse <ArrowRight size={18} /></>}
           </Button>
         </div>
         <p className="text-xs text-muted mt-6">Try GPS button for Indiranagar demo kitchens</p>
