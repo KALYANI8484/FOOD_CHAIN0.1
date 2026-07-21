@@ -39,7 +39,7 @@ export function Login({ onLogin, onBack, initialRole }: LoginProps) {
   }, [initialRole]);
 
   return (
-    <div className="min-h-screen bg-bg noise relative overflow-hidden flex items-center justify-center p-6">
+    <div className="min-h-screen noise relative overflow-hidden flex items-center justify-center p-6">
       {/* Back to home */}
       {onBack && (
         <button onClick={onBack} className="absolute top-6 left-6 text-muted hover:text-text transition-colors text-sm flex items-center gap-1.5 group z-10">

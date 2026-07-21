@@ -4,13 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0a0a0b',
-        surface: '#131316',
-        'surface-2': '#1a1a1f',
-        border: '#26262d',
-        accent: '#ff6b35',
-        'accent-2': '#ff9f1c',
-        muted: '#8b8b93',
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
+        border: 'var(--border)',
+        text: 'var(--text)',
+        accent: 'var(--accent)',
+        'accent-2': 'var(--accent-2)',
+        muted: 'var(--muted)',
+        success: 'var(--success)',
+        warning: 'var(--warning)',
+        error: 'var(--error)',
       },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
