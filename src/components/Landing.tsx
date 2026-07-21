@@ -11,15 +11,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const [showRegModal, setShowRegModal] = useState(false);
-  
-  // Registration Form State (exactly 4 fields)
-  const [regForm, setRegForm] = useState({
-    name: '',
-    landmark: '',
-    zipCode: '',
-    address: ''
-  });
+  // Registration modal removed to streamline flow
 
   const [scrollY, setScrollY] = useState(0);
 
@@ -54,16 +46,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
     { name: 'Premium', price: '₹1,499', validity: '90 Days', items: '30 Items', clients: '100 Clients', desc: 'Maximum reach and support' },
   ];
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regForm.name || !regForm.landmark || !regForm.zipCode || !regForm.address) {
-      alert('All registration fields are required.');
-      return;
-    }
-    // Route to client view passing the Zip Code as location gate
-    setShowRegModal(false);
-    onNavigate('client');
-  };
+  // Removed redundant handleRegisterSubmit
 
   const scrollToVendorPartners = () => {
     document.getElementById('vendor-partners')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -111,7 +94,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <Lock size={14} className="text-accent" />
               <span>Team Sign-In</span>
             </button>
-            <Button size="sm" onClick={() => setShowRegModal(true)}>
+            <Button size="sm" onClick={() => onNavigate('client')}>
               Start Ordering
             </Button>
           </div>
@@ -141,7 +124,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 Experience kitchen-fresh catering from verified neighborhood chefs. Fast delivery, dynamic menu planning, and premium quality ingredients.
               </p>
               <div className="flex flex-row items-center justify-center gap-4 mt-10">
-                <Button size="lg" className="magnetic-hover" onClick={() => setShowRegModal(true)}>
+                <Button size="lg" className="magnetic-hover" onClick={() => onNavigate('client')}>
                   Explore Master Menu
                 </Button>
                 <Button size="lg" variant="outline" className="magnetic-hover" onClick={scrollToVendorPartners}>
@@ -160,13 +143,13 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             {categories.map((c) => (
               <div
                 key={c.name}
-                onClick={() => setShowRegModal(true)}
+                onClick={() => onNavigate('client')}
                 className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border/50 frosted-glow"
               >
                 <img
                   src={c.img}
                   alt={c.name}
-                  onClick={() => setShowRegModal(true)}
+                  onClick={() => onNavigate('client')}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#111118]/75 via-[#111118]/25 to-transparent" />
@@ -279,70 +262,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         </div>
       </footer>
 
-      {/* Client Onboarding Registration Modal */}
-      <Modal open={showRegModal} onClose={() => setShowRegModal(false)} title="Client Registration">
-        <form onSubmit={handleRegisterSubmit} className="space-y-4">
-          <p className="text-sm text-muted">Register to start ordering premium meals near you.</p>
-          
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Full Name <span className="text-accent">*</span>
-            </label>
-            <input
-              type="text"
-              value={regForm.name}
-              onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
-              required
-              placeholder="e.g. Vikram Sharma"
-              className="w-full px-4 py-3 rounded-3xl bg-[#111118]/95 border border-white/10 text-white placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all text-sm"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-              ZIP Code <span className="text-accent">*</span>
-            </label>
-            <input
-              type="text"
-              value={regForm.zipCode}
-              onChange={(e) => setRegForm({ ...regForm, zipCode: e.target.value })}
-              required
-              placeholder="e.g. 560038"
-              className="w-full px-4 py-3 rounded-3xl bg-[#111118]/95 border border-white/10 text-white placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all text-sm"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Landmark <span className="text-accent">*</span>
-            </label>
-            <input
-              type="text"
-              value={regForm.landmark}
-              onChange={(e) => setRegForm({ ...regForm, landmark: e.target.value })}
-              required
-              placeholder="e.g. Near Indiranagar Metro Station"
-              className="w-full px-4 py-3 rounded-3xl bg-[#111118]/95 border border-white/10 text-white placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all text-sm"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Full Address</label>
-            <textarea
-              required
-              rows={3}
-              value={regForm.address}
-              onChange={(e) => setRegForm({ ...regForm, address: e.target.value })}
-              placeholder="Enter your flat number, building, street address"
-              className="w-full px-4 py-3 rounded-3xl bg-[#111118]/95 border border-white/10 text-white placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all text-sm"
-            />
-          </div>
-
-          <Button type="submit" className="w-full mt-2">
-            Confirm & Start Ordering
-          </Button>
-        </form>
-      </Modal>
+      {/* Client Onboarding Registration Modal Removed */}
     </div>
   );
 }

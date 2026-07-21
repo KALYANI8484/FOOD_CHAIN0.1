@@ -42,7 +42,12 @@ function App() {
   return (
     <>
       {screen === 'landing' && (
-        <Landing onNavigate={handleNavigate} />
+        <Landing
+          onNavigate={(role) => {
+            if (role === 'landing') setScreen('landing');
+            else setScreen('login');
+          }}
+        />
       )}
       {screen === 'login' && (
         <Login initialRole={loginRole === 'client' ? 'client' : undefined} onLogin={handleLoginSuccess} onBack={() => setScreen('landing')} />
