@@ -258,7 +258,7 @@ html, body, #root {
   -webkit-backdrop-filter: blur(20px) saturate(170%);
   border: 1px solid rgba(226, 226, 238, 0.5);
   box-shadow:
-    0 4px 24px -4px rgba(100, 100, 140, 0.08),
+    0 4px 24px -4px rgba(253, 251, 251, 0.026),
     0 0 0 1px rgba(255, 255, 255, 0.6) inset;
 }
 
@@ -271,7 +271,7 @@ html, body, #root {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(200, 122, 47, 0.12), rgba(160, 160, 208, 0.08));
+  background: linear-gradient(135deg, rgba(200, 122, 47, 0.12), rgba(239, 239, 242, 0.08));
   z-index: -1;
   filter: blur(12px);
   opacity: 0;
