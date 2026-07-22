@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Store, Package, CreditCard, FileText, Settings, Users,
-  ShoppingBag, DollarSign, CheckCircle2, Search, Plus, Trash2, Upload, AlertCircle,
+  ShoppingBag, DollarSign, CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
   Activity as ActivityIcon, Eye, Edit2, FileUp
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
@@ -342,6 +342,9 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
   const [imgUploadingId, setImgUploadingId] = useState<string | null>(null);
 
+  const currentPlan = viewVendor ? plans.find((p) => p.id === viewVendor.plan_id) : undefined;
+  const inventoryLimit = currentPlan?.max_items ?? 5;
+
   const load = async () => {
     const [{ data: v }, { data: p }, { data: m }] = await Promise.all([
       supabase.from('vendors').select('*').order('created_at', { ascending: false }),
@@ -403,7 +406,6 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       plan_name: plan?.name || null,
       logo_url: formData.logo_url || null,
       qr_url: formData.qr_url || null,
-      // If plan changed, restart dates
       subscription_start: editVendor.plan_id !== formData.plan_id ? new Date().toISOString().slice(0, 10) : editVendor.subscription_start,
       subscription_end: editVendor.plan_id !== formData.plan_id ? new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10) : editVendor.subscription_end,
     }).eq('id', editVendor.id);
@@ -418,12 +420,24 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     load();
   };
 
+  const handlePrepareEdit = async (v: Vendor) => {
+    const { data } = await supabase.from('vendors').select('*').eq('id', v.id).single();
+    if (data) {
+      setEditVendor(data);
+    } else {
+      setEditVendor(v);
+    }
+  };
+
   const handleView = async (v: Vendor) => {
-    setViewVendor(v);
+    const { data: freshVendor } = await supabase.from('vendors').select('*').eq('id', v.id).single();
+    if (freshVendor) {
+      setViewVendor(freshVendor);
+    } else {
+      setViewVendor(v);
+    }
     const { data } = await supabase.from('vendor_inventory').select('*').eq('vendor_id', v.id);
-    const list = data || [];
-    setViewInventory(list);
-    setEditingInventory(JSON.parse(JSON.stringify(list))); // Deep clone for in-panel editing
+    setViewInventory(data || []);
   };
 
   const handleConfirmDelete = async () => {
@@ -576,20 +590,20 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       />
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-2xl border border-border">
+      <div className="flex flex-col sm:flex-row gap-4 bg-[#f9f1e5] p-4 rounded-2xl border border-amber-200">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search vendors..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-amber-200 text-slate-900 text-sm focus:border-amber-400 outline-none"
           />
         </div>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm font-semibold text-text focus:border-accent outline-none cursor-pointer"
+          className="px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-sm font-semibold text-slate-900 focus:border-amber-400 outline-none cursor-pointer"
         >
           <option value="all">All Vendors</option>
           <option value="approved">Live (Approved)</option>
@@ -600,11 +614,11 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       </div>
 
       {/* Table */}
-      <div className="card overflow-hidden bg-surface border border-border">
+      <div className="card overflow-hidden bg-[#f7efe3] border border-amber-200">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
+              <tr className="bg-[#f2dfc8] text-xs font-bold text-slate-700 uppercase tracking-wider">
                 <th className="px-6 py-4">Shop Name</th>
                 <th className="px-6 py-4">Owner</th>
                 <th className="px-6 py-4">ZIP</th>
@@ -613,25 +627,25 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60 text-sm">
+            <tbody className="divide-y divide-amber-200 text-sm text-slate-800">
               {filtered.map((v) => (
-                <tr key={v.id} className="hover:bg-surface-2/20 transition-all">
+                <tr key={v.id} className="hover:bg-[#f5e9d9] transition-all">
                   <td className="px-6 py-4 flex items-center gap-3">
                     {v.logo_url ? (
-                      <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-border" />
+                      <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-amber-200" />
                     ) : (
-                      <div className="w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center border border-border"><Store size={16} className="text-muted" /></div>
+                      <div className="w-10 h-10 rounded-xl bg-[#f1e2cd] flex items-center justify-center border border-amber-200"><Store size={16} className="text-slate-600" /></div>
                     )}
                     <div>
-                      <p className="font-bold text-text">{v.shop_name}</p>
-                      <p className="text-[10px] text-muted mt-0.5">Start: {v.subscription_start || 'N/A'}</p>
+                      <p className="font-bold text-slate-900">{v.shop_name}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Start: {v.subscription_start || 'N/A'}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="font-medium text-text">{v.owner_name}</p>
-                    <p className="text-xs text-muted mt-0.5">{v.phone}</p>
+                    <p className="font-medium text-slate-900">{v.owner_name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{v.phone}</p>
                   </td>
-                  <td className="px-6 py-4 font-semibold">{v.zip_code}</td>
+                  <td className="px-6 py-4 font-semibold text-slate-800">{v.zip_code}</td>
                   <td className="px-6 py-4">
                     <Badge variant="accent">{v.plan_name || 'Free'}</Badge>
                   </td>
@@ -642,9 +656,9 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => handleView(v)} className="p-2 rounded-lg bg-surface-2 border border-border/40 text-muted hover:text-text hover:bg-border/20 transition-all"><Eye size={14} /></button>
-                      <button onClick={() => setEditVendor(v)} className="p-2 rounded-lg bg-surface-2 border border-border/40 text-muted hover:text-accent hover:bg-border/20 transition-all"><Edit2 size={14} /></button>
-                      <button onClick={() => setDeleteConfirmVendor(v)} className="p-2 rounded-lg bg-surface-2 border border-border/40 text-muted hover:text-red-500 hover:bg-border/20 transition-all"><Trash2 size={14} /></button>
+                      <button onClick={() => handleView(v)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-amber-50 transition-all" aria-label="View vendor"><Eye size={16} /></button>
+                      <button onClick={() => handlePrepareEdit(v)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-amber-50 transition-all" aria-label="Edit vendor"><Edit2 size={16} /></button>
+                      <button onClick={() => setDeleteConfirmVendor(v)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all" aria-label="Delete vendor"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -699,104 +713,89 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       </Modal>
 
       {/* View Profile Drawer (includes Vendor Inventory Sub-Module edit grid) */}
-      <Drawer open={!!viewVendor} onClose={() => setViewVendor(null)} title="Vendor Administration Panel">
+      <Drawer open={!!viewVendor} onClose={() => setViewVendor(null)} title="Vendor Profile">
         {viewVendor && (
           <div className="space-y-6">
-            <div className="text-center pb-6 border-b border-border">
-              {viewVendor.logo_url ? (
-                <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-16 h-16 rounded-2xl object-cover mx-auto border border-border" />
-              ) : (
-                <div className="w-16 h-16 rounded-2xl bg-surface-2 mx-auto flex items-center justify-center border border-border"><Store size={24} className="text-muted" /></div>
-              )}
-              <h2 className="text-xl font-extrabold text-text mt-3">{viewVendor.shop_name}</h2>
-              <p className="text-xs text-muted mt-1">{viewVendor.owner_name} · {viewVendor.phone}</p>
-              
-              {/* Subscription Item Limit Display */}
-              <div className="mt-3 flex items-center justify-center gap-2">
-                <Badge variant="accent">
-                  Allowance: {viewInventory.length} / {plans.find(p => p.id === viewVendor.plan_id)?.max_items || 5} Items
-                </Badge>
-                <Badge variant={viewVendor.status === 'approved' ? 'success' : 'warning'}>{viewVendor.status}</Badge>
+            <div className="rounded-3xl border border-amber-200 bg-[#fcf5e7] p-6">
+              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+                <div className="flex items-center gap-4">
+                  {viewVendor.logo_url ? (
+                    <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-20 h-20 rounded-3xl object-cover border border-amber-200 shadow-sm" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-3xl bg-[#fff1dc] flex items-center justify-center border border-amber-200 shadow-sm">
+                      <Store size={28} className="text-amber-600" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xl font-extrabold text-slate-900">{viewVendor.shop_name}</p>
+                    <p className="text-sm text-slate-600 mt-1">Owned by {viewVendor.owner_name}</p>
+                    <p className="text-xs text-slate-500 mt-1">{viewVendor.phone} · {viewVendor.email || 'No email provided'}</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-3xl bg-white p-4 border border-amber-200">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500">Subscription Plan</p>
+                    <p className="mt-2 font-semibold text-slate-900">{viewVendor.plan_name || 'Free'}</p>
+                    <p className="text-xs text-slate-500 mt-1">{viewVendor.subscription_start || 'N/A'} → {viewVendor.subscription_end || 'N/A'}</p>
+                  </div>
+                  <div className="rounded-3xl bg-white p-4 border border-amber-200">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500">Registered Clients</p>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-900">{viewVendor.total_clients ?? 0}</p>
+                    <p className="text-xs text-slate-500 mt-1">Total clients captured in profile</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-3xl bg-white p-4 border border-amber-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Status</p>
+                  <p className="mt-2 font-semibold text-slate-900">{viewVendor.status === 'approved' ? 'Active' : viewVendor.status === 'expired' ? 'Expired' : 'Pending'}</p>
+                </div>
+                <div className="rounded-3xl bg-white p-4 border border-amber-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500">ZIP Code</p>
+                  <p className="mt-2 font-semibold text-slate-900">{viewVendor.zip_code}</p>
+                </div>
+                <div className="rounded-3xl bg-white p-4 border border-amber-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Address</p>
+                  <p className="mt-2 text-sm text-slate-700">{viewVendor.address}</p>
+                </div>
               </div>
             </div>
 
-            {/* Inventory sub-module grid */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className="text-xs font-bold text-muted uppercase tracking-wider">Item Inventory Grid</p>
-                <Button 
-                  size="sm" 
-                  onClick={handleInventoryAddRow} 
-                  disabled={viewInventory.length >= (plans.find(p => p.id === viewVendor.plan_id)?.max_items || 5)}
-                >
-                  + Add Item
-                </Button>
+            <div className="rounded-3xl border border-amber-200 bg-white p-6">
+              <div className="flex items-center justify-between gap-4 mb-5">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Current Food Inventory</p>
+                  <p className="text-xs text-slate-500 mt-1">A snapshot of active menu items linked to this vendor.</p>
+                </div>
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">{viewInventory.length} items</span>
               </div>
 
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                {editingInventory.map((item, idx) => (
-                  <div key={item.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-3 relative hover:border-accent/30 transition-all">
-                    {/* Header: Link to Master Item Dropdown */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select 
-                        label="Inherit Master Item" 
-                        value={item.master_item_id || ''} 
-                        onChange={(val) => handleMasterItemSelectChange(item.id, val)}
-                        options={masterItems.map(m => ({ value: m.id, label: `${m.name} (${m.category})` }))}
-                      />
-                      <div>
-                        <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Photo Upload</label>
-                        <div className="relative border border-border rounded-xl p-1 bg-surface flex items-center justify-center h-11">
-                          {item.image_url ? (
-                            <img src={item.image_url} alt="" className="w-8 h-8 rounded object-cover" />
-                          ) : (
-                            <Upload size={14} className="text-muted" />
-                          )}
-                          <input 
-                            type="file" 
-                            accept="image/*"
-                            disabled={imgUploadingId === item.id}
-                            onChange={(e) => handleInventoryImageUpload(e, item.id)}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                          />
-                          {imgUploadingId === item.id && (
-                            <div className="absolute inset-0 bg-surface/90 flex items-center justify-center rounded-xl"><Spinner /></div>
-                          )}
+              {viewInventory.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {viewInventory.map((item) => (
+                    <div key={item.id} className="flex gap-4 rounded-3xl border border-amber-200 bg-[#fff8ef] p-4">
+                      <div className="w-20 h-20 rounded-3xl overflow-hidden bg-slate-100 border border-amber-200">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.item_name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-slate-500">No image</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">{item.item_name}</p>
+                        <p className="text-xs text-slate-500 mt-1 truncate">{item.category || 'Menu item'}</p>
+                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-700">
+                          <span className="rounded-full bg-white px-2 py-1 border border-amber-200">₹{item.price}</span>
+                          <span className="rounded-full bg-white px-2 py-1 border border-amber-200">Qty {item.quantity}</span>
                         </div>
                       </div>
                     </div>
-
-                    <Input label="Item Name" value={item.item_name} onChange={(v) => {
-                      setEditingInventory(prev => prev.map((itm, i) => i === idx ? { ...itm, item_name: v } : itm));
-                    }} />
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input label="Price (₹)" type="number" value={String(item.price)} onChange={(v) => {
-                        setEditingInventory(prev => prev.map((itm, i) => i === idx ? { ...itm, price: Number(v) } : itm));
-                      }} />
-                      <Input label="Daily Qty" type="number" value={String(item.quantity)} onChange={(v) => {
-                        setEditingInventory(prev => prev.map((itm, i) => i === idx ? { ...itm, quantity: Number(v) } : itm));
-                      }} />
-                    </div>
-
-                    {/* Actions row */}
-                    <div className="flex justify-between items-center pt-2 border-t border-border/40">
-                      <button 
-                        onClick={() => handleInventoryDeleteRow(item.id)} 
-                        className="text-xs text-red-500 font-semibold hover:underline"
-                      >
-                        Delete
-                      </button>
-                      <Button size="sm" onClick={() => handleInventorySaveRow(item)}>
-                        Save Row
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {editingInventory.length === 0 && <EmptyState icon={<Package size={20} />} title="No inventory items" />}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon={<Package size={20} />} title="No inventory items" />
+              )}
             </div>
-
           </div>
         )}
       </Drawer>

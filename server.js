@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 
 dotenv.config();
@@ -232,6 +232,25 @@ const models = {
 // Order countdown timers tracking
 const orderTimers = new Map();
 
+async function deleteS3Object(url) {
+  if (!url || typeof url !== 'string') return;
+  const bucketName = process.env.AWS_BUCKET_NAME;
+  const region = process.env.AWS_REGION;
+  if (!bucketName || !region) return;
+
+  const prefix = `https://${bucketName}.s3.${region}.amazonaws.com/`;
+  if (!url.startsWith(prefix)) return;
+
+  const key = url.substring(prefix.length);
+  if (!key) return;
+
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
+  } catch (err) {
+    console.error('Failed to delete S3 object:', url, err);
+  }
+}
+
 // Helper to check plan expiry on order delivery
 async function checkPlanLimitOnDelivery(orderId) {
   try {
@@ -457,6 +476,19 @@ app.post('/api/db', async (req, res) => {
       }
 
       case 'delete': {
+        if (table === 'vendors' && queryConditions._id) {
+          const vendorDoc = await Vendor.findById(queryConditions._id);
+          if (vendorDoc) {
+            await deleteS3Object(vendorDoc.logo_url);
+            await deleteS3Object(vendorDoc.qr_url);
+            const linkedItems = await models.vendor_inventory.find({ vendor_id: vendorDoc._id });
+            for (const item of linkedItems) {
+              await deleteS3Object(item.image_url);
+            }
+            await models.vendor_inventory.deleteMany({ vendor_id: vendorDoc._id });
+          }
+        }
+
         const docs = await Model.find(queryConditions);
         for (const doc of docs) {
           await doc.deleteOne();

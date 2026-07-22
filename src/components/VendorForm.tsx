@@ -30,6 +30,11 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
   });
 
   const selectedPlan = plans.find((p) => p.id === form.plan_id);
+  const today = new Date();
+  const startDate = today.toISOString().slice(0, 10);
+  const endDate = selectedPlan
+    ? new Date(today.getTime() + selectedPlan.validity_days * 86400000).toISOString().slice(0, 10)
+    : '';
 
   useEffect(() => {
     (async () => {
@@ -157,18 +162,31 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
       </div>
 
       {selectedPlan && (
-        <div className="card p-4 bg-surface-2/50 border-border flex items-center justify-between text-sm">
-          <div>
-            <p className="font-semibold text-text uppercase tracking-wider text-xs">Plan Limits Summary</p>
-            <p className="text-muted mt-1">
-              Validity: <span className="font-medium text-text">{selectedPlan.validity_days} Days</span> | 
-              Max Items: <span className="font-medium text-text">{selectedPlan.max_items}</span> | 
-              Max Clients: <span className="font-medium text-text">{selectedPlan.max_clients}</span>
-            </p>
+        <div className="grid gap-4 rounded-3xl border border-amber-200 bg-[#f9f1e5] p-4 text-slate-900">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Plan Limits Summary</p>
+              <p className="mt-1 text-sm text-slate-700">
+                Validity: <span className="font-bold text-slate-900">{selectedPlan.validity_days} Days</span> · 
+                Max Items: <span className="font-bold text-slate-900">{selectedPlan.max_items}</span> · 
+                Max Clients: <span className="font-bold text-slate-900">{selectedPlan.max_clients}</span>
+              </p>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
+              {selectedPlan.name} Tier
+            </span>
           </div>
-          <span className="bg-accent/15 text-accent border border-accent/25 px-2.5 py-1 rounded-full text-xs font-semibold">
-            {selectedPlan.name} Tier
-          </span>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl bg-white p-4 border border-amber-200">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">Start Date</p>
+              <p className="mt-1 font-semibold text-slate-900">{startDate}</p>
+            </div>
+            <div className="rounded-2xl bg-white p-4 border border-amber-200">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">End Date</p>
+              <p className="mt-1 font-semibold text-slate-900">{endDate}</p>
+            </div>
+          </div>
         </div>
       )}
 
