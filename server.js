@@ -110,6 +110,8 @@ const vendorSchema = new mongoose.Schema({
   shop_name: { type: String, required: true },
   address: { type: String, required: true },
   zip_code: { type: String, required: true },
+  birthdate: { type: String, default: null },
+  password: { type: String, default: null },
   plan_id: { type: String, default: null },
   plan_name: { type: String, default: null },
   status: { type: String, default: 'pending_approval' },
