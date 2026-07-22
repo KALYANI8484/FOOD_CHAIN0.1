@@ -306,6 +306,7 @@ interface OrderRadarProps {
 
 function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
   const [timers, setTimers] = useState<Record<string, number>>({});
+  const [otpInputs, setOtpInputs] = useState<Record<string, string>>({});
 
   // Clean timer loop
   useEffect(() => {
@@ -324,19 +325,29 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
     return () => clearInterval(interval);
   }, [radarOrders]);
 
-  const acceptOrder = async (order: Order) => {
+  const acceptOrder = async (order: Order, otpAttempt: string) => {
     if (vendor.status === 'expired') {
       onTab('upgrade');
       return;
     }
+    if (!otpAttempt) {
+      show('Please enter the client OTP to confirm', 'error');
+      return;
+    }
 
-    await supabase.from('orders').update({
+    const { error } = await supabase.from('orders').update({
       vendor_id: vendor.id,
       status: 'accepted',
+      otp_attempt: otpAttempt,
       accepted_at: new Date().toISOString()
-    }).eq('id', order.id);
+    } as any).eq('id', order.id);
 
-    show('Order accepted successfully!');
+    if (error) {
+      show(error.message || 'Failed to confirm order', 'error');
+      return;
+    }
+
+    show('Order confirmed and frozen successfully!');
     onTab('kanban'); // Move to Kanban board
   };
 
@@ -360,7 +371,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
           const formattedTimer = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
           // Button classes evaluation based on specifications
-          let btnLabel = 'Accept Order';
+          let btnLabel = 'Confirm Order';
           let disabled = false;
           let showRenew = false;
 
@@ -370,6 +381,9 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
           } else if (isExpired) {
             btnLabel = 'Renew Plan to Accept';
             showRenew = true;
+          } else if (vendor.plan_name === 'Free' || !vendor.plan_name) {
+            btnLabel = 'Paid Plan Required';
+            disabled = true;
           } else if (!isActive) {
             btnLabel = 'Awaiting Activation';
             disabled = true;
@@ -396,10 +410,21 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
                   </Badge>
                 </div>
 
-                <div className="my-4 space-y-1.5 text-xs text-muted">
+                <div className="my-4 space-y-2 text-xs text-muted">
                   <p>Client: <span className="font-semibold text-text">{o.client_name}</span></p>
                   <p>Zip Code: <span className="font-semibold text-text">{o.client_zip}</span></p>
                   {o.client_landmark && <p>Landmark: <span className="font-semibold text-text">{o.client_landmark}</span></p>}
+                  {isZipMatch && (vendor.plan_name !== 'Free' && vendor.plan_name) && (
+                    <div className="pt-2">
+                      <input
+                        type="text"
+                        placeholder="Enter Client OTP to Claim *"
+                        value={otpInputs[o.id] || ''}
+                        onChange={(e) => setOtpInputs({ ...otpInputs, [o.id]: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none text-xs font-semibold"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -419,8 +444,8 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
                           ? 'bg-muted/30 border border-border text-muted pointer-events-none' 
                           : 'bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-md'
                       }`}
-                      onClick={() => acceptOrder(o)}
-                      disabled={disabled}
+                      onClick={() => acceptOrder(o, otpInputs[o.id] || '')}
+                      disabled={disabled || (isZipMatch && !(otpInputs[o.id]?.trim()))}
                     >
                       {!isZipMatch && <Padlock size={14} />}
                       {btnLabel}
@@ -557,8 +582,8 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                   <p className="font-bold text-sm text-text">{o.item_name}</p>
                   <p className="text-[10px] text-muted">Address: {o.client_address}</p>
                 </div>
-                <Button size="sm" className="w-full bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => handleDeliverClick(o)}>
-                  Handover (OTP)
+                <Button size="sm" className="w-full bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => transitionOrder(o.id, 'delivered')}>
+                  Complete Handover
                 </Button>
               </div>
             ))}

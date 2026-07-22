@@ -5,16 +5,17 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import { v2 as cloudinary } from 'cloudinary';
-import { put } from '@vercel/blob';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 
 dotenv.config();
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
 
 const app = express();
@@ -264,18 +265,26 @@ async function checkPlanLimitOnDelivery(orderId) {
   }
 }
 
-// Upload file to Cloudinary
+// Upload file to AWS S3
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    const uploadResponse = await cloudinary.uploader.upload(base64Image, {
-      folder: 'food_chain',
-      resource_type: 'auto'
-    });
-    res.json({ url: uploadResponse.secure_url });
+    const fileKey = `${crypto.randomUUID()}-${req.file.originalname}`;
+    const bucketName = process.env.AWS_BUCKET_NAME;
+
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: fileKey,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+      })
+    );
+
+    const url = `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
+    res.json({ url });
   } catch (err) {
-    console.error('Upload error:', err);
+    console.error('S3 Upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -319,11 +328,28 @@ app.post('/api/db', async (req, res) => {
         if (limit !== null && limit !== undefined) {
           query = query.limit(limit);
         }
-        const docs = await query.exec();
-        if (single) {
-          responseData = docs.length > 0 ? docs[0].toJSON() : null;
+        let docs = await query.exec();
+        if (table === 'orders') {
+          docs = docs.map(d => {
+            const obj = d.toJSON();
+            if (obj.status === 'pending') {
+              obj.client_name = 'Hidden (Provide OTP)';
+              obj.client_phone = 'Hidden (Provide OTP)';
+              obj.client_address = 'Hidden (Provide OTP)';
+            }
+            return obj;
+          });
+          if (single) {
+            responseData = docs.length > 0 ? docs[0] : null;
+          } else {
+            responseData = docs;
+          }
         } else {
-          responseData = docs.map(d => d.toJSON());
+          if (single) {
+            responseData = docs.length > 0 ? docs[0].toJSON() : null;
+          } else {
+            responseData = docs.map(d => d.toJSON());
+          }
         }
         break;
       }
@@ -367,6 +393,31 @@ app.post('/api/db', async (req, res) => {
       }
 
       case 'update': {
+        if (table === 'orders' && data.status === 'accepted') {
+          const orderId = queryConditions._id || queryConditions.id;
+          const orderDoc = await models.orders.findById(orderId);
+          if (!orderDoc) {
+            return res.status(404).json({ error: 'Order not found' });
+          }
+          if (orderDoc.status !== 'pending') {
+            return res.status(400).json({ error: 'Order already claimed or confirmed by another vendor' });
+          }
+          if (orderDoc.otp !== data.otp_attempt) {
+            return res.status(400).json({ error: 'Invalid OTP code' });
+          }
+          const vendorDoc = await models.vendors.findById(data.vendor_id);
+          if (!vendorDoc) {
+            return res.status(404).json({ error: 'Vendor not found' });
+          }
+          if (!vendorDoc.plan_name || vendorDoc.plan_name === 'Free') {
+            return res.status(403).json({ error: 'Free plan members are not allowed to confirm orders. Please upgrade your plan.' });
+          }
+          if (vendorDoc.status !== 'approved') {
+            return res.status(403).json({ error: 'Your vendor account is not approved or is inactive.' });
+          }
+          delete data.otp_attempt;
+        }
+
         // If updating an order and it's accepted, clear its timer
         if (table === 'orders') {
           const idVal = queryConditions._id;

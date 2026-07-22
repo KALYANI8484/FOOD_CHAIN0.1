@@ -302,6 +302,7 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
                   <img
                     src={categoryImages[cat]}
                     alt={cat}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -346,6 +347,7 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
                     <img 
                       src={item.image_url} 
                       alt={item.item_name} 
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
                     />
                   ) : (
@@ -481,7 +483,7 @@ function CartView({ cart, setCart, clientZip, clientLandmark, clientProfile, onC
         {entries.map(({ item, qty }) => (
           <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl bg-surface-2 border border-border">
             {item.image_url ? (
-              <img src={item.image_url} alt={item.item_name} className="w-12 h-12 rounded-xl object-cover border border-border" />
+              <img src={item.image_url} alt={item.item_name} loading="lazy" className="w-12 h-12 rounded-xl object-cover border border-border" />
             ) : (
               <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center">
                 <Package size={16} className="text-muted" />
