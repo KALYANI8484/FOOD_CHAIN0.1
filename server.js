@@ -5,10 +5,17 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
 import { put } from '@vercel/blob';
 import crypto from 'crypto';
 
 dotenv.config();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 const app = express();
 const httpServer = createServer(app);
@@ -257,15 +264,16 @@ async function checkPlanLimitOnDelivery(orderId) {
   }
 }
 
-// Upload file to Vercel Blob
+// Upload file to Cloudinary
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const blob = await put(req.file.originalname, req.file.buffer, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN
+    const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const uploadResponse = await cloudinary.uploader.upload(base64Image, {
+      folder: 'food_chain',
+      resource_type: 'auto'
     });
-    res.json({ url: blob.url });
+    res.json({ url: uploadResponse.secure_url });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ error: err.message });
