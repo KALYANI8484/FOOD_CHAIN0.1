@@ -316,16 +316,16 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
         <div className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Email
+              {role === 'vendor' ? 'Phone / Email' : 'Email'}
             </label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                   <input
-                    type="email"
+                    type={role === 'vendor' ? 'text' : 'email'}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    placeholder={role === 'super_admin' ? 'your-email@gmail.com' : 'your@email.com'}
+                    placeholder={role === 'super_admin' ? 'your-email@gmail.com' : role === 'vendor' ? 'Phone number or email' : 'your@email.com'}
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
                     autoComplete="username"
                   />
