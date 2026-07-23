@@ -952,6 +952,12 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
               </div>
 
               <div className="mt-6 pt-4 border-t border-border/40">
+                {!isCurrent && (
+                  <div className="flex flex-col items-center mb-4 p-4 bg-surface-2 rounded-xl border border-border">
+                    <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Scan to pay for {p.name} Plan</p>
+                    <img src="/pay_qr.png" alt="Payment QR" className="w-24 h-24 rounded-lg bg-white" />
+                  </div>
+                )}
                 <Button 
                   className="w-full" 
                   disabled={isCurrent || submitting}

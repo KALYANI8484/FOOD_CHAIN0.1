@@ -564,8 +564,9 @@ app.post('/api/db', async (req, res) => {
 
 // Super Admin Password Reset Endpoint
 app.post('/api/super-admin/reset-password', async (req, res) => {
-  const { email } = req.body;
+  const { email, new_password } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!new_password) return res.status(400).json({ error: 'New password is required' });
 
   try {
     const superAdmin = await SuperAdmin.findOne({ email: email.trim().toLowerCase() });
@@ -573,42 +574,16 @@ app.post('/api/super-admin/reset-password', async (req, res) => {
       return res.status(404).json({ error: 'Super Admin with this email not found' });
     }
 
-    // Generate a temporary 8-character password
-    const tempPassword = Math.random().toString(36).slice(-8);
-    superAdmin.password = tempPassword;
+    superAdmin.password = new_password;
     await superAdmin.save();
 
-    // Create transport
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER || '',
-        pass: process.env.SMTP_PASS || '',
-      },
-    });
-
-    const mailOptions = {
-      from: `"VIKRAM ADVERTISING" <${process.env.SMTP_USER || 'no-reply@vikram-advertising.io'}>`,
-      to: superAdmin.email,
-      subject: 'Super Admin Password Reset',
-      text: `Hello,\n\nYour Super Admin password has been reset.\n\nYour new temporary password is: ${tempPassword}\n\nPlease log in and update your password immediately.\n\nBest regards,\nVIKRAM ADVERTISING`,
-      html: `<p>Hello,</p><p>Your Super Admin password has been reset.</p><p>Your new temporary password is: <strong>${tempPassword}</strong></p><p>Please log in and update your password immediately.</p><p>Best regards,<br>VIKRAM ADVERTISING</p>`
-    };
-
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      await transporter.sendMail(mailOptions);
-      res.json({ success: true, message: 'Password reset email sent successfully.' });
-    } else {
-      console.log(`[SMTP Mock] Reset password email for ${superAdmin.email}:\n`, mailOptions.text);
-      res.json({ success: true, message: 'Password reset locally. Check server logs for the temporary password.' });
-    }
+    res.json({ message: 'Password reset successfully. You can now log in.' });
   } catch (err) {
-    console.error('Reset password error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Password reset error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
+
 // Setup and Seed initial data if DB empty
 const seedDatabase = async () => {
   // 0. Seed Super-Admin

@@ -116,17 +116,30 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
 
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
 
   const handleResetPassword = async () => {
     setError('');
     setResetSuccess('');
     setLoading(true);
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/super-admin/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail })
+        body: JSON.stringify({ email: resetEmail, new_password: newPassword })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -207,6 +220,34 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="your-email@gmail.com"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all font-semibold"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider">New Password</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider">Confirm Password</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
                 />
               </div>
             </div>

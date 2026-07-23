@@ -202,12 +202,12 @@ export function Landing({
                   <p className="text-xs text-slate-400 mt-1 px-4">Dynamic business tools for growth and performance.</p>
                   <div className="w-full rounded-3xl bg-[#111318]/95 border border-white/10 p-4 my-6 shadow-[0_20px_50px_rgba(0,0,0,0.18)]">
                     <img
-                      src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://vikram-advertising.io/plans"
+                      src="/pay_qr.png"
                       alt="Plans QR Code"
                       className="mx-auto w-36 h-36 rounded-2xl border border-white/10 bg-[#090A0F]"
                     />
                   </div>
-                  <p className="text-xs font-bold text-accent uppercase tracking-wider">Scan to view our</p>
+                  <p className="text-xs font-bold text-accent uppercase tracking-wider">Scan this code to pay</p>
                   <p className="text-sm font-extrabold text-white mt-0.5">Vendor Subscription Plans</p>
                 </div>
               </div>
