@@ -3,14 +3,33 @@ import {
   UtensilsCrossed, Zap, ArrowRight,
   Clock, TrendingUp, Store, Lock
 } from 'lucide-react';
-import { Button, Badge, Modal, Input } from './ui';
+import { Button, Badge, Modal } from './ui';
 
 type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
-export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
+export function Landing({ 
+  onNavigate, 
+  onClientLogin 
+}: { 
+  onNavigate: (role: Role) => void; 
+  onClientLogin: (name: string, phone: string) => void;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
 
+<<<<<<< HEAD
+=======
+  const handleClientSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (clientName && clientPhone) {
+      onClientLogin(clientName, clientPhone);
+    }
+  };
+
+>>>>>>> landingUpdate
   // Registration modal removed to streamline flow
 
   const [scrollY, setScrollY] = useState(0);
@@ -27,11 +46,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   }, []);
 
   const categories = [
-    { name: 'Tiffin', img: 'https://images.pexels.com/photos/9585644/pexels-photo-9585644.jpeg', price: '₹99' },
-    { name: 'Breakfast', img: 'https://images.pexels.com/photos/5560700/pexels-photo-5560700.jpeg', price: '₹59' },
-    { name: 'Lunch/Dinner', img: 'https://images.pexels.com/photos/1624487/pexels-photo-1624487.jpeg', price: '₹149' },
-    { name: 'Vegetables', img: 'https://images.pexels.com/photos/1458691/pexels-photo-1458691.jpeg', price: '₹39' },
-    { name: 'Thali', img: 'https://images.pexels.com/photos/9585643/pexels-photo-9585643.jpeg', price: '₹179' },
+    { name: 'Tiffin', img: 'https://i.pinimg.com/736x/13/ac/3c/13ac3ce7b1db637177b34659d74fef73.jpg', price: '₹99' },
+    { name: 'Breakfast', img: 'https://i.pinimg.com/736x/db/73/5d/db735dfb9eca73033b7c127e46436ee3.jpg', price: '₹59' },
+    { name: 'Lunch/Dinner', img: 'https://i.pinimg.com/control1/1200x/f0/ce/0b/f0ce0bf92ce7748dda4ec368a4c5d51e.jpg', price: '₹149' },
+    { name: 'Vegetables', img: 'https://i.pinimg.com/736x/6a/04/e5/6a04e5d7d3b1bfd0c4d9ca06b2c041f0.jpg', price: '₹39' },
+    { name: 'Thali', img: 'https://i.pinimg.com/736x/5f/56/b3/5f56b35ba78d9678a79db6fa234ed8c0.jpg', price: '₹179' },
   ];
 
   const benefits = [
@@ -47,11 +66,16 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   ];
 
   // Removed redundant handleRegisterSubmit
+<<<<<<< HEAD
+=======
 
-
+  const scrollToVendorPartners = () => {
+    document.getElementById('vendor-partners')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+>>>>>>> landingUpdate
 
   return (
-    <div className="min-h-screen bg-bg noise relative overflow-hidden text-text">
+    <div className="min-h-screen landing-shell noise relative overflow-hidden text-text">
       {/* Ambient glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div
@@ -92,7 +116,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <Lock size={14} className="text-accent" />
               <span>Team Sign-In</span>
             </button>
+<<<<<<< HEAD
             <Button size="sm" onClick={() => onNavigate('client')}>
+=======
+            <Button size="sm" onClick={() => setShowLoginModal(true)}>
+>>>>>>> landingUpdate
               Start Ordering
             </Button>
           </div>
@@ -108,52 +136,52 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             alt="Fresh meals background" 
             className="w-full h-[120%] object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#F8F8FF]/95 via-[#F8F8FF]/80 to-[#F8F8FF]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#F8F8FF]/92 via-[#F8F8FF]/80 to-[#F8F8FF]/95" />
         </div>
 
-        <div className="max-w-7xl mx-auto relative z-10 text-center">
-
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[1.05] animate-fade-in-up delay-100 text-[#111118]">
-            Premium Local Meals,<br />
-            <span className="gradient-text">Delivered to You</span>
-          </h1>
-          <p className="text-lg md:text-xl text-[#52525E] mt-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
-            Experience kitchen-fresh catering from verified neighborhood chefs. Fast delivery, dynamic menu planning, and premium quality ingredients.
-          </p>
-          <div className="flex flex-row items-center justify-center gap-4 mt-10 animate-fade-in-up delay-300">
-            <Button size="lg" className="magnetic-hover" onClick={() => onNavigate('client')}>
-              Explore Master Menu
-            </Button>
-            <Button size="lg" variant="outline" className="magnetic-hover" onClick={() => onNavigate('login')}>
-              Grow Your Business
-            </Button>
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="section-panel glass hero-panel rounded-[48px] border border-white/40 px-6 py-16 lg:px-12 lg:py-24">
+            <div className="relative text-center">
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[1.05] text-[#111118]">
+                Premium Local Meals,<br />
+                <span className="gradient-text">Delivered to You</span>
+              </h1>
+              <p className="text-lg md:text-xl text-[#52525E] mt-8 max-w-2xl mx-auto leading-relaxed">
+                Experience kitchen-fresh catering from verified neighborhood chefs. Fast delivery, dynamic menu planning, and premium quality ingredients.
+              </p>
+              <div className="flex flex-row items-center justify-center gap-4 mt-10">
+                <Button size="lg" className="magnetic-hover" onClick={() => setShowLoginModal(true)}>
+                  Explore Master Menu
+                </Button>
+                <Button size="lg" variant="outline" className="magnetic-hover" onClick={scrollToVendorPartners}>
+                  Grow Your Business
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Client Experience categories section */}
-      <section id="categories" className="py-24 px-6 relative z-10 border-y border-border/50">
-        <div className="max-w-7xl mx-auto">
-
-
+      <section id="categories" className="py-24 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto section-panel rounded-[40px] border border-white/40 p-8">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 stagger">
             {categories.map((c) => (
               <div
                 key={c.name}
-                onClick={() => onNavigate('client')}
+                onClick={() => setShowLoginModal(true)}
                 className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border/50 frosted-glow"
               >
                 <img
                   src={c.img}
                   alt={c.name}
+                  onClick={() => setShowLoginModal(true)}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#111118]/75 via-[#111118]/25 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-5">
                   <p className="font-bold text-white text-lg">{c.name}</p>
                 </div>
-                
-                {/* Interactive Hover Price Overlay */}
                 <div className="absolute inset-0 bg-accent/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
                   <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Starting Base Price</span>
                   <p className="text-white text-3xl font-extrabold mt-1">{c.price}</p>
@@ -162,54 +190,40 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               </div>
             ))}
           </div>
-
-
         </div>
       </section>
 
       {/* Vendor Partnership Section */}
-      <section className="py-24 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
+      <section id="vendor-partners" className="py-24 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto section-panel rounded-[40px] border border-white/40 p-8">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
-            
-            {/* Left: Mobile Phone mockup displaying dynamic QR */}
             <div className="lg:col-span-5 flex justify-center animate-fade-in-up">
-              <div className="w-[300px] h-[580px] rounded-[48px] frosted-card p-3 shadow-2xl relative border-4 border-border/30">
-                {/* Speaker */}
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-4 bg-border rounded-full" />
-                
-                {/* Phone screen */}
-                <div className="w-full h-full rounded-[40px] bg-bg overflow-hidden flex flex-col items-center justify-center p-6 text-center relative border border-muted/10">
-                  <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
+              <div className="w-[300px] h-[580px] rounded-[48px] bg-[#111118]/90 border border-white/10 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-4 bg-white/10 rounded-full shadow-sm" />
+                <div className="w-full h-full rounded-[40px] bg-[#0F1116]/90 overflow-hidden flex flex-col items-center justify-center p-6 text-center relative border border-white/10 shadow-inner">
+                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-accent/15 to-[#7C3AED]/10 border border-white/10 flex items-center justify-center mb-4">
                     <Store size={22} className="text-accent" />
                   </div>
-                  <h4 className="font-extrabold text-lg">Vendor Portal</h4>
-                  <p className="text-xs text-muted mt-1 px-4">Dynamic Business Tools</p>
-                  
-                  {/* Dynamic QR Code */}
-                  <div className="card p-3 bg-white border border-border rounded-2xl my-6">
-                    <img 
-                      src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://vikram-advertising.io/plans" 
-                      alt="Plans QR Code" 
-                      className="w-36 h-36"
+                  <h4 className="font-extrabold text-lg text-white">Vendor Portal</h4>
+                  <p className="text-xs text-slate-400 mt-1 px-4">Dynamic business tools for growth and performance.</p>
+                  <div className="w-full rounded-3xl bg-[#111318]/95 border border-white/10 p-4 my-6 shadow-[0_20px_50px_rgba(0,0,0,0.18)]">
+                    <img
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://vikram-advertising.io/plans"
+                      alt="Plans QR Code"
+                      className="mx-auto w-36 h-36 rounded-2xl border border-white/10 bg-[#090A0F]"
                     />
                   </div>
-                  
                   <p className="text-xs font-bold text-accent uppercase tracking-wider">Scan to view our</p>
-                  <p className="text-sm font-extrabold text-text mt-0.5">Vendor Subscription Plans</p>
+                  <p className="text-sm font-extrabold text-white mt-0.5">Vendor Subscription Plans</p>
                 </div>
               </div>
             </div>
-
-            {/* Right: Plans & Features */}
             <div className="lg:col-span-7 space-y-12">
               <div>
                 <Badge variant="accent">Vendor Partners</Badge>
                 <h2 className="text-4xl font-extrabold mt-3">Partner with VIKRAM ADVERTISING</h2>
                 <p className="text-muted mt-2">Access state-of-the-art tools to expand your tiffin and restaurant business.</p>
               </div>
-
-              {/* Benefit Icons */}
               <div className="grid gap-6">
                 {benefits.map((b) => (
                   <div key={b.title} className="flex gap-4 p-4 rounded-2xl frosted-card frosted-glow">
@@ -223,8 +237,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                   </div>
                 ))}
               </div>
-
-              {/* Plans Preview */}
               <div>
                 <p className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Subscription Pricing Preview</p>
                 <div className="grid sm:grid-cols-3 gap-4">
@@ -243,39 +255,74 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 </div>
               </div>
             </div>
-            
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 py-12 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center">
-              <UtensilsCrossed size={16} className="text-white" />
+      <footer className="py-12 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto section-panel rounded-[40px] border border-white/40 p-6 md:p-8">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center">
+                <UtensilsCrossed size={16} className="text-white" />
+              </div>
+              <span className="font-bold text-text">VIKRAM ADVERTISING</span>
+              <span className="text-muted text-sm ml-2">© 2026</span>
             </div>
-            <span className="font-bold text-text">VIKRAM ADVERTISING</span>
-            <span className="text-muted text-sm ml-2">© 2026</span>
-          </div>
-          
-          <div className="text-center md:text-right text-xs text-muted space-y-1">
-            <p>Email: contact@vikram-advertising.io | Tel: +91 98765 43210</p>
-            <p>12th Main Road, Indiranagar, Bengaluru, KA, India</p>
-          </div>
+            
+            <div className="text-center md:text-right text-xs text-muted space-y-1">
+              <p>Email: contact@vikram-advertising.io | Tel: +91 98765 43210</p>
+              <p>12th Main Road, Indiranagar, Bengaluru, KA, India</p>
+            </div>
 
-          <div className="flex items-center gap-6 text-sm">
-            <button 
-              onClick={() => onNavigate('login')}
-              className="text-muted hover:text-text transition-colors flex items-center gap-1"
-            >
-              <Lock size={12} className="text-accent" /> Team Sign-In
-            </button>
+            <div className="flex items-center gap-6 text-sm">
+              <button 
+                onClick={() => onNavigate('login')}
+                className="text-muted hover:text-text transition-colors flex items-center gap-1"
+              >
+                <Lock size={12} className="text-accent" /> Team Sign-In
+              </button>
+            </div>
           </div>
         </div>
       </footer>
 
+<<<<<<< HEAD
       {/* Client Onboarding Registration Modal Removed */}
+=======
+      <Modal open={showLoginModal} onClose={() => setShowLoginModal(false)} title="Client Login">
+        <form onSubmit={handleClientSubmit} className="space-y-4">
+          <p className="text-xs text-muted mb-4">Enter your details to view local menus and place orders.</p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Your Name *</label>
+            <input
+              type="text"
+              required
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="e.g. Vikram Singh"
+              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none text-sm font-semibold"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Phone Number *</label>
+            <input
+              type="tel"
+              required
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              placeholder="e.g. +91 99999 88888"
+              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none text-sm font-semibold"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t border-border mt-6">
+            <Button type="button" variant="outline" onClick={() => setShowLoginModal(false)}>Cancel</Button>
+            <Button type="submit" disabled={!clientName || !clientPhone}>Continue <ArrowRight size={16} /></Button>
+          </div>
+        </form>
+      </Modal>
+>>>>>>> landingUpdate
     </div>
   );
 }

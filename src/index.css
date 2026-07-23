@@ -139,6 +139,30 @@ html, body, #root {
   box-shadow: 0 2px 12px -2px rgba(100, 100, 140, 0.06);
 }
 
+.landing-shell {
+  background: radial-gradient(circle at 14% 10%, rgba(232, 162, 97, 0.18), transparent 18%),
+              radial-gradient(circle at 88% 12%, rgba(200, 122, 47, 0.12), transparent 18%),
+              radial-gradient(circle at 70% 95%, rgba(135, 150, 220, 0.08), transparent 24%),
+              linear-gradient(175deg, #F8F8FF 0%, #F0F0FA 45%, #EEEEF6 100%);
+}
+
+.section-panel {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 30px 70px -40px rgba(80, 90, 130, 0.18);
+}
+
+.hero-panel {
+  min-height: 420px;
+  background: rgba(255, 255, 255, 0.84);
+  background-image: radial-gradient(circle at top left, rgba(232, 162, 97, 0.12), transparent 24%),
+                    radial-gradient(circle at 80% 20%, rgba(136, 136, 187, 0.08), transparent 28%);
+}
+
 /* Hover lift — cool ambient shadow */
 .hover-lift {
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
