@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback, memo } from 'react';
 import {
   MapPin, Search, ShoppingBag, Clock, ArrowLeft, ArrowRight,
   Plus, Minus, CheckCircle2, KeyRound, Navigation, UtensilsCrossed,
@@ -130,7 +130,7 @@ export function Client({
   );
 }
 
-function LocationGate({ 
+const LocationGate = memo(function LocationGate({ 
   initialName, 
   initialPhone, 
   initialZip, 
@@ -232,7 +232,7 @@ function LocationGate({
       </div>
     </div>
   );
-}
+});
 
 interface BrowseProps {
   zip: string;
@@ -243,7 +243,7 @@ interface BrowseProps {
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
 }
 
-function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: BrowseProps) {
+const Browse = memo(function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: BrowseProps) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [items, setItems] = useState<VendorItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -252,6 +252,7 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedItemName, setSelectedItemName] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
+  const [displayedItemsCount, setDisplayedItemsCount] = useState(20);
 
   useEffect(() => {
     (async () => {
@@ -276,16 +277,18 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
     'Vegetables': 'https://images.pexels.com/photos/1458691/pexels-photo-1458691.jpeg',
   };
 
-  const categoryItems = items.filter(i => i.category === selectedCategory);
-  const uniqueItemNames = Array.from(new Set(categoryItems.map(i => i.item_name)));
+  const categoryItems = useMemo(() => items.filter(i => i.category === selectedCategory), [items, selectedCategory]);
+  const uniqueItemNames = useMemo(() => Array.from(new Set(categoryItems.map(i => i.item_name))), [categoryItems]);
   
-  const matchingVendorItems = categoryItems.filter(i => i.item_name === selectedItemName);
+  const displayedItemNames = useMemo(() => uniqueItemNames.slice(0, displayedItemsCount), [uniqueItemNames, displayedItemsCount]);
+  
+  const matchingVendorItems = useMemo(() => categoryItems.filter(i => i.item_name === selectedItemName), [categoryItems, selectedItemName]);
   const firstItem = matchingVendorItems[0];
   
-  const minPrice = matchingVendorItems.length > 0 ? Math.min(...matchingVendorItems.map(i => Number(i.price) || 0)) : 0;
-  const maxPrice = matchingVendorItems.length > 0 ? Math.max(...matchingVendorItems.map(i => Number(i.price) || 0)) : 0;
+  const minPrice = useMemo(() => matchingVendorItems.length > 0 ? Math.min(...matchingVendorItems.map(i => Number(i.price) || 0)) : 0, [matchingVendorItems]);
+  const maxPrice = useMemo(() => matchingVendorItems.length > 0 ? Math.max(...matchingVendorItems.map(i => Number(i.price) || 0)) : 0, [matchingVendorItems]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = useCallback(() => {
     if (!firstItem) return;
     const c = { ...cart };
     if (c[firstItem.id]) {
@@ -298,7 +301,7 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
     setCartOpen(true);
     setSelectedItemName('');
     setQuantity(1);
-  };
+  }, [cart, firstItem, quantity, setCart, setCartOpen, show]);
 
   if (loading) return <div className="py-24"><Spinner /></div>;
 
@@ -356,6 +359,7 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
                 setSelectedCategory(null);
                 setSelectedItemName('');
                 setQuantity(1);
+                setDisplayedItemsCount(20);
               }}
               className="text-sm font-semibold text-muted hover:text-text transition-colors flex items-center gap-1.5 group"
             >
@@ -380,7 +384,7 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
                     className="w-full pl-12 pr-10 py-3.5 rounded-2xl bg-surface-2 border border-border text-text focus:border-accent outline-none transition-all text-sm font-semibold appearance-none"
                   >
                     <option value="" disabled>Choose an item...</option>
-                    {uniqueItemNames.map(name => (
+                    {displayedItemNames.map(name => (
                       <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
@@ -388,6 +392,14 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
                     <ArrowRight size={16} className="rotate-90" />
                   </div>
                 </div>
+                {uniqueItemNames.length > displayedItemsCount && (
+                  <button 
+                    onClick={() => setDisplayedItemsCount(c => c + 20)}
+                    className="mt-2 text-xs text-accent font-semibold hover:underline"
+                  >
+                    Load more items...
+                  </button>
+                )}
               </div>
 
               {selectedItemName && firstItem && (
@@ -459,7 +471,7 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
       )}
     </div>
   );
-}
+});
 
 interface CartViewProps {
   cart: Record<string, { item: VendorItem; qty: number }>;
@@ -470,7 +482,7 @@ interface CartViewProps {
   defaultPhone?: string;
 }
 
-function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPhone = '' }: CartViewProps) {
+const CartView = memo(function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPhone = '' }: CartViewProps) {
   const [name, setName] = useState(defaultName);
   const [phone, setPhone] = useState(defaultPhone);
   const [zipInput, setZipInput] = useState('');
@@ -628,9 +640,9 @@ function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPh
       </div>
     </div>
   );
-}
+});
 
-function Tracking({ order, onBack }: { order: Order; onBack: () => void }) {
+const Tracking = memo(function Tracking({ order, onBack }: { order: Order; onBack: () => void }) {
   const [status, setStatus] = useState(order.status);
   const [liveOrder, setLiveOrder] = useState<Order>(order);
 
@@ -745,4 +757,4 @@ function Tracking({ order, onBack }: { order: Order; onBack: () => void }) {
       </div>
     </div>
   );
-}
+});

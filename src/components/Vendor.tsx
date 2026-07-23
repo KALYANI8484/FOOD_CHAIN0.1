@@ -696,12 +696,17 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
   };
 
   const saveRow = async (row: VendorItem) => {
-    await supabase.from('vendor_inventory').update({
+    const { error } = await supabase.from('vendor_inventory').update({
       price: Number(row.price),
       quantity: Number(row.quantity)
     }).eq('id', row.id);
-    show('Saved inventory item');
-    load();
+    
+    if (error) {
+      show('Failed to save inventory item', 'error');
+      load();
+    } else {
+      show('Saved inventory item');
+    }
   };
 
   const removeRow = async (rowId: string) => {
@@ -726,19 +731,40 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
     }
 
     setAdding(true);
-    await supabase.from('vendor_inventory').insert({
+    
+    const tempId = `temp-${Date.now()}`;
+    const tempItem = {
+      id: tempId,
       vendor_id: vendor.id,
       item_name: itemName,
       category: selectedCategory,
       price: customPrice,
       quantity: customQty,
       image_url: ''
-    });
+    };
+    
+    setItems(prev => [...prev, tempItem as VendorItem]);
+    setItemName('');
+    
+    const { data, error } = await supabase.from('vendor_inventory').insert({
+      vendor_id: vendor.id,
+      item_name: tempItem.item_name,
+      category: tempItem.category,
+      price: tempItem.price,
+      quantity: tempItem.quantity,
+      image_url: tempItem.image_url
+    }).select().single();
 
     setAdding(false);
-    setItemName('');
+    
+    if (error) {
+      show('Failed to add item', 'error');
+      setItems(prev => prev.filter(i => i.id !== tempId));
+      return;
+    }
+
+    setItems(prev => prev.map(i => i.id === tempId ? data : i));
     show('Item added to inventory!');
-    load();
   };
 
   if (loading) return <Spinner />;

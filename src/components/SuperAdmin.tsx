@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   LayoutDashboard, Store, Package, CreditCard, FileText, Settings, Users,
   ShoppingBag, DollarSign, CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
@@ -446,6 +446,53 @@ function VendorInventoryBuilder({ items, setItems, maxItems, categories }: Vendo
   );
 }
 
+const VendorRow = React.memo(({ vendor, itemCounts, plans, onView, onEdit, onDelete }: { vendor: Vendor, itemCounts: Record<string, number>, plans: Plan[], onView: (v: Vendor) => void, onEdit: (v: Vendor) => void, onDelete: (v: Vendor) => void }) => {
+  return (
+    <tr className="hover:bg-[#f5e9d9] transition-all">
+      <td className="px-6 py-4 flex items-center gap-3">
+        {vendor.logo_url ? (
+          <img src={vendor.logo_url} alt={vendor.shop_name} className="w-10 h-10 rounded-xl object-cover border border-amber-200" />
+        ) : (
+          <div className="w-10 h-10 rounded-xl bg-[#f1e2cd] flex items-center justify-center border border-amber-200"><Store size={16} className="text-slate-600" /></div>
+        )}
+        <div>
+          <p className="font-bold text-slate-900">{vendor.shop_name}</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Start: {vendor.subscription_start || 'N/A'}</p>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <p className="font-medium text-slate-900">{vendor.owner_name}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{vendor.phone}</p>
+      </td>
+      <td className="px-6 py-4 font-semibold text-slate-800">{vendor.zip_code}</td>
+      <td className="px-6 py-4">
+        <Badge variant="accent">{vendor.plan_name || 'Free'}</Badge>
+      </td>
+      <td className="px-6 py-4 font-semibold text-slate-800">
+        {plans.find(p => p.id === vendor.plan_id)?.max_items ?? 5}
+      </td>
+      <td className="px-6 py-4 font-semibold text-slate-800">
+        {itemCounts[vendor.id] || 0}
+      </td>
+      <td className="px-6 py-4 font-semibold text-slate-800">
+        {(plans.find(p => p.id === vendor.plan_id)?.max_items ?? 5) - (itemCounts[vendor.id] || 0)}
+      </td>
+      <td className="px-6 py-4">
+        <Badge variant={vendor.status === 'approved' ? 'success' : vendor.status === 'rejected' ? 'error' : 'warning'}>
+          {vendor.status === 'approved' ? 'Live' : vendor.status === 'expired' ? 'Expired' : vendor.status === 'rejected' ? 'Rejected' : 'Review'}
+        </Badge>
+      </td>
+      <td className="px-6 py-4 text-right">
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={() => onView(vendor)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-amber-50 transition-all" aria-label="View vendor"><Eye size={16} /></button>
+          <button onClick={() => onEdit(vendor)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-amber-50 transition-all" aria-label="Edit vendor"><Edit2 size={16} /></button>
+          <button onClick={() => onDelete(vendor)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all" aria-label="Delete vendor"><Trash2 size={16} /></button>
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 // 2. Vendors Management Module Tab
 function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -658,18 +705,25 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   };
 
   const handleInventorySaveRow = async (row: VendorItem) => {
-    await supabase.from('vendor_inventory').update({
-      item_name: row.item_name,
-      price: Number(row.price),
-      quantity: Number(row.quantity),
-      image_url: row.image_url
-    }).eq('id', row.id);
+    const previousView = [...viewInventory];
+    const previousEditing = [...editingInventory];
 
-    show('Inventory row saved successfully');
-    // Refresh view
-    if (viewVendor) {
-      const { data } = await supabase.from('vendor_inventory').select('*').eq('vendor_id', viewVendor.id);
-      setViewInventory(data || []);
+    const updateItem = (prev: VendorItem[]) => prev.map(item => item.id === row.id ? { ...item, ...row, price: Number(row.price), quantity: Number(row.quantity) } : item);
+    setViewInventory(updateItem);
+    setEditingInventory(updateItem);
+
+    try {
+      await supabase.from('vendor_inventory').update({
+        item_name: row.item_name,
+        price: Number(row.price),
+        quantity: Number(row.quantity),
+        image_url: row.image_url
+      }).eq('id', row.id);
+      show('Inventory row saved successfully');
+    } catch (err) {
+      setViewInventory(previousView);
+      setEditingInventory(previousEditing);
+      show('Failed to save inventory item', 'error');
     }
   };
 
@@ -738,11 +792,11 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     }));
   };
 
-  const filtered = vendors.filter((v) => {
+  const filteredVendors = useMemo(() => vendors.filter((v) => {
     const matchSearch = v.shop_name.toLowerCase().includes(search.toLowerCase()) || v.owner_name.toLowerCase().includes(search.toLowerCase());
     const matchFilter = filter === 'all' || v.status === filter;
     return matchSearch && matchFilter;
-  });
+  }), [vendors, search, filter]);
 
   if (loading) return <Spinner />;
 
@@ -796,54 +850,21 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
               </tr>
             </thead>
             <tbody className="divide-y divide-amber-200 text-sm text-slate-800">
-              {filtered.map((v) => (
-                <tr key={v.id} className="hover:bg-[#f5e9d9] transition-all">
-                  <td className="px-6 py-4 flex items-center gap-3">
-                    {v.logo_url ? (
-                      <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-amber-200" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-xl bg-[#f1e2cd] flex items-center justify-center border border-amber-200"><Store size={16} className="text-slate-600" /></div>
-                    )}
-                    <div>
-                      <p className="font-bold text-slate-900">{v.shop_name}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Start: {v.subscription_start || 'N/A'}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-slate-900">{v.owner_name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{v.phone}</p>
-                  </td>
-                  <td className="px-6 py-4 font-semibold text-slate-800">{v.zip_code}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="accent">{v.plan_name || 'Free'}</Badge>
-                  </td>
-                  <td className="px-6 py-4 font-semibold text-slate-800">
-                    {plans.find(p => p.id === v.plan_id)?.max_items ?? 5}
-                  </td>
-                  <td className="px-6 py-4 font-semibold text-slate-800">
-                    {itemCounts[v.id] || 0}
-                  </td>
-                  <td className="px-6 py-4 font-semibold text-slate-800">
-                    {(plans.find(p => p.id === v.plan_id)?.max_items ?? 5) - (itemCounts[v.id] || 0)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}>
-                      {v.status === 'approved' ? 'Live' : v.status === 'expired' ? 'Expired' : v.status === 'rejected' ? 'Rejected' : 'Review'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => handleView(v)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-amber-50 transition-all" aria-label="View vendor"><Eye size={16} /></button>
-                      <button onClick={() => handlePrepareEdit(v)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-amber-50 transition-all" aria-label="Edit vendor"><Edit2 size={16} /></button>
-                      <button onClick={() => setDeleteConfirmVendor(v)} className="p-2 rounded-xl bg-white border border-amber-200 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all" aria-label="Delete vendor"><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                </tr>
+              {filteredVendors.map((v) => (
+                <VendorRow
+                  key={v.id}
+                  vendor={v}
+                  itemCounts={itemCounts}
+                  plans={plans}
+                  onView={handleView}
+                  onEdit={handlePrepareEdit}
+                  onDelete={setDeleteConfirmVendor}
+                />
               ))}
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 && <EmptyState icon={<Store size={28} />} title="No vendors found" />}
+        {filteredVendors.length === 0 && <EmptyState icon={<Store size={28} />} title="No vendors found" />}
       </div>
 
       {/* Create Vendor Modal */}

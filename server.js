@@ -8,8 +8,13 @@ import multer from 'multer';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import compression from 'compression';
+import sharp from 'sharp';
 
 dotenv.config();
+
+let masterCategoryCache = { data: null, lastFetch: 0 };
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -29,6 +34,7 @@ const io = new Server(httpServer, {
 });
 
 app.use(cors());
+app.use(compression());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -216,6 +222,10 @@ const clientSchema = new mongoose.Schema({
 }, schemaOptions);
 
 // Models
+vendorSchema.index({ zip_code: 1, status: 1 });
+vendorItemSchema.index({ category: 1, vendor_id: 1 });
+clientSchema.index({ phone: 1 });
+
 const SuperAdmin = mongoose.model('SuperAdmin', superAdminSchema, 'super_admins');
 const SubAdmin = mongoose.model('SubAdmin', subAdminSchema, 'sub_admins');
 const Plan = mongoose.model('Plan', planSchema, 'subscription_plans');
@@ -303,15 +313,20 @@ async function checkPlanLimitOnDelivery(orderId) {
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const fileKey = `${crypto.randomUUID()}-${req.file.originalname}`;
+
+    const processedBuffer = await sharp(req.file.buffer)
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const fileKey = `${crypto.randomUUID()}-${req.file.originalname}.webp`;
     const bucketName = process.env.AWS_BUCKET_NAME;
 
     await s3.send(
       new PutObjectCommand({
         Bucket: bucketName,
         Key: fileKey,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype,
+        Body: processedBuffer,
+        ContentType: 'image/webp',
       })
     );
 
@@ -325,7 +340,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
 app.get('/api/master-categories', async (req, res) => {
   try {
+    const now = Date.now();
+    if (masterCategoryCache.data && (now - masterCategoryCache.lastFetch < CACHE_TTL)) {
+      return res.json({ data: masterCategoryCache.data });
+    }
     const categories = await MasterItem.distinct('category');
+    masterCategoryCache = { data: categories, lastFetch: now };
     res.json({ data: categories });
   } catch (err) {
     res.status(500).json({ error: err.message });

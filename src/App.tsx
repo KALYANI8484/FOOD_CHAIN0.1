@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Login } from './components/Login';
-import { Landing } from './components/Landing';
-import { SuperAdmin } from './components/SuperAdmin';
-import { SubAdmin } from './components/SubAdmin';
-import { Vendor } from './components/Vendor';
-import { Client } from './components/Client';
+import React, { useState, useEffect, Suspense } from 'react';
+const Login = React.lazy(() => import('./components/Login').then(m => ({ default: m.Login })));
+const Landing = React.lazy(() => import('./components/Landing').then(m => ({ default: m.Landing })));
+const SuperAdmin = React.lazy(() => import('./components/SuperAdmin').then(m => ({ default: m.SuperAdmin })));
+const SubAdmin = React.lazy(() => import('./components/SubAdmin').then(m => ({ default: m.SubAdmin })));
+const Vendor = React.lazy(() => import('./components/Vendor').then(m => ({ default: m.Vendor })));
+const Client = React.lazy(() => import('./components/Client').then(m => ({ default: m.Client })));
 
 type Screen = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
@@ -36,7 +36,7 @@ function App() {
   };
 
   return (
-    <>
+    <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full" /></div>}>
       {screen === 'landing' && (
         <Landing
           onNavigate={(role) => setScreen(role)}
@@ -58,7 +58,7 @@ function App() {
           initialPhone={clientPhone} 
         />
       )}
-    </>
+    </Suspense>
   );
 }
 
