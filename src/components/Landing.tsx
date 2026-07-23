@@ -7,9 +7,25 @@ import { Button, Badge, Modal } from './ui';
 
 type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
-export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
+export function Landing({ 
+  onNavigate, 
+  onClientLogin 
+}: { 
+  onNavigate: (role: Role) => void; 
+  onClientLogin: (name: string, phone: string) => void;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+
+  const handleClientSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (clientName && clientPhone) {
+      onClientLogin(clientName, clientPhone);
+    }
+  };
 
   // Registration modal removed to streamline flow
 
@@ -94,7 +110,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <Lock size={14} className="text-accent" />
               <span>Team Sign-In</span>
             </button>
-            <Button size="sm" onClick={() => onNavigate('client')}>
+            <Button size="sm" onClick={() => setShowLoginModal(true)}>
               Start Ordering
             </Button>
           </div>
@@ -124,7 +140,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 Experience kitchen-fresh catering from verified neighborhood chefs. Fast delivery, dynamic menu planning, and premium quality ingredients.
               </p>
               <div className="flex flex-row items-center justify-center gap-4 mt-10">
-                <Button size="lg" className="magnetic-hover" onClick={() => onNavigate('client')}>
+                <Button size="lg" className="magnetic-hover" onClick={() => setShowLoginModal(true)}>
                   Explore Master Menu
                 </Button>
                 <Button size="lg" variant="outline" className="magnetic-hover" onClick={scrollToVendorPartners}>
@@ -143,13 +159,13 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             {categories.map((c) => (
               <div
                 key={c.name}
-                onClick={() => onNavigate('client')}
+                onClick={() => setShowLoginModal(true)}
                 className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border/50 frosted-glow"
               >
                 <img
                   src={c.img}
                   alt={c.name}
-                  onClick={() => onNavigate('client')}
+                  onClick={() => setShowLoginModal(true)}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#111118]/75 via-[#111118]/25 to-transparent" />
@@ -262,7 +278,37 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         </div>
       </footer>
 
-      {/* Client Onboarding Registration Modal Removed */}
+      <Modal open={showLoginModal} onClose={() => setShowLoginModal(false)} title="Client Login">
+        <form onSubmit={handleClientSubmit} className="space-y-4">
+          <p className="text-xs text-muted mb-4">Enter your details to view local menus and place orders.</p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Your Name *</label>
+            <input
+              type="text"
+              required
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="e.g. Vikram Singh"
+              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none text-sm font-semibold"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Phone Number *</label>
+            <input
+              type="tel"
+              required
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              placeholder="e.g. +91 99999 88888"
+              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none text-sm font-semibold"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t border-border mt-6">
+            <Button type="button" variant="outline" onClick={() => setShowLoginModal(false)}>Cancel</Button>
+            <Button type="submit" disabled={!clientName || !clientPhone}>Continue <ArrowRight size={16} /></Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
