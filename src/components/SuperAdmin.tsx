@@ -337,6 +337,22 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
   const [deleteInputName, setDeleteInputName] = useState('');
 
+  const getVendorPlan = (vendor: Vendor | null) => vendor ? plans.find((p) => p.id === vendor.plan_id) : undefined;
+  const getVendorItemLimit = (vendor: Vendor | null) => {
+    const plan = getVendorPlan(vendor);
+    if (!plan) return 5;
+    if (plan.max_items <= 0 || plan.name?.toLowerCase().includes('premium')) return Infinity;
+    return plan.max_items;
+  };
+  const getVendorLimitLabel = (vendor: Vendor | null) => {
+    const limit = getVendorItemLimit(vendor);
+    return limit === Infinity ? 'Unlimited' : String(limit);
+  };
+  const getVendorRemainingLabel = (vendor: Vendor | null, activeCount: number) => {
+    const limit = getVendorItemLimit(vendor);
+    return limit === Infinity ? 'Unlimited' : String(Math.max(0, limit - activeCount));
+  };
+
   // Editing inventory sub-module details
   const [editingInventory, setEditingInventory] = useState<VendorItem[]>([]);
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
@@ -525,10 +541,9 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
   const handleInventoryAddRow = async () => {
     if (!viewVendor) return;
-    const plan = plans.find(p => p.id === viewVendor.plan_id);
-    const limit = plan ? plan.max_items : 5;
+    const limit = getVendorItemLimit(viewVendor);
 
-    if (viewInventory.length >= limit) {
+    if (limit !== Infinity && viewInventory.length >= limit) {
       alert(`Limit Reached! Plan limit is ${limit} menu items.`);
       return;
     }
@@ -720,6 +735,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       <Drawer open={!!viewVendor} onClose={() => setViewVendor(null)} title="Vendor Profile">
         {viewVendor && (
           <div className="space-y-6">
+<<<<<<< Updated upstream
             <div className="rounded-3xl border border-amber-200 bg-[#fcf5e7] p-6">
               <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
                 <div className="flex items-center gap-4">
@@ -761,10 +777,43 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                 <div className="rounded-3xl bg-white p-4 border border-amber-200">
                   <p className="text-[10px] uppercase tracking-wider text-slate-500">Address</p>
                   <p className="mt-2 text-sm text-slate-700">{viewVendor.address}</p>
+=======
+            <div className="text-center pb-6 border-b border-border">
+              {viewVendor.logo_url ? (
+                <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-16 h-16 rounded-2xl object-cover mx-auto border border-border" />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-surface-2 mx-auto flex items-center justify-center border border-border"><Store size={24} className="text-muted" /></div>
+              )}
+              <h2 className="text-xl font-extrabold text-text mt-3">{viewVendor.shop_name}</h2>
+              <p className="text-xs text-muted mt-1">{viewVendor.owner_name} · {viewVendor.phone}</p>
+              
+              {/* Subscription Item Limit Display */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-3xl border border-border bg-surface-2 p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Vendor Name</p>
+                  <p className="font-bold text-text mt-1">{viewVendor.shop_name}</p>
+                </div>
+                <div className="rounded-3xl border border-border bg-surface-2 p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Subscription Plan</p>
+                  <p className="font-bold text-accent mt-1">{getVendorPlan(viewVendor)?.name || 'Free'}</p>
+                </div>
+                <div className="rounded-3xl border border-border bg-surface-2 p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Maximum Allowed Items</p>
+                  <p className="font-bold text-text mt-1">{getVendorLimitLabel(viewVendor)}</p>
+                </div>
+                <div className="rounded-3xl border border-border bg-surface-2 p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Current Items Added</p>
+                  <p className="font-bold text-text mt-1">{viewInventory.length}</p>
+                </div>
+                <div className="sm:col-span-2 rounded-3xl border border-border bg-surface-2 p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Remaining Items</p>
+                  <p className="font-bold text-text mt-1">{getVendorRemainingLabel(viewVendor, viewInventory.length)}</p>
+>>>>>>> Stashed changes
                 </div>
               </div>
             </div>
 
+<<<<<<< Updated upstream
             <div className="rounded-3xl border border-amber-200 bg-white p-6">
               <div className="flex items-center justify-between gap-4 mb-5">
                 <div>
@@ -772,7 +821,25 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                   <p className="text-xs text-slate-500 mt-1">A snapshot of active menu items linked to this vendor.</p>
                 </div>
                 <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">{viewInventory.length} items</span>
+=======
+            {/* Inventory sub-module grid */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-xs font-bold text-muted uppercase tracking-wider">Add Items</p>
+                <Button 
+                  size="sm" 
+                  onClick={handleInventoryAddRow} 
+                  disabled={viewInventory.length >= getVendorItemLimit(viewVendor)}
+                >
+                  + Add Item
+                </Button>
+>>>>>>> Stashed changes
               </div>
+              {viewInventory.length >= getVendorItemLimit(viewVendor) && getVendorItemLimit(viewVendor) !== Infinity && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  You have reached your plan limit. Upgrade your subscription to add more items.
+                </div>
+              )}
 
               {viewInventory.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2">
