@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Store, Package, CreditCard, FileText, Settings, Users,
   ShoppingBag, DollarSign, CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp
+  Activity as ActivityIcon, Eye, Edit2, FileUp, Lock
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
@@ -318,6 +318,133 @@ function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     </div>
   );
 }
+interface VendorInventoryBuilderProps {
+  items: Array<{ category: string; item_name: string; quantity: number; price: number; price_locked: boolean; locked_price: number | null; }>;
+  setItems: (items: VendorInventoryBuilderProps['items']) => void;
+  maxItems: number;
+  categories: string[];
+}
+
+function VendorInventoryBuilder({ items, setItems, maxItems, categories }: VendorInventoryBuilderProps) {
+  const [category, setCategory] = useState('');
+  const [itemName, setItemName] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [price, setPrice] = useState(0);
+  const [priceLocked, setPriceLocked] = useState(false);
+  const [lockedPrice, setLockedPrice] = useState<number | ''>('');
+
+  useEffect(() => {
+    if (categories.length > 0 && !category) setCategory(categories[0]);
+  }, [categories, category]);
+
+  const handleAdd = () => {
+    if (!category || !itemName || quantity <= 0 || price < 0) return;
+    if (items.length >= maxItems) return;
+    setItems([...items, {
+      category,
+      item_name: itemName,
+      quantity,
+      price,
+      price_locked: priceLocked,
+      locked_price: priceLocked ? Number(lockedPrice) : null
+    }]);
+    setItemName('');
+    setQuantity(1);
+    setPrice(0);
+    setPriceLocked(false);
+    setLockedPrice('');
+  };
+
+  const handleRemove = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const isLimitReached = items.length >= maxItems;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-end">
+        <div>
+          <h3 className="font-extrabold text-base text-text">Vendor Inventory</h3>
+          <p className="text-xs text-muted mt-1">Items Added: {items.length} / {maxItems} ({Math.max(0, maxItems - items.length)} remaining)</p>
+        </div>
+      </div>
+      
+      {isLimitReached && (
+        <p className="text-sm font-bold text-red-600 bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+          You have reached your plan limit. Upgrade your subscription to add more items.
+        </p>
+      )}
+
+      <div className="grid sm:grid-cols-6 gap-3 items-end bg-surface-2 p-4 rounded-xl border border-border">
+        <div className="sm:col-span-2 space-y-1">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">Category</label>
+          <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-surface border border-border text-sm focus:border-accent outline-none">
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="sm:col-span-2 space-y-1">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">Item Name</label>
+          <input value={itemName} onChange={e => setItemName(e.target.value)} placeholder="e.g. Aloo Paratha" className="w-full px-3 py-2.5 rounded-xl bg-surface border border-border text-sm focus:border-accent outline-none" />
+        </div>
+        <div className="sm:col-span-1 space-y-1">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">Qty</label>
+          <input type="number" min="1" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-full px-3 py-2.5 rounded-xl bg-surface border border-border text-sm focus:border-accent outline-none" />
+        </div>
+        <div className="sm:col-span-1 space-y-1">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">Price</label>
+          <input type="number" min="0" value={price} onChange={e => setPrice(Number(e.target.value))} className="w-full px-3 py-2.5 rounded-xl bg-surface border border-border text-sm focus:border-accent outline-none" />
+        </div>
+        <div className="sm:col-span-4 flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-text">
+            <input type="checkbox" checked={priceLocked} onChange={e => setPriceLocked(e.target.checked)} className="w-4 h-4 rounded text-accent focus:ring-accent" />
+            Lock Price
+          </label>
+          {priceLocked && (
+            <input type="number" min="0" value={lockedPrice} onChange={e => setLockedPrice(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Locked Price" className="px-3 py-1.5 rounded-xl bg-surface border border-border text-sm focus:border-accent outline-none w-32" />
+          )}
+        </div>
+        <div className="sm:col-span-2 text-right">
+          <Button type="button" onClick={handleAdd} disabled={isLimitReached || !itemName} className="w-full">
+            <Plus size={16} /> Add Item
+          </Button>
+        </div>
+      </div>
+
+      {items.length > 0 && (
+        <div className="border border-border rounded-xl bg-surface overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3">Item</th>
+                <th className="px-4 py-3">Qty</th>
+                <th className="px-4 py-3">Price</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {items.map((item, idx) => (
+                <tr key={idx} className="hover:bg-surface-2/30">
+                  <td className="px-4 py-3"><Badge variant="outline">{item.category}</Badge></td>
+                  <td className="px-4 py-3 font-semibold text-text">{item.item_name}</td>
+                  <td className="px-4 py-3">{item.quantity}</td>
+                  <td className="px-4 py-3 font-bold flex items-center gap-1">
+                    ₹{item.price_locked ? item.locked_price : item.price}
+                    {item.price_locked && <Lock size={12} className="text-amber-500" />}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => handleRemove(idx)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // 2. Vendors Management Module Tab
 function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
@@ -337,6 +464,11 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
   const [deleteInputName, setDeleteInputName] = useState('');
 
+  const [newVendorInventory, setNewVendorInventory] = useState<VendorInventoryBuilderProps['items']>([]);
+  const [masterCategories, setMasterCategories] = useState<string[]>([]);
+  const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
+  const [vendorFormState, setVendorFormState] = useState<any>(null);
+
   // Editing inventory sub-module details
   const [editingInventory, setEditingInventory] = useState<VendorItem[]>([]);
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
@@ -346,14 +478,27 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const inventoryLimit = currentPlan?.max_items ?? 5;
 
   const load = async () => {
-    const [{ data: v }, { data: p }, { data: m }] = await Promise.all([
+    const [{ data: v }, { data: p }, { data: m }, { data: inv }] = await Promise.all([
       supabase.from('vendors').select('*').order('created_at', { ascending: false }),
       supabase.from('subscription_plans').select('*'),
-      supabase.from('master_inventory').select('*')
+      supabase.from('master_inventory').select('*'),
+      supabase.from('vendor_inventory').select('*')
     ]);
     setVendors(v || []);
     setPlans(p || []);
     setMasterItems(m || []);
+    
+    const counts: Record<string, number> = {};
+    (inv || []).forEach((item: any) => {
+      counts[item.vendor_id] = (counts[item.vendor_id] || 0) + 1;
+    });
+    setItemCounts(counts);
+
+    fetch('/api/master-categories')
+      .then(r => r.json())
+      .then(d => setMasterCategories(d.data || []))
+      .catch(() => setMasterCategories(['Breakfast', 'Lunch/Dinner', 'Tiffin', 'Thali', 'Vegetables']));
+
     setLoading(false);
   };
 
@@ -363,7 +508,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     const plan = plans.find((p) => p.id === formData.plan_id);
     const validityDays = plan?.validity_days || 30;
 
-    await supabase.from('vendors').insert({
+    const { data: newVendors } = await supabase.from('vendors').insert({
       owner_name: formData.owner_name,
       phone: formData.phone,
       email: formData.email || null,
@@ -380,7 +525,23 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       submitted_by: 'Super Admin',
       subscription_start: new Date().toISOString().slice(0, 10),
       subscription_end: new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10),
-    });
+    }).select();
+
+    const newVendorId = newVendors?.[0]?.id;
+    if (newVendorId && newVendorInventory.length > 0) {
+      for (const item of newVendorInventory) {
+        await supabase.from('vendor_inventory').insert({
+          vendor_id: newVendorId,
+          item_name: item.item_name,
+          category: item.category,
+          price: item.price_locked ? item.locked_price : item.price,
+          quantity: item.quantity,
+          price_locked: item.price_locked,
+          locked_price: item.price_locked ? item.locked_price : null,
+        });
+      }
+    }
+    setNewVendorInventory([]);
 
     await supabase.from('activity_log').insert({
       action: `Vendor created directly: ${formData.shop_name}`,
@@ -627,6 +788,9 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                 <th className="px-6 py-4">Owner</th>
                 <th className="px-6 py-4">ZIP</th>
                 <th className="px-6 py-4">Plan Name</th>
+                <th className="px-6 py-4">Max Items</th>
+                <th className="px-6 py-4">Current Items</th>
+                <th className="px-6 py-4">Remaining</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -653,6 +817,15 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                   <td className="px-6 py-4">
                     <Badge variant="accent">{v.plan_name || 'Free'}</Badge>
                   </td>
+                  <td className="px-6 py-4 font-semibold text-slate-800">
+                    {plans.find(p => p.id === v.plan_id)?.max_items ?? 5}
+                  </td>
+                  <td className="px-6 py-4 font-semibold text-slate-800">
+                    {itemCounts[v.id] || 0}
+                  </td>
+                  <td className="px-6 py-4 font-semibold text-slate-800">
+                    {(plans.find(p => p.id === v.plan_id)?.max_items ?? 5) - (itemCounts[v.id] || 0)}
+                  </td>
                   <td className="px-6 py-4">
                     <Badge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}>
                       {v.status === 'approved' ? 'Live' : v.status === 'expired' ? 'Expired' : v.status === 'rejected' ? 'Rejected' : 'Review'}
@@ -675,7 +848,22 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
       {/* Create Vendor Modal */}
       <Modal open={createMode} onClose={() => setCreateMode(false)} title="Create New Vendor" size="xl">
-        <VendorForm submitLabel="Create Vendor" onSubmit={handleCreateSubmit} onCancel={() => setCreateMode(false)} />
+        <div className="space-y-8">
+          <VendorForm 
+            submitLabel="Create Vendor" 
+            onSubmit={handleCreateSubmit} 
+            onCancel={() => setCreateMode(false)} 
+            onChange={setVendorFormState}
+          />
+          <div className="border-t border-border pt-8">
+            <VendorInventoryBuilder
+              items={newVendorInventory}
+              setItems={setNewVendorInventory}
+              maxItems={plans.find(p => p.id === vendorFormState?.plan_id)?.max_items ?? 5}
+              categories={masterCategories}
+            />
+          </div>
+        </div>
       </Modal>
 
       {/* Edit Vendor Modal */}

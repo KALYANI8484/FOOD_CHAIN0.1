@@ -141,6 +141,8 @@ const vendorItemSchema = new mongoose.Schema({
   category: { type: String, default: null },
   image_url: { type: String, default: null },
   price: { type: Number, required: true },
+  price_locked: { type: Boolean, default: false },
+  locked_price: { type: Number, default: null },
   quantity: { type: Number, required: true },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
@@ -153,6 +155,7 @@ const orderSchema = new mongoose.Schema({
   client_landmark: { type: String, default: null },
   client_address: { type: String, required: true },
   item_name: { type: String, required: true },
+  category: { type: String, default: null },
   item_id: { type: String, default: null },
   vendor_id: { type: String, default: null },
   price: { type: Number, required: true },
@@ -320,6 +323,15 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+app.get('/api/master-categories', async (req, res) => {
+  try {
+    const categories = await MasterItem.distinct('category');
+    res.json({ data: categories });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Generic Database Handler matching Supabase JS queries
 app.post('/api/db', async (req, res) => {
   const { table, action, data, filters, sorts, limit, single } = req.body;
@@ -398,6 +410,14 @@ app.post('/api/db', async (req, res) => {
 
         // Socket broadcast for new orders
         if (table === 'orders') {
+          if (doc.category && doc.client_zip) {
+            const vendors = await Vendor.find({ status: 'approved', zip_code: doc.client_zip });
+            const vendorIds = vendors.map(v => v._id);
+            const items = await VendorItem.find({ vendor_id: { $in: vendorIds }, category: doc.category });
+            const distinctVendorIds = [...new Set(items.map(item => item.vendor_id))];
+            responseData.target_vendors = distinctVendorIds;
+          }
+
           io.emit('newOrder', responseData);
           
           // Set 10 minutes timeout timer

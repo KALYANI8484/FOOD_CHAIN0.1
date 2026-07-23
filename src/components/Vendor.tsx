@@ -86,6 +86,12 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         // Avoid duplicate additions
         if (prev.some((o) => o.id === newOrder.id)) return prev;
         
+        if ((newOrder as any).target_vendors && Array.isArray((newOrder as any).target_vendors)) {
+          if (!(newOrder as any).target_vendors.includes(vendor.id)) {
+            return prev;
+          }
+        }
+
         // Play Chime alert if order is in vendor's zip code
         if (newOrder.client_zip === vendor.zip_code) {
           playPOSChime();
@@ -637,25 +643,26 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
 // 4. Inventory Sub-module Tab
 function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [items, setItems] = useState<VendorItem[]>([]);
-  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   // New Row Item State
-  const [selectedMasterId, setSelectedMasterId] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [itemName, setItemName] = useState('');
   const [customPrice, setCustomPrice] = useState(100);
   const [customQty, setCustomQty] = useState(10);
   const [adding, setAdding] = useState(false);
 
   const load = async () => {
-    const [{ data: v }, { data: m }] = await Promise.all([
+    const [{ data: v }, catRes] = await Promise.all([
       supabase.from('vendor_inventory').select('*').eq('vendor_id', vendor.id),
-      supabase.from('master_inventory').select('*')
+      fetch('/api/master-categories').then(r => r.json())
     ]);
     setItems(v || []);
-    setMasterItems(m || []);
-    if (m && m.length > 0 && !selectedMasterId) {
-      setSelectedMasterId(m[0].id);
+    setCategories(catRes.data || []);
+    if (catRes.data && catRes.data.length > 0 && !selectedCategory) {
+      setSelectedCategory(catRes.data[0]);
     }
     setLoading(false);
   };
@@ -704,33 +711,33 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
   };
 
   const addNewItem = async () => {
-    const master = masterItems.find(x => x.id === selectedMasterId);
-    if (!master) return;
+    if (!itemName.trim()) {
+      show('Please enter an item name', 'error');
+      return;
+    }
 
     // Check Plan item capacity
-    // Default cap: 5 items
     let maxLimit = 5;
     if (vendor.plan_name === 'Starter') maxLimit = 10;
     else if (vendor.plan_name === 'Premium') maxLimit = 30;
 
     if (items.length >= maxLimit) {
-      alert(`Plan limit reached! Max items permitted: ${maxLimit}`);
       return;
     }
 
     setAdding(true);
     await supabase.from('vendor_inventory').insert({
       vendor_id: vendor.id,
-      master_item_id: master.id,
-      item_name: master.name,
-      category: master.category, // Auto inherits master category
+      item_name: itemName,
+      category: selectedCategory,
       price: customPrice,
       quantity: customQty,
-      image_url: master.image_url
+      image_url: ''
     });
 
     setAdding(false);
-    show('Dishes mapped to inventory!');
+    setItemName('');
+    show('Item added to inventory!');
     load();
   };
 
@@ -748,23 +755,27 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
 
       {/* Mapping form panel */}
       <div className="card p-6 bg-surface border border-border animate-fade-in-up delay-100 space-y-4">
-        <h3 className="font-extrabold text-base uppercase tracking-wider text-muted">Link Master dish template</h3>
-        <div className="grid sm:grid-cols-3 gap-4 items-end">
+        <h3 className="font-extrabold text-base uppercase tracking-wider text-muted">Add New Menu Item</h3>
+        <div className="grid sm:grid-cols-4 gap-4 items-end">
           <Select 
-            label="Choose Master Dish"
-            value={selectedMasterId}
-            onChange={setSelectedMasterId}
-            options={masterItems.map(m => ({ value: m.id, label: `${m.name} (${m.category})` }))}
+            label="Category"
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+            options={categories.map(c => ({ value: c, label: c }))}
           />
-          <Input label="Custom Active Price (₹)" type="number" value={String(customPrice)} onChange={(v) => setCustomPrice(Number(v))} />
-          <Input label="Initial Quantity" type="number" value={String(customQty)} onChange={(v) => setCustomQty(Number(v))} />
+          <Input label="Item Name" value={itemName} onChange={setItemName} placeholder="e.g. Idli" />
+          <Input label="Price (₹)" type="number" value={String(customPrice)} onChange={(v) => setCustomPrice(Number(v))} />
+          <Input label="Quantity" type="number" value={String(customQty)} onChange={(v) => setCustomQty(Number(v))} />
         </div>
-        <div className="flex justify-end pt-2">
+        <div className="flex flex-col items-end pt-2 gap-2">
+          {items.length >= (vendor.plan_name === 'Starter' ? 10 : vendor.plan_name === 'Premium' ? 30 : 5) && (
+            <p className="text-red-500 text-sm font-bold">You have reached your plan limit. Upgrade your subscription to add more items.</p>
+          )}
           <Button 
             onClick={addNewItem} 
-            disabled={adding || items.length >= (vendor.plan_name === 'Starter' ? 10 : vendor.plan_name === 'Premium' ? 30 : 5)}
+            disabled={adding || items.length >= (vendor.plan_name === 'Starter' ? 10 : vendor.plan_name === 'Premium' ? 30 : 5) || !itemName.trim()}
           >
-            Map to Menu
+            Add Item
           </Button>
         </div>
       </div>
@@ -810,15 +821,19 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <input
-                      type="number"
-                      value={item.price}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setItems(prev => prev.map((itm, i) => i === idx ? { ...itm, price: val } : itm));
-                      }}
-                      className="w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={item.price}
+                        readOnly={(item as any).price_locked}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setItems(prev => prev.map((itm, i) => i === idx ? { ...itm, price: val } : itm));
+                        }}
+                        className={`w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold ${(item as any).price_locked ? 'opacity-70 bg-surface-2' : ''}`}
+                      />
+                      {(item as any).price_locked && <Padlock size={14} className="text-muted" />}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <input

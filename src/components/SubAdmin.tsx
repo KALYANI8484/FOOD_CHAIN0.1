@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Store, Plus, Users, Clock, CheckCircle2,
   Activity as ActivityIcon, AlertCircle, FileText, Eye, Pencil, Search,
-  ArrowRight, Package
+  ArrowRight, Package, X, Lock
 } from 'lucide-react';
 import { supabase, type Vendor, type Activity, type VendorItem } from '../lib/supabase';
 import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer } from './ui';
@@ -190,13 +190,27 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  const [newVendorInventory, setNewVendorInventory] = useState<any[]>([]);
+  const [masterCategories, setMasterCategories] = useState<string[]>([]);
+  const [vendorFormState, setVendorFormState] = useState<any>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+
   const load = async () => {
     const { data } = await supabase.from('vendors').select('*').order('created_at', { ascending: false });
     setVendors(data || []);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    load(); 
+    
+    fetch('/api/master-categories')
+      .then(res => res.json())
+      .then(res => { if (res.data) setMasterCategories(res.data); })
+      .catch(err => console.error(err));
+      
+    supabase.from('subscription_plans').select('*').eq('status', 'active').then(({ data }) => setPlans(data || []));
+  }, []);
 
   const handleCreateSubmit = async (formData: any) => {
     const payload = {
@@ -215,11 +229,19 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       created_at: new Date().toISOString()
     };
 
-    const { error } = await supabase.from('vendors').insert(payload);
+    const { data: newVendor, error } = await supabase.from('vendors').insert(payload).select().single();
 
     if (error) {
       show('Failed to submit vendor: ' + (error.message || 'Unknown error'), 'error');
       return;
+    }
+
+    if (newVendorInventory.length > 0) {
+      const inventoryPayload = newVendorInventory.map(item => ({
+        ...item,
+        vendor_id: newVendor.id
+      }));
+      await supabase.from('vendor_inventory').insert(inventoryPayload);
     }
 
     await supabase.from('activity_log').insert({
@@ -229,6 +251,8 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
 
     show('Vendor submitted for Super Admin review', 'success');
     setCreateMode(false);
+    setNewVendorInventory([]);
+    setVendorFormState(null);
     await load();
   };
 
@@ -380,8 +404,23 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       </div>
 
       {/* Creation Modal */}
-      <Modal open={createMode} onClose={() => setCreateMode(false)} title="Onboard New Vendor" size="xl">
-        <VendorForm submitLabel="Submit for Approval" onSubmit={handleCreateSubmit} onCancel={() => setCreateMode(false)} />
+      <Modal open={createMode} onClose={() => { setCreateMode(false); setNewVendorInventory([]); setVendorFormState(null); }} title="Onboard New Vendor" size="xl">
+        <VendorForm 
+          submitLabel="Submit for Approval" 
+          onSubmit={handleCreateSubmit} 
+          onCancel={() => { setCreateMode(false); setNewVendorInventory([]); setVendorFormState(null); }}
+          onChange={setVendorFormState}
+        />
+        
+        <div className="mt-8 border-t border-border pt-6">
+          <h3 className="text-lg font-bold mb-4">Vendor Inventory</h3>
+          <VendorInventoryBuilder
+            items={newVendorInventory}
+            setItems={setNewVendorInventory}
+            maxItems={plans.find(p => p.id === vendorFormState?.plan_id)?.max_items || 50}
+            categories={masterCategories.length > 0 ? masterCategories : ['Breakfast', 'Lunch', 'Dinner', 'Beverages']}
+          />
+        </div>
       </Modal>
 
       {/* Edit Modal */}
@@ -697,6 +736,109 @@ function SubActivity() {
           ))}
           {logs.length === 0 && <EmptyState icon={<ActivityIcon size={24} />} title="Audit log empty" />}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function VendorInventoryBuilder({ items, setItems, maxItems, categories }: {
+  items: Array<{ category: string; item_name: string; quantity: number; price: number; price_locked: boolean; locked_price: number | null; }>;
+  setItems: (items: any[]) => void;
+  maxItems: number;
+  categories: string[];
+}) {
+  const [category, setCategory] = useState(categories[0] || '');
+  const [itemName, setItemName] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [price, setPrice] = useState(0);
+  const [priceLocked, setPriceLocked] = useState(false);
+
+  const handleAdd = () => {
+    if (!category || !itemName || quantity <= 0 || price < 0) return;
+    if (items.length >= maxItems) return;
+    setItems([...items, { category, item_name: itemName, quantity, price, price_locked: priceLocked, locked_price: priceLocked ? price : null }]);
+    setItemName('');
+    setQuantity(1);
+    setPrice(0);
+    setPriceLocked(false);
+  };
+
+  const remove = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const remaining = maxItems - items.length;
+  const limitReached = items.length >= maxItems;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm font-bold text-muted">
+          Items Added: {items.length} / {maxItems} ({remaining} remaining)
+        </p>
+      </div>
+      {limitReached && (
+        <p className="text-sm text-red-500 font-semibold">
+          You have reached your plan limit. Upgrade your subscription to add more items.
+        </p>
+      )}
+      
+      <div className="grid grid-cols-6 gap-3 items-end bg-surface-2 p-4 rounded-xl border border-border">
+        <div className="col-span-1">
+          <label className="text-xs font-semibold text-muted block mb-1">Category</label>
+          <select 
+            value={category} onChange={(e) => setCategory(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm outline-none focus:border-accent"
+          >
+            <option value="">Select...</option>
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className="text-xs font-semibold text-muted block mb-1">Item Name</label>
+          <input 
+            value={itemName} onChange={(e) => setItemName(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm outline-none focus:border-accent"
+            placeholder="e.g. Burger"
+          />
+        </div>
+        <div className="col-span-1">
+          <label className="text-xs font-semibold text-muted block mb-1">Qty</label>
+          <input 
+            type="number" min="1" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm outline-none focus:border-accent"
+          />
+        </div>
+        <div className="col-span-1">
+          <label className="text-xs font-semibold text-muted block mb-1">Price (₹)</label>
+          <input 
+            type="number" min="0" value={price} onChange={(e) => setPrice(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm outline-none focus:border-accent"
+          />
+        </div>
+        <div className="col-span-1 flex items-center justify-between pb-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={priceLocked} onChange={(e) => setPriceLocked(e.target.checked)} className="rounded bg-surface border-border accent-accent" />
+            <span className="text-xs font-semibold text-muted flex items-center gap-1"><Lock size={12} /> Lock</span>
+          </label>
+          <Button size="sm" onClick={handleAdd} disabled={limitReached || !category || !itemName} className="px-3">Add</Button>
+        </div>
+      </div>
+
+      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+        {items.map((item, i) => (
+          <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
+            <div className="flex items-center gap-3">
+              <Badge variant="accent">{item.category}</Badge>
+              <p className="text-sm font-bold">{item.item_name} <span className="text-xs text-muted font-normal">x{item.quantity}</span></p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-sm font-bold">₹{item.price}</div>
+              {item.price_locked && <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-1 rounded-full font-bold flex items-center gap-1"><Lock size={10} /> Locked</span>}
+              <button onClick={() => remove(i)} className="text-red-500 hover:text-red-600 p-1 bg-red-500/10 rounded-lg"><X size={14} /></button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

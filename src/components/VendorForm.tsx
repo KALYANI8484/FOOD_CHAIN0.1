@@ -7,9 +7,10 @@ interface VendorFormProps {
   submitLabel: string;
   onSubmit: (formData: any) => Promise<void>;
   onCancel?: () => void;
+  onChange?: (form: any) => void;
 }
 
-export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: VendorFormProps) {
+export function VendorForm({ initialData, submitLabel, onSubmit, onCancel, onChange }: VendorFormProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -28,6 +29,10 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     logo_url: initialData?.logo_url || '',
     qr_url: initialData?.qr_url || '',
   });
+
+  useEffect(() => {
+    if (onChange) onChange(form);
+  }, [form]);
 
   const selectedPlan = plans.find((p) => p.id === form.plan_id);
   const today = new Date();

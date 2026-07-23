@@ -55,6 +55,8 @@ export type VendorItem = {
   image_url: string | null;
   price: number;
   quantity: number;
+  price_locked: boolean;
+  locked_price: number | null;
   created_at: string;
 };
 
@@ -76,6 +78,7 @@ export type Order = {
   created_at: string;
   accepted_at: string | null;
   delivered_at: string | null;
+  category: string | null;
 };
 
 export type Guide = {

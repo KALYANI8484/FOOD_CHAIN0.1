@@ -247,10 +247,11 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [items, setItems] = useState<VendorItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   
   // Selected category in Smart Menu. Default: null (shows Category Grid)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedItemName, setSelectedItemName] = useState<string>('');
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     (async () => {
@@ -275,20 +276,29 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
     'Vegetables': 'https://images.pexels.com/photos/1458691/pexels-photo-1458691.jpeg',
   };
 
-  const addToCart = (item: VendorItem) => {
-    const c = { ...cart };
-    if (c[item.id]) c[item.id].qty++;
-    else c[item.id] = { item, qty: 1 };
-    setCart(c);
-    show(`${item.item_name} added to cart`);
-    setCartOpen(true); // Sleek side-drawer triggered immediately to confirm checkout
-  };
+  const categoryItems = items.filter(i => i.category === selectedCategory);
+  const uniqueItemNames = Array.from(new Set(categoryItems.map(i => i.item_name)));
+  
+  const matchingVendorItems = categoryItems.filter(i => i.item_name === selectedItemName);
+  const firstItem = matchingVendorItems[0];
+  
+  const minPrice = matchingVendorItems.length > 0 ? Math.min(...matchingVendorItems.map(i => Number(i.price) || 0)) : 0;
+  const maxPrice = matchingVendorItems.length > 0 ? Math.max(...matchingVendorItems.map(i => Number(i.price) || 0)) : 0;
 
-  const filteredItems = items.filter((i) => {
-    const matchSearch = i.item_name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = !selectedCategory || i.category === selectedCategory;
-    return matchSearch && matchCat;
-  });
+  const handleAddToCart = () => {
+    if (!firstItem) return;
+    const c = { ...cart };
+    if (c[firstItem.id]) {
+      c[firstItem.id].qty += quantity;
+    } else {
+      c[firstItem.id] = { item: firstItem, qty: quantity };
+    }
+    setCart(c);
+    show(`${quantity}x ${firstItem.item_name} added to cart`);
+    setCartOpen(true);
+    setSelectedItemName('');
+    setQuantity(1);
+  };
 
   if (loading) return <div className="py-24"><Spinner /></div>;
 
@@ -338,78 +348,113 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
           </div>
         </div>
       ) : (
-        /* Smart Menu view */
+        /* Order Form view */
         <div className="space-y-6 animate-scale-in">
           <div className="flex items-center justify-between">
             <button 
-              onClick={() => setSelectedCategory(null)}
+              onClick={() => {
+                setSelectedCategory(null);
+                setSelectedItemName('');
+                setQuantity(1);
+              }}
               className="text-sm font-semibold text-muted hover:text-text transition-colors flex items-center gap-1.5 group"
             >
               <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> 
               <span>Back to Categories</span>
             </button>
-            <Badge variant="accent">{selectedCategory} Menu</Badge>
+            <Badge variant="accent">{selectedCategory} Order Form</Badge>
           </div>
 
-          <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search in ${selectedCategory}...`}
-              className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-surface border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none transition-all text-sm"
-            />
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredItems.map((item) => (
-              <div key={item.id} className="card overflow-hidden bg-surface border border-border hover-lift group">
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  {item.image_url ? (
-                    <img 
-                      src={item.image_url} 
-                      alt={item.item_name} 
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-surface-2 flex items-center justify-center">
-                      <Package size={32} className="text-muted" />
-                    </div>
-                  )}
-                  
-                  {/* Trust Badge */}
-                  <div className="absolute top-3 left-3">
-                    <Badge variant="success">
-                      <HeartHandshake size={10} /> Verified Kitchen
-                    </Badge>
-                  </div>
-                </div>
-                
-                <div className="p-5 space-y-3">
-                  <div>
-                    <h3 className="font-extrabold text-base text-text">{item.item_name}</h3>
-                    <p className="text-xs text-muted mt-1 font-medium">Prepared by a local verified vendor</p>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                    <span className="text-xl font-extrabold text-accent">₹{item.price}</span>
-                    <Button size="sm" onClick={() => addToCart(item)} disabled={item.quantity === 0}>
-                      <Plus size={14} /> Add to Cart
-                    </Button>
+          <div className="card p-8 glass bg-surface border border-border animate-scale-in max-w-2xl mx-auto">
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-text mb-2">Select Item</label>
+                <div className="relative">
+                  <UtensilsCrossed size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+                  <select
+                    value={selectedItemName}
+                    onChange={(e) => {
+                      setSelectedItemName(e.target.value);
+                      setQuantity(1);
+                    }}
+                    className="w-full pl-12 pr-10 py-3.5 rounded-2xl bg-surface-2 border border-border text-text focus:border-accent outline-none transition-all text-sm font-semibold appearance-none"
+                  >
+                    <option value="" disabled>Choose an item...</option>
+                    {uniqueItemNames.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted">
+                    <ArrowRight size={16} className="rotate-90" />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {filteredItems.length === 0 && (
-            <EmptyState 
-              icon={<Search size={28} />} 
-              title="No items in this category" 
-              subtitle="All local kitchens are currently preparing other items." 
-            />
-          )}
+              {selectedItemName && firstItem && (
+                <div className="animate-fade-in-up space-y-6">
+                  <div className="flex flex-col md:flex-row gap-6 p-5 rounded-2xl bg-surface-2 border border-border">
+                    {firstItem.image_url ? (
+                      <img 
+                        src={firstItem.image_url} 
+                        alt={firstItem.item_name} 
+                        className="w-full md:w-32 h-32 rounded-xl object-cover border border-border" 
+                      />
+                    ) : (
+                      <div className="w-full md:w-32 h-32 rounded-xl bg-surface border border-border flex items-center justify-center">
+                        <Package size={32} className="text-muted" />
+                      </div>
+                    )}
+                    
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <h3 className="text-xl font-extrabold text-text">{selectedItemName}</h3>
+                        <p className="text-sm text-muted mt-1 flex items-center gap-1.5">
+                          <HeartHandshake size={14} className="text-accent" /> 
+                          Available from {matchingVendorItems.length} verified {matchingVendorItems.length === 1 ? 'kitchen' : 'kitchens'}
+                        </p>
+                      </div>
+
+                      <div className="inline-block px-3 py-1.5 rounded-lg bg-surface border border-border">
+                        <span className="text-lg font-extrabold text-accent">
+                          {minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6 pt-4 border-t border-border">
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="w-10 h-10 rounded-xl bg-surface border border-border hover:bg-surface-2 flex items-center justify-center text-text transition-colors"
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span className="text-lg font-bold w-6 text-center">{quantity}</span>
+                      <button 
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="w-10 h-10 rounded-xl bg-surface border border-border hover:bg-surface-2 flex items-center justify-center text-text transition-colors"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+
+                    <Button size="lg" className="flex-1" onClick={handleAddToCart}>
+                      <ShoppingBag size={18} /> Add to Cart
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!selectedItemName && uniqueItemNames.length === 0 && (
+                <EmptyState 
+                  icon={<Package size={28} />} 
+                  title="No items in this category" 
+                  subtitle="Please check back later or try another category." 
+                />
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -474,6 +519,7 @@ function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPh
       client_landmark: landmarkInput || null,
       client_address: address,
       item_name: entries.map((e) => `${e.item.item_name} (x${e.qty})`).join(', '),
+      category: entries[0]?.item.category || null,
       vendor_id: vendorId,
       price: total,
       quantity: entries.reduce((s, c) => s + c.qty, 0),
