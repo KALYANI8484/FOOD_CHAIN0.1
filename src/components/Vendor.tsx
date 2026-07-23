@@ -34,9 +34,13 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 
   useEffect(() => {
     (async () => {
-      // Find the approved vendor matching the logged-in phone session
-      const queryPhone = vendorPhone || '+919876543210';
-      const { data } = await supabase.from('vendors').select('*').eq('phone', queryPhone).maybeSingle();
+      const queryId = vendorPhone || '';
+      // Try by phone first, then by email
+      let { data } = await supabase.from('vendors').select('*').eq('phone', queryId).maybeSingle();
+      if (!data && queryId.includes('@')) {
+        const res = await supabase.from('vendors').select('*').eq('email', queryId.toLowerCase()).maybeSingle();
+        data = res.data;
+      }
       setVendor(data);
       setLoading(false);
     })();

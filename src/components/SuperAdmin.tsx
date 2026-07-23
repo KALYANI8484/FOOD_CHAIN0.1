@@ -650,12 +650,13 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     }
     const { data } = await supabase.from('vendor_inventory').select('*').eq('vendor_id', v.id);
     setViewInventory(data || []);
+    setEditingInventory(data || []);
   };
 
   const handleConfirmDelete = async () => {
     if (!deleteConfirmVendor) return;
-    if (deleteInputName !== deleteConfirmVendor.shop_name) {
-      alert('Verification text does not match.');
+    if (deleteInputName.trim().toLowerCase() !== deleteConfirmVendor.shop_name.trim().toLowerCase()) {
+      alert('Verification text does not match. Please type the exact shop name.');
       return;
     }
 

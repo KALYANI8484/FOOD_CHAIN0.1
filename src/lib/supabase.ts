@@ -138,7 +138,7 @@ export type ClientProfile = {
 
 class QueryBuilder {
   private table: string;
-  private action: 'select' | 'insert' | 'update' | 'delete' = 'select';
+  private action: 'select' | 'insert' | 'update' | 'delete' | null = null;
   private data: any = null;
   private filters: { field: string; op: 'eq' | 'in'; value: any }[] = [];
   private sorts: { field: string; ascending: boolean }[] = [];
@@ -150,7 +150,9 @@ class QueryBuilder {
   }
 
   select(_columns?: string) {
-    this.action = 'select';
+    if (!this.action) {
+      this.action = 'select';
+    }
     return this;
   }
 
@@ -210,7 +212,7 @@ class QueryBuilder {
         },
         body: JSON.stringify({
           table: this.table,
-          action: this.action,
+          action: this.action ?? 'select',
           data: this.data,
           filters: this.filters,
           sorts: this.sorts,

@@ -180,11 +180,34 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
         onLogin('sub_admin', email.trim());
 
       } else if (role === 'vendor') {
-        if (email.trim().toLowerCase() !== VENDOR_EMAIL || password !== VENDOR_PASSWORD) {
-          setError('Invalid email or password');
+        // Look up vendor by phone (used as email/login) or email with password
+        const { data: vendorByPhone } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('phone', email.trim())
+          .maybeSingle();
+
+        const { data: vendorByEmail } = email.includes('@')
+          ? await supabase.from('vendors').select('*').eq('email', email.trim().toLowerCase()).maybeSingle()
+          : { data: null };
+
+        const vendor = vendorByPhone || vendorByEmail;
+
+        if (!vendor || vendor.password !== password) {
+          setError('Invalid phone/email or password');
           return;
         }
-        onLogin('vendor', email.trim());
+        if (vendor.status !== 'approved') {
+          setError('Your account is pending approval from the Super Admin.');
+          return;
+        }
+        // Check active plan
+        const today = new Date().toISOString().slice(0, 10);
+        if (!vendor.plan_id || !vendor.subscription_end || vendor.subscription_end < today) {
+          setError('Your subscription plan has expired or is not active. Please contact your admin.');
+          return;
+        }
+        onLogin('vendor', vendor.phone || vendor.email);
       }
     } finally {
       setLoading(false);
