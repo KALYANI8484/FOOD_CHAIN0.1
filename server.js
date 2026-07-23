@@ -5,8 +5,13 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+<<<<<<< HEAD
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+=======
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+>>>>>>> landingUpdate
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -70,6 +75,13 @@ const schemaOptions = {
 };
 
 // Mongoose Schemas
+const superAdminSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  created_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
 const subAdminSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   name: { type: String, required: true },
@@ -110,6 +122,8 @@ const vendorSchema = new mongoose.Schema({
   shop_name: { type: String, required: true },
   address: { type: String, required: true },
   zip_code: { type: String, required: true },
+  birthdate: { type: String, default: null },
+  password: { type: String, default: null },
   plan_id: { type: String, default: null },
   plan_name: { type: String, default: null },
   status: { type: String, default: 'pending_approval' },
@@ -203,6 +217,7 @@ const clientSchema = new mongoose.Schema({
 }, schemaOptions);
 
 // Models
+const SuperAdmin = mongoose.model('SuperAdmin', superAdminSchema, 'super_admins');
 const SubAdmin = mongoose.model('SubAdmin', subAdminSchema, 'sub_admins');
 const Plan = mongoose.model('Plan', planSchema, 'subscription_plans');
 const MasterItem = mongoose.model('MasterItem', masterItemSchema, 'master_inventory');
@@ -216,6 +231,7 @@ const UpgradeRequest = mongoose.model('UpgradeRequest', upgradeRequestSchema, 'u
 const ClientProfile = mongoose.model('ClientProfile', clientSchema, 'clients');
 
 const models = {
+  super_admins: SuperAdmin,
   sub_admins: SubAdmin,
   subscription_plans: Plan,
   master_inventory: MasterItem,
@@ -231,6 +247,25 @@ const models = {
 
 // Order countdown timers tracking
 const orderTimers = new Map();
+
+async function deleteS3Object(url) {
+  if (!url || typeof url !== 'string') return;
+  const bucketName = process.env.AWS_BUCKET_NAME;
+  const region = process.env.AWS_REGION;
+  if (!bucketName || !region) return;
+
+  const prefix = `https://${bucketName}.s3.${region}.amazonaws.com/`;
+  if (!url.startsWith(prefix)) return;
+
+  const key = url.substring(prefix.length);
+  if (!key) return;
+
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
+  } catch (err) {
+    console.error('Failed to delete S3 object:', url, err);
+  }
+}
 
 // Helper to check plan expiry on order delivery
 async function checkPlanLimitOnDelivery(orderId) {
@@ -457,6 +492,19 @@ app.post('/api/db', async (req, res) => {
       }
 
       case 'delete': {
+        if (table === 'vendors' && queryConditions._id) {
+          const vendorDoc = await Vendor.findById(queryConditions._id);
+          if (vendorDoc) {
+            await deleteS3Object(vendorDoc.logo_url);
+            await deleteS3Object(vendorDoc.qr_url);
+            const linkedItems = await models.vendor_inventory.find({ vendor_id: vendorDoc._id });
+            for (const item of linkedItems) {
+              await deleteS3Object(item.image_url);
+            }
+            await models.vendor_inventory.deleteMany({ vendor_id: vendorDoc._id });
+          }
+        }
+
         const docs = await Model.find(queryConditions);
         for (const doc of docs) {
           await doc.deleteOne();
@@ -476,9 +524,66 @@ app.post('/api/db', async (req, res) => {
   }
 });
 
+// Super Admin Password Reset Endpoint
+app.post('/api/super-admin/reset-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  try {
+    const superAdmin = await SuperAdmin.findOne({ email: email.trim().toLowerCase() });
+    if (!superAdmin) {
+      return res.status(404).json({ error: 'Super Admin with this email not found' });
+    }
+
+    // Generate a temporary 8-character password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    superAdmin.password = tempPassword;
+    await superAdmin.save();
+
+    // Create transport
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+      },
+    });
+
+    const mailOptions = {
+      from: `"VIKRAM ADVERTISING" <${process.env.SMTP_USER || 'no-reply@vikram-advertising.io'}>`,
+      to: superAdmin.email,
+      subject: 'Super Admin Password Reset',
+      text: `Hello,\n\nYour Super Admin password has been reset.\n\nYour new temporary password is: ${tempPassword}\n\nPlease log in and update your password immediately.\n\nBest regards,\nVIKRAM ADVERTISING`,
+      html: `<p>Hello,</p><p>Your Super Admin password has been reset.</p><p>Your new temporary password is: <strong>${tempPassword}</strong></p><p>Please log in and update your password immediately.</p><p>Best regards,<br>VIKRAM ADVERTISING</p>`
+    };
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      await transporter.sendMail(mailOptions);
+      res.json({ success: true, message: 'Password reset email sent successfully.' });
+    } else {
+      console.log(`[SMTP Mock] Reset password email for ${superAdmin.email}:\n`, mailOptions.text);
+      res.json({ success: true, message: 'Password reset locally. Check server logs for the temporary password.' });
+    }
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Setup and Seed initial data if DB empty
 app.post('/api/init-db', async (req, res) => {
   try {
+    // 0. Seed Super-Admin
+    const superAdminCount = await SuperAdmin.countDocuments();
+    if (superAdminCount === 0) {
+      await SuperAdmin.create({
+        email: '2711vikram@gmail.com',
+        password: 'Tatwavivek@271'
+      });
+    }
+
     // 1. Seed Sub-Admins
     const subAdminCount = await SubAdmin.countDocuments();
     if (subAdminCount === 0) {

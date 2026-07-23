@@ -9,16 +9,26 @@ import { Button, Badge, Drawer, useToast, Toast, Spinner, EmptyState, Input } fr
 
 type Step = 'location' | 'browse' | 'tracking';
 
-export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?: string }) {
-  const [step, setStep] = useState<Step>('location');
-  const [zip, setZip] = useState(initialZip || '');
+export function Client({ 
+  onExit, 
+  initialName = '', 
+  initialPhone = '' 
+}: { 
+  onExit: () => void; 
+  initialName?: string; 
+  initialPhone?: string; 
+}) {
+  const [step, setStep] = useState<Step>(initialName && initialPhone ? 'browse' : 'location');
+  const [clientName, setClientName] = useState(initialName);
+  const [clientPhone, setClientPhone] = useState(initialPhone);
+  const [zip, setZip] = useState('');
   const [landmark, setLandmark] = useState('');
-  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [cart, setCart] = useState<Record<string, { item: VendorItem; qty: number }>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const { toast, show } = useToast();
 
+<<<<<<< HEAD
   const handleLocationSubmit = async (name: string, phone: string, selectedZip: string, selectedLandmark: string) => {
     const { data } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
     if (data) {
@@ -30,6 +40,15 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
     setLandmark(selectedLandmark);
     setStep('browse');
   };
+=======
+  const handleLocationSubmit = (name: string, phone: string) => {
+    setClientName(name);
+    setClientPhone(phone);
+    setStep('browse');
+  };
+
+
+>>>>>>> landingUpdate
 
 
 
@@ -66,8 +85,13 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
 
       {step === 'location' && (
         <LocationGate 
+<<<<<<< HEAD
           initialZip={zip} 
           initialLandmark={landmark} 
+=======
+          initialName={clientName} 
+          initialPhone={clientPhone} 
+>>>>>>> landingUpdate
           onSubmit={handleLocationSubmit} 
         />
       )}
@@ -93,9 +117,8 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
         <CartView 
           cart={cart} 
           setCart={setCart} 
-          clientZip={zip}
-          clientLandmark={landmark}
-          clientProfile={clientProfile}
+          defaultName={clientName}
+          defaultPhone={clientPhone}
           onCheckout={(order) => { 
             setCartOpen(false); 
             setActiveOrder(order); 
@@ -113,10 +136,11 @@ export function Client({ onExit, initialZip }: { onExit: () => void; initialZip?
 }
 
 function LocationGate({ 
-  initialZip, 
-  initialLandmark, 
+  initialName, 
+  initialPhone, 
   onSubmit 
 }: { 
+<<<<<<< HEAD
   initialZip: string; 
   initialLandmark: string; 
   onSubmit: (name: string, phone: string, zip: string, landmark: string) => Promise<void> | void 
@@ -142,6 +166,19 @@ function LocationGate({
     if (zipInput.length >= 4 && nameInput && phoneInput) {
       setSubmitting(true);
       await onSubmit(nameInput, phoneInput, zipInput, landmarkInput);
+=======
+  initialName: string; 
+  initialPhone: string; 
+  onSubmit: (name: string, phone: string) => void 
+}) {
+  const [nameInput, setNameInput] = useState(initialName);
+  const [phoneInput, setPhoneInput] = useState(initialPhone);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleConfirm = () => {
+    if (nameInput && phoneInput) {
+      onSubmit(nameInput, phoneInput);
+>>>>>>> landingUpdate
     }
   };
 
@@ -155,9 +192,10 @@ function LocationGate({
           <div className="absolute inset-0 rounded-3xl border-2 border-accent/30 animate-ping" style={{ animationDuration: '2s' }} />
         </div>
         <h1 className="text-3xl font-extrabold text-text leading-tight">Welcome to <br/>VIKRAM ADVERTISING</h1>
-        <p className="text-muted mt-3 text-sm">Enter your Delivery Location to browse local verified kitchens</p>
+        <p className="text-muted mt-3 text-sm">Enter your details to browse local verified kitchens</p>
         
         <div className="mt-8 space-y-4 text-left">
+<<<<<<< HEAD
           <Input 
             label="Your Name *"
             value={nameInput}
@@ -190,23 +228,34 @@ function LocationGate({
             </button>
           </div>
           
+=======
+>>>>>>> landingUpdate
           <Input 
-            label="Nearest Landmark"
-            value={landmarkInput}
-            onChange={setLandmarkInput}
-            placeholder="e.g. Near Metro Station"
+            label="Your Name *"
+            value={nameInput}
+            onChange={setNameInput}
+            placeholder="Enter full name"
+          />
+          <Input 
+            label="Phone Number *"
+            value={phoneInput}
+            onChange={setPhoneInput}
+            placeholder="e.g. +91 99999 88888"
           />
 
           <Button 
             size="lg" 
             className="w-full mt-6" 
             onClick={handleConfirm} 
+<<<<<<< HEAD
             disabled={zipInput.length < 4 || !nameInput || !phoneInput || detecting || submitting}
+=======
+            disabled={!nameInput || !phoneInput || submitting}
+>>>>>>> landingUpdate
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <>Confirm & Browse <ArrowRight size={18} /></>}
           </Button>
         </div>
-        <p className="text-xs text-muted mt-6">Try GPS button for Indiranagar demo kitchens</p>
       </div>
     </div>
   );
@@ -397,17 +446,18 @@ function Browse({ zip, landmark: _landmark, cart, setCart, setCartOpen, show }: 
 interface CartViewProps {
   cart: Record<string, { item: VendorItem; qty: number }>;
   setCart: (c: Record<string, { item: VendorItem; qty: number }>) => void;
-  clientZip: string;
-  clientLandmark: string;
-  clientProfile: ClientProfile | null;
   onCheckout: (o: Order) => void;
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
+  defaultName?: string;
+  defaultPhone?: string;
 }
 
-function CartView({ cart, setCart, clientZip, clientLandmark, clientProfile, onCheckout, show }: CartViewProps) {
-  const [name, setName] = useState(clientProfile?.name || '');
-  const [phone, setPhone] = useState(clientProfile?.phone || '');
-  const [address, setAddress] = useState(clientProfile?.address || '');
+function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPhone = '' }: CartViewProps) {
+  const [name, setName] = useState(defaultName);
+  const [phone, setPhone] = useState(defaultPhone);
+  const [zipInput, setZipInput] = useState('');
+  const [landmarkInput, setLandmarkInput] = useState('');
+  const [address, setAddress] = useState('');
   const [placing, setPlacing] = useState(false);
 
   const entries = Object.values(cart);
@@ -423,8 +473,8 @@ function CartView({ cart, setCart, clientZip, clientLandmark, clientProfile, onC
   };
 
   const placeOrder = async () => {
-    if (!name || !phone || !address) { 
-      show('Please complete name, phone and delivery address', 'error'); 
+    if (!name || !phone || !address || !zipInput) { 
+      show('Please complete name, phone, zip code, and delivery address', 'error'); 
       return; 
     }
     if (entries.length === 0) { 
@@ -434,6 +484,7 @@ function CartView({ cart, setCart, clientZip, clientLandmark, clientProfile, onC
     
     setPlacing(true);
 
+<<<<<<< HEAD
     // Save client profile silently so they are remembered next time
     const { data: existingClient } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
     if (existingClient) {
@@ -442,11 +493,13 @@ function CartView({ cart, setCart, clientZip, clientLandmark, clientProfile, onC
       await supabase.from('clients').insert({ name, phone, address, zip_code: clientZip, landmark: clientLandmark || null });
     }
 
+=======
+>>>>>>> landingUpdate
     const { data, error } = await supabase.from('orders').insert({
       client_name: name,
       client_phone: phone,
-      client_zip: clientZip,
-      client_landmark: clientLandmark || null,
+      client_zip: zipInput,
+      client_landmark: landmarkInput || null,
       client_address: address,
       item_name: entries.map((e) => `${e.item.item_name} (x${e.qty})`).join(', '),
       vendor_id: vendorId,
@@ -518,6 +571,19 @@ function CartView({ cart, setCart, clientZip, clientLandmark, clientProfile, onC
           onChange={setPhone}
           placeholder="e.g. +91 99999 88888"
           required
+        />
+        <Input 
+          label="ZIP Code *"
+          value={zipInput}
+          onChange={setZipInput}
+          placeholder="e.g. 560038"
+          required
+        />
+        <Input 
+          label="Nearest Landmark"
+          value={landmarkInput}
+          onChange={setLandmarkInput}
+          placeholder="e.g. Near Metro Station"
         />
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Confirm Delivery Address *</label>

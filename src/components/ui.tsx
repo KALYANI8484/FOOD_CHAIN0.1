@@ -180,9 +180,9 @@ export function Input({
   required?: boolean;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {label && (
-        <label className="text-xs font-semibold text-muted uppercase tracking-wider">
+        <label className="text-sm font-semibold text-text block">
           {label} {required && <span className="text-accent">*</span>}
         </label>
       )}
@@ -192,7 +192,7 @@ export function Input({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-white placeholder:text-muted/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
+        className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm"
       />
     </div>
   );
@@ -210,15 +210,15 @@ export function Select({
   options: { value: string; label: string }[];
 }) {
   return (
-    <div className="space-y-1.5">
-      {label && <label className="text-xs font-semibold text-muted uppercase tracking-wider">{label}</label>}
+    <div className="space-y-2">
+      {label && <label className="text-sm font-semibold text-text block">{label}</label>}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-white focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all appearance-none cursor-pointer"
+        className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all appearance-none cursor-pointer shadow-sm"
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-surface-2">
+          <option key={o.value} value={o.value} className="bg-white text-text">
             {o.label}
           </option>
         ))}

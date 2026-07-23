@@ -12,6 +12,8 @@ function App() {
   const [screen, setScreen] = useState<Screen>('landing');
   const [clientZip, setClientZip] = useState('');
   const [sessionCred, setSessionCred] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -27,11 +29,21 @@ function App() {
     setScreen(role);
   };
 
+  const handleClientLogin = (name: string, phone: string) => {
+    setClientName(name);
+    setClientPhone(phone);
+    setScreen('client');
+  };
+
   return (
     <>
       {screen === 'landing' && (
         <Landing
           onNavigate={(role) => setScreen(role)}
+<<<<<<< HEAD
+=======
+          onClientLogin={handleClientLogin}
+>>>>>>> landingUpdate
         />
       )}
       {screen === 'login' && (
@@ -40,7 +52,13 @@ function App() {
       {screen === 'super_admin' && <SuperAdmin onExit={() => setScreen('landing')} />}
       {screen === 'sub_admin' && <SubAdmin onExit={() => setScreen('landing')} adminEmail={sessionCred} />}
       {screen === 'vendor' && <Vendor onExit={() => setScreen('landing')} vendorPhone={sessionCred} />}
-      {screen === 'client' && <Client onExit={() => setScreen('landing')} initialZip={clientZip} />}
+      {screen === 'client' && (
+        <Client 
+          onExit={() => setScreen('landing')} 
+          initialName={clientName} 
+          initialPhone={clientPhone} 
+        />
+      )}
     </>
   );
 }

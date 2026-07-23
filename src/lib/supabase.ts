@@ -31,6 +31,8 @@ export type Vendor = {
   shop_name: string;
   address: string;
   zip_code: string;
+  birthdate: string | null;
+  password: string | null;
   plan_id: string | null;
   plan_name: string | null;
   status: string;
