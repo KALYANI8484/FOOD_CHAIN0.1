@@ -15,11 +15,9 @@ export type Plan = {
 export type MasterItem = {
   id: string;
   name: string;
-  category: string;
   image_url: string | null;
-  base_price: number;
-  quantity: number;
-  description: string | null;
+  starting_price: number;
+  status: string;
   created_at: string;
 };
 

@@ -745,13 +745,19 @@ function VendorInventoryBuilder({ items, setItems, maxItems, categories }: {
   items: Array<{ category: string; item_name: string; quantity: number; price: number; price_locked: boolean; locked_price: number | null; }>;
   setItems: (items: any[]) => void;
   maxItems: number;
-  categories: string[];
+  categories: any[];
 }) {
-  const [category, setCategory] = useState(categories[0] || '');
+  const [category, setCategory] = useState('');
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(0);
   const [priceLocked, setPriceLocked] = useState(false);
+
+  useEffect(() => {
+    if (categories.length > 0 && !category) {
+      setCategory(categories[0]?.name || categories[0]);
+    }
+  }, [categories, category]);
 
   const handleAdd = () => {
     if (!category || !itemName || quantity <= 0 || price < 0) return;
@@ -786,12 +792,8 @@ function VendorInventoryBuilder({ items, setItems, maxItems, categories }: {
       <div className="grid grid-cols-6 gap-3 items-end bg-surface-2 p-4 rounded-xl border border-border">
         <div className="col-span-1">
           <label className="text-xs font-semibold text-muted block mb-1">Category</label>
-          <select 
-            value={category} onChange={(e) => setCategory(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm outline-none focus:border-accent"
-          >
-            <option value="">Select...</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-surface border border-border text-sm focus:border-accent outline-none">
+            {categories.map((c: any) => <option key={c.name || c} value={c.name || c}>{c.name || c}</option>)}
           </select>
         </div>
         <div className="col-span-2">

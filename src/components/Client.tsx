@@ -254,6 +254,8 @@ const Browse = memo(function Browse({ zip, landmark: _landmark, cart, setCart, s
   const [quantity, setQuantity] = useState(1);
   const [displayedItemsCount, setDisplayedItemsCount] = useState(20);
 
+  const [masterCategories, setMasterCategories] = useState<any[]>([]);
+
   useEffect(() => {
     (async () => {
       // Fetch approved active vendors
@@ -263,19 +265,20 @@ const Browse = memo(function Browse({ zip, landmark: _landmark, cart, setCart, s
         const { data: i } = await supabase.from('vendor_inventory').select('*').in('vendor_id', v.map((x: any) => x.id));
         setItems(i || []);
       }
+      
+      try {
+        const res = await fetch('/api/master-categories');
+        const json = await res.json();
+        if (json.data) setMasterCategories(json.data);
+      } catch (err) {
+        console.error(err);
+      }
+
       setLoading(false);
     })();
   }, []);
 
-  const masterCategories = ['Tiffin', 'Breakfast', 'Lunch/Dinner', 'Thali', 'Vegetables'];
 
-  const categoryImages: Record<string, string> = {
-    'Tiffin': 'https://images.pexels.com/photos/9585644/pexels-photo-9585644.jpeg',
-    'Breakfast': 'https://images.pexels.com/photos/5560700/pexels-photo-5560700.jpeg',
-    'Lunch/Dinner': 'https://images.pexels.com/photos/1624487/pexels-photo-1624487.jpeg',
-    'Thali': 'https://images.pexels.com/photos/9585643/pexels-photo-9585643.jpeg',
-    'Vegetables': 'https://images.pexels.com/photos/1458691/pexels-photo-1458691.jpeg',
-  };
 
   const categoryItems = useMemo(() => items.filter(i => i.category === selectedCategory), [items, selectedCategory]);
   const uniqueItemNames = useMemo(() => Array.from(new Set(categoryItems.map(i => i.item_name))), [categoryItems]);
@@ -330,20 +333,20 @@ const Browse = memo(function Browse({ zip, landmark: _landmark, cart, setCart, s
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
               {masterCategories.map((cat) => (
                 <div
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  key={cat.name}
+                  onClick={() => setSelectedCategory(cat.name)}
                   className="group relative aspect-[4/5] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border bg-surface shadow-sm"
                 >
                   <img
-                    src={categoryImages[cat]}
-                    alt={cat}
+                    src={cat.image_url}
+                    alt={cat.name}
                     loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-5 text-center">
-                    <p className="font-extrabold text-white text-lg">{cat}</p>
-                    <p className="text-xs text-accent-2/90 font-medium mt-1">Tap to browse</p>
+                    <p className="font-extrabold text-white text-lg">{cat.name}</p>
+                    <p className="text-xs text-accent-2/90 font-medium mt-1">Starting at ₹{cat.starting_price}</p>
                   </div>
                 </div>
               ))}

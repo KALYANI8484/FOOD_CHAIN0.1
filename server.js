@@ -108,11 +108,9 @@ const planSchema = new mongoose.Schema({
 const masterItemSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   name: { type: String, required: true },
-  category: { type: String, required: true },
   image_url: { type: String, default: null },
-  base_price: { type: Number, required: true },
-  quantity: { type: Number, required: true },
-  description: { type: String, default: null },
+  starting_price: { type: Number, required: true },
+  status: { type: String, default: 'Active' },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
@@ -344,9 +342,10 @@ app.get('/api/master-categories', async (req, res) => {
     if (masterCategoryCache.data && (now - masterCategoryCache.lastFetch < CACHE_TTL)) {
       return res.json({ data: masterCategoryCache.data });
     }
-    const categories = await MasterItem.distinct('category');
-    masterCategoryCache = { data: categories, lastFetch: now };
-    res.json({ data: categories });
+    const categories = await MasterItem.find({ status: 'Active' });
+    const formattedCategories = categories.map(c => c.toJSON());
+    masterCategoryCache = { data: formattedCategories, lastFetch: now };
+    res.json({ data: formattedCategories });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -648,13 +647,13 @@ const seedDatabase = async () => {
   // 3. Seed Master Inventory
   const masterCount = await MasterItem.countDocuments();
   if (masterCount === 0) {
+    await MasterItem.deleteMany({}); // Wipe old items format if existing
     await MasterItem.create([
-      { name: 'Executive Veg Thali', category: 'Thali', base_price: 180, quantity: 100, description: 'Roti, Rice, Dal, 2 Sabzi, Sweet, Raita, Salad', image_url: 'https://images.pexels.com/photos/1624487/pexels-photo-1624487.jpeg' },
-      { name: 'Masala Dosa', category: 'Breakfast', base_price: 80, quantity: 150, description: 'Crisp rice crepe filled with potato masala, served with sambar and chutneys', image_url: 'https://images.pexels.com/photos/5560700/pexels-photo-5560700.jpeg' },
-      { name: 'Idli Sambar', category: 'Breakfast', base_price: 60, quantity: 200, description: 'Soft steamed rice cakes served with sambar and coconut chutney', image_url: 'https://images.pexels.com/photos/4331587/pexels-photo-4331587.jpeg' },
-      { name: 'Dal Khichdi', category: 'Lunch/Dinner', base_price: 120, quantity: 120, description: 'Comforting rice and lentil dish tempered with ghee and cumin', image_url: 'https://images.pexels.com/photos/8063617/pexels-photo-8063617.jpeg' },
-      { name: 'Standard Roti Tiffin', category: 'Tiffin', base_price: 100, quantity: 80, description: '4 Butter rotis, 1 dry sabzi, 1 gravy sabzi, salad', image_url: 'https://images.pexels.com/photos/9585644/pexels-photo-9585644.jpeg' },
-      { name: 'Organic Fresh Broccoli', category: 'Vegetables', base_price: 50, quantity: 50, description: 'Farm fresh broccoli per 500g', image_url: 'https://images.pexels.com/photos/47347/broccoli-vegetable-food-healthy-47347.jpeg' }
+      { name: 'Tiffin', starting_price: 99, status: 'Active', image_url: 'https://i.pinimg.com/736x/13/ac/3c/13ac3ce7b1db637177b34659d74fef73.jpg' },
+      { name: 'Breakfast', starting_price: 59, status: 'Active', image_url: 'https://i.pinimg.com/736x/db/73/5d/db735dfb9eca73033b7c127e46436ee3.jpg' },
+      { name: 'Lunch/Dinner', starting_price: 149, status: 'Active', image_url: 'https://i.pinimg.com/control1/1200x/f0/ce/0b/f0ce0bf92ce7748dda4ec368a4c5d51e.jpg' },
+      { name: 'Vegetables', starting_price: 39, status: 'Active', image_url: 'https://i.pinimg.com/736x/6a/04/e5/6a04e5d7d3b1bfd0c4d9ca06b2c041f0.jpg' },
+      { name: 'Thali', starting_price: 179, status: 'Active', image_url: 'https://i.pinimg.com/736x/5f/56/b3/5f56b35ba78d9678a79db6fa234ed8c0.jpg' }
     ]);
   }
 

@@ -322,7 +322,7 @@ interface VendorInventoryBuilderProps {
   items: Array<{ category: string; item_name: string; quantity: number; price: number; price_locked: boolean; locked_price: number | null; }>;
   setItems: (items: VendorInventoryBuilderProps['items']) => void;
   maxItems: number;
-  categories: string[];
+  categories: any[];
 }
 
 function VendorInventoryBuilder({ items, setItems, maxItems, categories }: VendorInventoryBuilderProps) {
@@ -334,7 +334,7 @@ function VendorInventoryBuilder({ items, setItems, maxItems, categories }: Vendo
   const [lockedPrice, setLockedPrice] = useState<number | ''>('');
 
   useEffect(() => {
-    if (categories.length > 0 && !category) setCategory(categories[0]);
+    if (categories.length > 0 && !category) setCategory(categories[0]?.name || categories[0]);
   }, [categories, category]);
 
   const handleAdd = () => {
@@ -380,7 +380,7 @@ function VendorInventoryBuilder({ items, setItems, maxItems, categories }: Vendo
         <div className="sm:col-span-2 space-y-1">
           <label className="text-xs font-bold text-muted uppercase tracking-wider">Category</label>
           <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-surface border border-border text-sm focus:border-accent outline-none">
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            {categories.map((c: any) => <option key={c.name || c} value={c.name || c}>{c.name || c}</option>)}
           </select>
         </div>
         <div className="sm:col-span-2 space-y-1">
@@ -1484,10 +1484,8 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   
   const [form, setForm] = useState({
     name: '',
-    category: 'Tiffin',
-    base_price: 100,
-    quantity: 10,
-    description: '',
+    starting_price: 100,
+    status: 'Active',
     image_url: ''
   });
 
@@ -1528,19 +1526,17 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   };
 
   const handleCreate = async () => {
-    if (!form.name || form.base_price < 0) return;
+    if (!form.name || form.starting_price < 0) return;
     await supabase.from('master_inventory').insert({
       name: form.name,
-      category: form.category,
-      base_price: Number(form.base_price),
-      quantity: Number(form.quantity),
-      description: form.description || null,
+      starting_price: Number(form.starting_price),
+      status: form.status,
       image_url: form.image_url || null
     });
 
-    show(`Master Item ${form.name} created successfully!`);
+    show(`Master Category ${form.name} created successfully!`);
     setModal(false);
-    setForm({ name: '', category: 'Tiffin', base_price: 100, quantity: 10, description: '', image_url: '' });
+    setForm({ name: '', starting_price: 100, status: 'Active', image_url: '' });
     load();
   };
 
@@ -1548,14 +1544,12 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     if (!editItem) return;
     await supabase.from('master_inventory').update({
       name: editItem.name,
-      category: editItem.category,
-      base_price: Number(editItem.base_price),
-      quantity: Number(editItem.quantity),
-      description: editItem.description,
+      starting_price: Number(editItem.starting_price),
+      status: editItem.status,
       image_url: editItem.image_url
     }).eq('id', editItem.id);
 
-    show('Master Item updated');
+    show('Master Category updated');
     setEditItem(null);
     load();
   };
@@ -1568,12 +1562,8 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     }
   };
 
-  const categories = ['Tiffin', 'Breakfast', 'Lunch/Dinner', 'Thali', 'Vegetables'];
-
   const filtered = items.filter((i) => {
-    const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = category === 'all' || i.category === category;
-    return matchSearch && matchCat;
+    return i.name.toLowerCase().includes(search.toLowerCase());
   });
 
   if (loading) return <Spinner />;
@@ -1615,17 +1605,16 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               ) : (
                 <div className="w-full h-full bg-surface-2 flex items-center justify-center"><Package size={24} className="text-muted" /></div>
               )}
-              <div className="absolute top-2 left-2"><Badge variant="accent">{item.category}</Badge></div>
+              <div className="absolute top-2 left-2"><Badge variant={item.status === 'Active' ? 'success' : 'warning'}>{item.status}</Badge></div>
             </div>
 
             <div className="p-5 flex-1 flex flex-col justify-between">
               <div>
                 <h3 className="font-extrabold text-base text-text">{item.name}</h3>
-                <p className="text-xs text-muted mt-1 line-clamp-2">{item.description || 'No description available.'}</p>
               </div>
 
               <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
-                <span className="text-lg font-extrabold text-accent">₹{item.base_price}</span>
+                <span className="text-lg font-extrabold text-accent">₹{item.starting_price}</span>
                 <div className="flex gap-2">
                   <button onClick={() => setEditItem(item)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-text" title="Edit"><Edit2 size={12} /></button>
                   <button onClick={() => handleDelete(item)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500" title="Delete"><Trash2 size={12} /></button>
@@ -1641,23 +1630,11 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       {/* Add Master Item Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="Create Master Item">
         <div className="space-y-4">
-          <Input label="Item Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-          <Select label="Category" value={form.category} onChange={(v) => setForm({ ...form, category: v })} options={categories.map(c => ({ value: c, label: c }))} />
+          <Input label="Category Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Base Price (₹)" type="number" value={String(form.base_price)} onChange={(v) => setForm({ ...form, base_price: Number(v) })} required />
-            <Input label="Default Qty" type="number" value={String(form.quantity)} onChange={(v) => setForm({ ...form, quantity: Number(v) })} required />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Description</label>
-            <textarea
-              rows={2}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="List inclusions (e.g. Rice, Roti, Dal)"
-              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
-            />
+            <Input label="Starting Price (₹)" type="number" value={String(form.starting_price)} onChange={(v) => setForm({ ...form, starting_price: Number(v) })} required />
+            <Select label="Status" value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={[{value: 'Active', label: 'Active'}, {value: 'Inactive', label: 'Inactive'}]} />
           </div>
 
           <div className="space-y-1.5">
@@ -1690,23 +1667,11 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Modify Master Item">
         {editItem && (
           <div className="space-y-4">
-            <Input label="Item Name" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
-            <Select label="Category" value={editItem.category} onChange={(v) => setEditItem({ ...editItem, category: v })} options={categories.map(c => ({ value: c, label: c }))} />
+            <Input label="Category Name" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
             
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Base Price (₹)" type="number" value={String(editItem.base_price)} onChange={(v) => setEditItem({ ...editItem, base_price: Number(v) })} required />
-              <Input label="Default Qty" type="number" value={String(editItem.quantity)} onChange={(v) => setEditItem({ ...editItem, quantity: Number(v) })} required />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Description</label>
-              <textarea
-                rows={2}
-                value={editItem.description || ''}
-                onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
-                placeholder="Inclusions list"
-                className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
-              />
+              <Input label="Starting Price (₹)" type="number" value={String(editItem.starting_price)} onChange={(v) => setEditItem({ ...editItem, starting_price: Number(v) })} required />
+              <Select label="Status" value={editItem.status} onChange={(v) => setEditItem({ ...editItem, status: v })} options={[{value: 'Active', label: 'Active'}, {value: 'Inactive', label: 'Inactive'}]} />
             </div>
 
             <div className="space-y-1.5">

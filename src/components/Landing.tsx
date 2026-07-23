@@ -44,13 +44,14 @@ export function Landing({
     };
   }, []);
 
-  const categories = [
-    { name: 'Tiffin', img: 'https://i.pinimg.com/736x/13/ac/3c/13ac3ce7b1db637177b34659d74fef73.jpg', price: '₹99' },
-    { name: 'Breakfast', img: 'https://i.pinimg.com/736x/db/73/5d/db735dfb9eca73033b7c127e46436ee3.jpg', price: '₹59' },
-    { name: 'Lunch/Dinner', img: 'https://i.pinimg.com/control1/1200x/f0/ce/0b/f0ce0bf92ce7748dda4ec368a4c5d51e.jpg', price: '₹149' },
-    { name: 'Vegetables', img: 'https://i.pinimg.com/736x/6a/04/e5/6a04e5d7d3b1bfd0c4d9ca06b2c041f0.jpg', price: '₹39' },
-    { name: 'Thali', img: 'https://i.pinimg.com/736x/5f/56/b3/5f56b35ba78d9678a79db6fa234ed8c0.jpg', price: '₹179' },
-  ];
+  const [categories, setCategories] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/master-categories')
+      .then(res => res.json())
+      .then(d => { if (d.data) setCategories(d.data); })
+      .catch(console.error);
+  }, []);
 
   const benefits = [
     { icon: Zap, title: 'Manage Inventory', desc: 'Add, update or remove dishes instantly matching master templates.' },
@@ -168,19 +169,16 @@ export function Landing({
                 onClick={() => setShowLoginModal(true)}
                 className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border/50 frosted-glow"
               >
-                <img
-                  src={c.img}
-                  alt={c.name}
-                  onClick={() => setShowLoginModal(true)}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#111118]/75 via-[#111118]/25 to-transparent" />
+                <img src={c.image_url} alt={c.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" />
+                <div className="absolute top-4 left-4 bg-surface/90 backdrop-blur font-bold px-3 py-1.5 rounded-lg border border-white/20 text-text text-sm">
+                    ₹{c.starting_price}
+                </div>
                 <div className="absolute bottom-0 left-0 right-0 p-5">
                   <p className="font-bold text-white text-lg">{c.name}</p>
                 </div>
                 <div className="absolute inset-0 bg-accent/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
                   <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Starting Base Price</span>
-                  <p className="text-white text-3xl font-extrabold mt-1">{c.price}</p>
+                  <p className="text-white text-3xl font-extrabold mt-1">{c.starting_price}</p>
                   <span className="text-white/90 text-xs mt-3 flex items-center gap-1">Order now <ArrowRight size={10} /></span>
                 </div>
               </div>
