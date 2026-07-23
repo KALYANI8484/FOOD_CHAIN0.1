@@ -224,7 +224,7 @@ const clientSchema = new mongoose.Schema({
 // Models
 vendorSchema.index({ zip_code: 1, status: 1 });
 vendorItemSchema.index({ category: 1, vendor_id: 1 });
-clientSchema.index({ phone: 1 });
+
 
 const SuperAdmin = mongoose.model('SuperAdmin', superAdminSchema, 'super_admins');
 const SubAdmin = mongoose.model('SubAdmin', subAdminSchema, 'sub_admins');
@@ -366,7 +366,7 @@ app.post('/api/db', async (req, res) => {
     const queryConditions = {};
     if (filters && Array.isArray(filters)) {
       for (const filter of filters) {
-        let field = filter.field === 'id' ? '_id' : filter.field;
+        let field = (filter.column || filter.field) === 'id' ? '_id' : (filter.column || filter.field);
         if (filter.op === 'eq') {
           queryConditions[field] = filter.value;
         } else if (filter.op === 'in') {
@@ -383,7 +383,7 @@ app.post('/api/db', async (req, res) => {
         if (sorts && Array.isArray(sorts)) {
           const sortObj = {};
           for (const s of sorts) {
-            let field = s.field === 'id' ? '_id' : s.field;
+            let field = (s.column || s.field) === 'id' ? '_id' : (s.column || s.field);
             sortObj[field] = s.ascending ? 1 : -1;
           }
           query = query.sort(sortObj);
@@ -427,6 +427,7 @@ app.post('/api/db', async (req, res) => {
         const doc = new Model(data);
         await doc.save();
         responseData = doc.toJSON();
+        if (table === 'master_inventory') masterCategoryCache.data = null;
 
         // Socket broadcast for new orders
         if (table === 'orders') {
@@ -514,6 +515,7 @@ app.post('/api/db', async (req, res) => {
         } else {
           responseData = updated;
         }
+        if (table === 'master_inventory') masterCategoryCache.data = null;
 
         // Notify client and vendor of updates
         if (table === 'orders' && updated.length > 0) {
@@ -546,6 +548,7 @@ app.post('/api/db', async (req, res) => {
           await doc.deleteOne();
         }
         responseData = { success: true, count: docs.length };
+        if (table === 'master_inventory') masterCategoryCache.data = null;
         break;
       }
 
