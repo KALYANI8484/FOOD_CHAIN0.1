@@ -20,8 +20,7 @@ export function Landing({
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
 
-<<<<<<< HEAD
-=======
+
   const handleClientSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (clientName && clientPhone) {
@@ -29,7 +28,7 @@ export function Landing({
     }
   };
 
->>>>>>> landingUpdate
+
   // Registration modal removed to streamline flow
 
   const [scrollY, setScrollY] = useState(0);
@@ -66,13 +65,13 @@ export function Landing({
   ];
 
   // Removed redundant handleRegisterSubmit
-<<<<<<< HEAD
-=======
+
+
 
   const scrollToVendorPartners = () => {
     document.getElementById('vendor-partners')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
->>>>>>> landingUpdate
+
 
   return (
     <div className="min-h-screen landing-shell noise relative overflow-hidden text-text">
@@ -116,11 +115,11 @@ export function Landing({
               <Lock size={14} className="text-accent" />
               <span>Team Sign-In</span>
             </button>
-<<<<<<< HEAD
+
             <Button size="sm" onClick={() => onNavigate('client')}>
-=======
+
             <Button size="sm" onClick={() => setShowLoginModal(true)}>
->>>>>>> landingUpdate
+
               Start Ordering
             </Button>
           </div>
@@ -288,9 +287,9 @@ export function Landing({
         </div>
       </footer>
 
-<<<<<<< HEAD
+
       {/* Client Onboarding Registration Modal Removed */}
-=======
+
       <Modal open={showLoginModal} onClose={() => setShowLoginModal(false)} title="Client Login">
         <form onSubmit={handleClientSubmit} className="space-y-4">
           <p className="text-xs text-muted mb-4">Enter your details to view local menus and place orders.</p>
@@ -322,7 +321,7 @@ export function Landing({
           </div>
         </form>
       </Modal>
->>>>>>> landingUpdate
+
     </div>
   );
 }

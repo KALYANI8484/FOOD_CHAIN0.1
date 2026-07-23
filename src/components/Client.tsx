@@ -28,7 +28,7 @@ export function Client({
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const { toast, show } = useToast();
 
-<<<<<<< HEAD
+
   const handleLocationSubmit = async (name: string, phone: string, selectedZip: string, selectedLandmark: string) => {
     const { data } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
     if (data) {
@@ -40,7 +40,6 @@ export function Client({
     setLandmark(selectedLandmark);
     setStep('browse');
   };
-=======
   const handleLocationSubmit = (name: string, phone: string) => {
     setClientName(name);
     setClientPhone(phone);
@@ -48,7 +47,6 @@ export function Client({
   };
 
 
->>>>>>> landingUpdate
 
 
 
@@ -85,13 +83,13 @@ export function Client({
 
       {step === 'location' && (
         <LocationGate 
-<<<<<<< HEAD
+
           initialZip={zip} 
           initialLandmark={landmark} 
-=======
+
           initialName={clientName} 
           initialPhone={clientPhone} 
->>>>>>> landingUpdate
+
           onSubmit={handleLocationSubmit} 
         />
       )}
@@ -140,7 +138,7 @@ function LocationGate({
   initialPhone, 
   onSubmit 
 }: { 
-<<<<<<< HEAD
+
   initialZip: string; 
   initialLandmark: string; 
   onSubmit: (name: string, phone: string, zip: string, landmark: string) => Promise<void> | void 
@@ -166,7 +164,7 @@ function LocationGate({
     if (zipInput.length >= 4 && nameInput && phoneInput) {
       setSubmitting(true);
       await onSubmit(nameInput, phoneInput, zipInput, landmarkInput);
-=======
+
   initialName: string; 
   initialPhone: string; 
   onSubmit: (name: string, phone: string) => void 
@@ -178,7 +176,7 @@ function LocationGate({
   const handleConfirm = () => {
     if (nameInput && phoneInput) {
       onSubmit(nameInput, phoneInput);
->>>>>>> landingUpdate
+
     }
   };
 
@@ -195,7 +193,7 @@ function LocationGate({
         <p className="text-muted mt-3 text-sm">Enter your details to browse local verified kitchens</p>
         
         <div className="mt-8 space-y-4 text-left">
-<<<<<<< HEAD
+
           <Input 
             label="Your Name *"
             value={nameInput}
@@ -228,8 +226,7 @@ function LocationGate({
             </button>
           </div>
           
-=======
->>>>>>> landingUpdate
+
           <Input 
             label="Your Name *"
             value={nameInput}
@@ -247,11 +244,11 @@ function LocationGate({
             size="lg" 
             className="w-full mt-6" 
             onClick={handleConfirm} 
-<<<<<<< HEAD
+
             disabled={zipInput.length < 4 || !nameInput || !phoneInput || detecting || submitting}
-=======
+
             disabled={!nameInput || !phoneInput || submitting}
->>>>>>> landingUpdate
+
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <>Confirm & Browse <ArrowRight size={18} /></>}
           </Button>
@@ -484,7 +481,7 @@ function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPh
     
     setPlacing(true);
 
-<<<<<<< HEAD
+
     // Save client profile silently so they are remembered next time
     const { data: existingClient } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
     if (existingClient) {
@@ -493,8 +490,7 @@ function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPh
       await supabase.from('clients').insert({ name, phone, address, zip_code: clientZip, landmark: clientLandmark || null });
     }
 
-=======
->>>>>>> landingUpdate
+
     const { data, error } = await supabase.from('orders').insert({
       client_name: name,
       client_phone: phone,

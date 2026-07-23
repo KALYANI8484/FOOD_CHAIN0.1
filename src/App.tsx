@@ -40,10 +40,9 @@ function App() {
       {screen === 'landing' && (
         <Landing
           onNavigate={(role) => setScreen(role)}
-<<<<<<< HEAD
-=======
+
           onClientLogin={handleClientLogin}
->>>>>>> landingUpdate
+
         />
       )}
       {screen === 'login' && (
