@@ -22,9 +22,12 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (isoMatch) {
       const [, year, month, day] = isoMatch;
-      return `${day}/${month}/${year}`;
+      return `${day}${month}${year}`;
     }
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+      return value.replace(/\//g, '');
+    }
+    if (/^\d{8}$/.test(value)) {
       return value;
     }
     return value;
@@ -35,6 +38,13 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     const displayMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (displayMatch) {
       const [, day, month, year] = displayMatch;
+      return `${year}-${month}-${day}`;
+    }
+    const plainMatch = value.match(/^(\d{8})$/);
+    if (plainMatch) {
+      const day = value.slice(0, 2);
+      const month = value.slice(2, 4);
+      const year = value.slice(4);
       return `${year}-${month}-${day}`;
     }
     return value;
@@ -94,7 +104,7 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
         return;
       }
       if (form.password !== birthdateForPassword) {
-        alert('Password must match the vendor birthdate in DD/MM/YYYY format.');
+        alert('Password must match the vendor birthdate in DDMMYYYY format.');
         return;
       }
     } else if (form.password || form.confirm_password) {
@@ -103,7 +113,7 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
         return;
       }
       if (form.password !== birthdateForPassword) {
-        alert('Password must match the vendor birthdate in DD/MM/YYYY format.');
+        alert('Password must match the vendor birthdate in DDMMYYYY format.');
         return;
       }
     }
@@ -176,7 +186,7 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
               type={showPassword ? 'text' : 'password'}
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder={initialData ? 'Leave blank to keep existing password' : 'DD/MM/YYYY'}
+              placeholder={initialData ? 'Leave blank to keep existing password' : 'DDMMYYYY'}
               required={!initialData}
               className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm pr-12"
             />
