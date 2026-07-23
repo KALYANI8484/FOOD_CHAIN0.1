@@ -116,10 +116,7 @@ export function Landing({
               <span>Team Sign-In</span>
             </button>
 
-            <Button size="sm" onClick={() => onNavigate('client')}>
-
             <Button size="sm" onClick={() => setShowLoginModal(true)}>
-
               Start Ordering
             </Button>
           </div>

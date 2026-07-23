@@ -27,9 +27,11 @@ export function Client({
   const [cartOpen, setCartOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const { toast, show } = useToast();
-
+  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
 
   const handleLocationSubmit = async (name: string, phone: string, selectedZip: string, selectedLandmark: string) => {
+    setClientName(name);
+    setClientPhone(phone);
     const { data } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
     if (data) {
       setClientProfile(data);
@@ -38,11 +40,6 @@ export function Client({
     }
     setZip(selectedZip);
     setLandmark(selectedLandmark);
-    setStep('browse');
-  };
-  const handleLocationSubmit = (name: string, phone: string) => {
-    setClientName(name);
-    setClientPhone(phone);
     setStep('browse');
   };
 
@@ -136,15 +133,18 @@ export function Client({
 function LocationGate({ 
   initialName, 
   initialPhone, 
+  initialZip, 
+  initialLandmark, 
   onSubmit 
 }: { 
-
+  initialName: string; 
+  initialPhone: string; 
   initialZip: string; 
   initialLandmark: string; 
   onSubmit: (name: string, phone: string, zip: string, landmark: string) => Promise<void> | void 
 }) {
-  const [nameInput, setNameInput] = useState('');
-  const [phoneInput, setPhoneInput] = useState('');
+  const [nameInput, setNameInput] = useState(initialName);
+  const [phoneInput, setPhoneInput] = useState(initialPhone);
   const [zipInput, setZipInput] = useState(initialZip);
   const [landmarkInput, setLandmarkInput] = useState(initialLandmark);
   const [detecting, setDetecting] = useState(false);
@@ -164,19 +164,7 @@ function LocationGate({
     if (zipInput.length >= 4 && nameInput && phoneInput) {
       setSubmitting(true);
       await onSubmit(nameInput, phoneInput, zipInput, landmarkInput);
-
-  initialName: string; 
-  initialPhone: string; 
-  onSubmit: (name: string, phone: string) => void 
-}) {
-  const [nameInput, setNameInput] = useState(initialName);
-  const [phoneInput, setPhoneInput] = useState(initialPhone);
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleConfirm = () => {
-    if (nameInput && phoneInput) {
-      onSubmit(nameInput, phoneInput);
-
+      setSubmitting(false);
     }
   };
 
@@ -193,7 +181,6 @@ function LocationGate({
         <p className="text-muted mt-3 text-sm">Enter your details to browse local verified kitchens</p>
         
         <div className="mt-8 space-y-4 text-left">
-
           <Input 
             label="Your Name *"
             value={nameInput}
@@ -226,29 +213,18 @@ function LocationGate({
             </button>
           </div>
           
-
           <Input 
-            label="Your Name *"
-            value={nameInput}
-            onChange={setNameInput}
-            placeholder="Enter full name"
-          />
-          <Input 
-            label="Phone Number *"
-            value={phoneInput}
-            onChange={setPhoneInput}
-            placeholder="e.g. +91 99999 88888"
+            label="Landmark (Optional)"
+            value={landmarkInput}
+            onChange={setLandmarkInput}
+            placeholder="e.g. Near Metro Station"
           />
 
           <Button 
             size="lg" 
             className="w-full mt-6" 
             onClick={handleConfirm} 
-
             disabled={zipInput.length < 4 || !nameInput || !phoneInput || detecting || submitting}
-
-            disabled={!nameInput || !phoneInput || submitting}
-
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <>Confirm & Browse <ArrowRight size={18} /></>}
           </Button>
@@ -485,9 +461,9 @@ function CartView({ cart, setCart, onCheckout, show, defaultName = '', defaultPh
     // Save client profile silently so they are remembered next time
     const { data: existingClient } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
     if (existingClient) {
-      await supabase.from('clients').update({ name, address, zip_code: clientZip, landmark: clientLandmark || null }).eq('id', existingClient.id);
+      await supabase.from('clients').update({ name, address, zip_code: zipInput, landmark: landmarkInput || null }).eq('id', existingClient.id);
     } else {
-      await supabase.from('clients').insert({ name, phone, address, zip_code: clientZip, landmark: clientLandmark || null });
+      await supabase.from('clients').insert({ name, phone, address, zip_code: zipInput, landmark: landmarkInput || null });
     }
 
 

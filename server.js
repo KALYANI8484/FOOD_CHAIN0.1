@@ -5,11 +5,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
-
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 

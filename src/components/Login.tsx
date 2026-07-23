@@ -4,6 +4,7 @@ import {
   Eye, EyeOff, ArrowRight, Lock, Mail, ChevronLeft,
 } from 'lucide-react';
 import { Button, Spinner } from './ui';
+import { supabase } from '../lib/supabase';
 
 type Role = 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
