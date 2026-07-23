@@ -567,99 +567,101 @@ app.post('/api/super-admin/reset-password', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 // Setup and Seed initial data if DB empty
+const seedDatabase = async () => {
+  // 0. Seed Super-Admin
+  const superAdminCount = await SuperAdmin.countDocuments();
+  if (superAdminCount === 0) {
+    await SuperAdmin.create({
+      email: '2711vikram@gmail.com',
+      password: 'Tatwavivek@271'
+    });
+  }
+
+  // 1. Seed Sub-Admins
+  const subAdminCount = await SubAdmin.countDocuments();
+  if (subAdminCount === 0) {
+    await SubAdmin.create({
+      name: 'Arjun Sen',
+      email: 'arjun@mealmesh.io',
+      password: 'admin123',
+      force_change: false
+    });
+  }
+
+  // 2. Seed Subscription Plans
+  const planCount = await Plan.countDocuments();
+  if (planCount === 0) {
+    await Plan.create([
+      { name: 'Free', price: 0, validity_days: 30, max_items: 5, max_clients: 10, status: 'active' },
+      { name: 'Starter', price: 499, validity_days: 30, max_items: 10, max_clients: 30, status: 'active' },
+      { name: 'Premium', price: 1499, validity_days: 90, max_items: 30, max_clients: 100, status: 'active' }
+    ]);
+  }
+
+  // Fetch Premium plan id for vendor seeding
+  const premiumPlan = await Plan.findOne({ name: 'Premium' });
+
+  // 3. Seed Master Inventory
+  const masterCount = await MasterItem.countDocuments();
+  if (masterCount === 0) {
+    await MasterItem.create([
+      { name: 'Executive Veg Thali', category: 'Thali', base_price: 180, quantity: 100, description: 'Roti, Rice, Dal, 2 Sabzi, Sweet, Raita, Salad', image_url: 'https://images.pexels.com/photos/1624487/pexels-photo-1624487.jpeg' },
+      { name: 'Masala Dosa', category: 'Breakfast', base_price: 80, quantity: 150, description: 'Crisp rice crepe filled with potato masala, served with sambar and chutneys', image_url: 'https://images.pexels.com/photos/5560700/pexels-photo-5560700.jpeg' },
+      { name: 'Idli Sambar', category: 'Breakfast', base_price: 60, quantity: 200, description: 'Soft steamed rice cakes served with sambar and coconut chutney', image_url: 'https://images.pexels.com/photos/4331587/pexels-photo-4331587.jpeg' },
+      { name: 'Dal Khichdi', category: 'Lunch/Dinner', base_price: 120, quantity: 120, description: 'Comforting rice and lentil dish tempered with ghee and cumin', image_url: 'https://images.pexels.com/photos/8063617/pexels-photo-8063617.jpeg' },
+      { name: 'Standard Roti Tiffin', category: 'Tiffin', base_price: 100, quantity: 80, description: '4 Butter rotis, 1 dry sabzi, 1 gravy sabzi, salad', image_url: 'https://images.pexels.com/photos/9585644/pexels-photo-9585644.jpeg' },
+      { name: 'Organic Fresh Broccoli', category: 'Vegetables', base_price: 50, quantity: 50, description: 'Farm fresh broccoli per 500g', image_url: 'https://images.pexels.com/photos/47347/broccoli-vegetable-food-healthy-47347.jpeg' }
+    ]);
+  }
+
+  // 4. Seed Default Vendor
+  const vendorCount = await Vendor.countDocuments();
+  if (vendorCount === 0 && premiumPlan) {
+    const vendorDoc = await Vendor.create({
+      owner_name: 'Vikram Singh',
+      phone: '+919876543210',
+      email: 'vikram@spicegarden.io',
+      shop_name: 'Spice Garden',
+      address: '12th Main Road, Indiranagar',
+      zip_code: '560038',
+      plan_id: premiumPlan._id,
+      plan_name: premiumPlan.name,
+      status: 'approved',
+      logo_url: 'https://images.pexels.com/photos/262047/pexels-photo-262047.jpeg',
+      subscription_start: new Date().toISOString().slice(0, 10),
+      subscription_end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      total_clients: 0
+    });
+
+    // Seed vendor items from master items
+    const items = await MasterItem.find();
+    for (const item of items) {
+      await VendorItem.create({
+        vendor_id: vendorDoc._id,
+        master_item_id: item._id,
+        item_name: item.name,
+        category: item.category,
+        price: item.base_price,
+        quantity: item.quantity,
+        image_url: item.image_url
+      });
+    }
+  }
+
+  // 5. Seed Settings
+  const settingsCount = await Settings.countDocuments();
+  if (settingsCount === 0) {
+    await Settings.create({
+      logo_url: 'https://images.pexels.com/photos/262047/pexels-photo-262047.jpeg',
+      qr_url: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://vikram-advertising.io'
+    });
+  }
+};
+
 app.post('/api/init-db', async (req, res) => {
   try {
-    // 0. Seed Super-Admin
-    const superAdminCount = await SuperAdmin.countDocuments();
-    if (superAdminCount === 0) {
-      await SuperAdmin.create({
-        email: '2711vikram@gmail.com',
-        password: 'Tatwavivek@271'
-      });
-    }
-
-    // 1. Seed Sub-Admins
-    const subAdminCount = await SubAdmin.countDocuments();
-    if (subAdminCount === 0) {
-      await SubAdmin.create({
-        name: 'Arjun Sen',
-        email: 'arjun@mealmesh.io',
-        password: 'admin123',
-        force_change: false
-      });
-    }
-
-    // 2. Seed Subscription Plans
-    const planCount = await Plan.countDocuments();
-    if (planCount === 0) {
-      await Plan.create([
-        { name: 'Free', price: 0, validity_days: 30, max_items: 5, max_clients: 10, status: 'active' },
-        { name: 'Starter', price: 499, validity_days: 30, max_items: 10, max_clients: 30, status: 'active' },
-        { name: 'Premium', price: 1499, validity_days: 90, max_items: 30, max_clients: 100, status: 'active' }
-      ]);
-    }
-
-    // Fetch Premium plan id for vendor seeding
-    const premiumPlan = await Plan.findOne({ name: 'Premium' });
-
-    // 3. Seed Master Inventory
-    const masterCount = await MasterItem.countDocuments();
-    if (masterCount === 0) {
-      await MasterItem.create([
-        { name: 'Executive Veg Thali', category: 'Thali', base_price: 180, quantity: 100, description: 'Roti, Rice, Dal, 2 Sabzi, Sweet, Raita, Salad', image_url: 'https://images.pexels.com/photos/1624487/pexels-photo-1624487.jpeg' },
-        { name: 'Masala Dosa', category: 'Breakfast', base_price: 80, quantity: 150, description: 'Crisp rice crepe filled with potato masala, served with sambar and chutneys', image_url: 'https://images.pexels.com/photos/5560700/pexels-photo-5560700.jpeg' },
-        { name: 'Idli Sambar', category: 'Breakfast', base_price: 60, quantity: 200, description: 'Soft steamed rice cakes served with sambar and coconut chutney', image_url: 'https://images.pexels.com/photos/4331587/pexels-photo-4331587.jpeg' },
-        { name: 'Dal Khichdi', category: 'Lunch/Dinner', base_price: 120, quantity: 120, description: 'Comforting rice and lentil dish tempered with ghee and cumin', image_url: 'https://images.pexels.com/photos/8063617/pexels-photo-8063617.jpeg' },
-        { name: 'Standard Roti Tiffin', category: 'Tiffin', base_price: 100, quantity: 80, description: '4 Butter rotis, 1 dry sabzi, 1 gravy sabzi, salad', image_url: 'https://images.pexels.com/photos/9585644/pexels-photo-9585644.jpeg' },
-        { name: 'Organic Fresh Broccoli', category: 'Vegetables', base_price: 50, quantity: 50, description: 'Farm fresh broccoli per 500g', image_url: 'https://images.pexels.com/photos/47347/broccoli-vegetable-food-healthy-47347.jpeg' }
-      ]);
-    }
-
-    // 4. Seed Default Vendor
-    const vendorCount = await Vendor.countDocuments();
-    if (vendorCount === 0 && premiumPlan) {
-      const vendorDoc = await Vendor.create({
-        owner_name: 'Vikram Singh',
-        phone: '+919876543210',
-        email: 'vikram@spicegarden.io',
-        shop_name: 'Spice Garden',
-        address: '12th Main Road, Indiranagar',
-        zip_code: '560038',
-        plan_id: premiumPlan._id,
-        plan_name: premiumPlan.name,
-        status: 'approved',
-        logo_url: 'https://images.pexels.com/photos/262047/pexels-photo-262047.jpeg',
-        subscription_start: new Date().toISOString().slice(0, 10),
-        subscription_end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-        total_clients: 0
-      });
-
-      // Seed vendor items from master items
-      const items = await MasterItem.find();
-      for (const item of items) {
-        await VendorItem.create({
-          vendor_id: vendorDoc._id,
-          master_item_id: item._id,
-          item_name: item.name,
-          category: item.category,
-          price: item.base_price,
-          quantity: item.quantity,
-          image_url: item.image_url
-        });
-      }
-    }
-
-    // 5. Seed Settings
-    const settingsCount = await Settings.countDocuments();
-    if (settingsCount === 0) {
-      await Settings.create({
-        logo_url: 'https://images.pexels.com/photos/262047/pexels-photo-262047.jpeg',
-        qr_url: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://vikram-advertising.io'
-      });
-    }
-
+    await seedDatabase();
     res.json({ success: true, message: 'Database initialized and seeded successfully' });
   } catch (err) {
     console.error('Seeding error:', err);
@@ -677,6 +679,12 @@ if (process.env.NODE_ENV === 'production') {
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
+  try {
+    await seedDatabase();
+    console.log('Database auto-seeded successfully on startup.');
+  } catch (err) {
+    console.error('Failed to auto-seed database on startup:', err);
+  }
 });
