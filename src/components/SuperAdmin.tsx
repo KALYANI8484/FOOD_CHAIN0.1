@@ -634,11 +634,12 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
   const handlePrepareEdit = async (v: Vendor) => {
     const { data } = await supabase.from('vendors').select('*').eq('id', v.id).single();
-    if (data) {
-      setEditVendor(data);
-    } else {
-      setEditVendor(v);
-    }
+    const vendor = data || v;
+    setEditVendor(vendor);
+    // Load this vendor's inventory into the editing grid
+    const { data: inv } = await supabase.from('vendor_inventory').select('*').eq('vendor_id', vendor.id);
+    setViewInventory(inv || []);
+    setEditingInventory(inv || []);
   };
 
   const handleView = async (v: Vendor) => {
@@ -740,11 +741,12 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   };
 
   const handleInventoryAddRow = async () => {
-    if (!viewVendor) return;
-    const plan = plans.find(p => p.id === viewVendor.plan_id);
+    const activeVendor = viewVendor || editVendor;
+    if (!activeVendor) return;
+    const plan = plans.find(p => p.id === activeVendor.plan_id);
     const limit = plan ? plan.max_items : 5;
 
-    if (viewInventory.length >= limit) {
+    if (editingInventory.length >= limit) {
       alert(`Limit Reached! Plan limit is ${limit} menu items.`);
       return;
     }
@@ -757,7 +759,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     const defaultMaster = masterItems[0];
 
     const { data } = await supabase.from('vendor_inventory').insert({
-      vendor_id: viewVendor.id,
+      vendor_id: activeVendor.id,
       master_item_id: defaultMaster.id,
       item_name: defaultMaster.name,
       category: defaultMaster.category,
@@ -889,14 +891,83 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       </Modal>
 
       {/* Edit Vendor Modal */}
-      <Modal open={!!editVendor} onClose={() => setEditVendor(null)} title="Modify Vendor Record" size="xl">
+      <Modal open={!!editVendor} onClose={() => { setEditVendor(null); setEditingInventory([]); }} title="Modify Vendor Record" size="xl">
         {editVendor && (
-          <VendorForm 
-            initialData={editVendor} 
-            submitLabel="Save Changes" 
-            onSubmit={handleEditSubmit} 
-            onCancel={() => setEditVendor(null)} 
-          />
+          <div className="space-y-8">
+            <VendorForm 
+              initialData={editVendor} 
+              submitLabel="Save Changes" 
+              onSubmit={handleEditSubmit} 
+              onCancel={() => { setEditVendor(null); setEditingInventory([]); }} 
+            />
+
+            {/* Inventory Edit Section */}
+            <div className="border-t border-border pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm font-bold text-text">Current Inventory</p>
+                  <p className="text-xs text-muted mt-0.5">{editingInventory.length} item(s) — edit price, quantity or remove items</p>
+                </div>
+                <button
+                  onClick={handleInventoryAddRow}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors"
+                >
+                  <Plus size={13} /> Add Item
+                </button>
+              </div>
+
+              {editingInventory.length === 0 ? (
+                <div className="text-center py-8 text-muted text-sm border border-dashed border-border rounded-xl">
+                  No inventory items yet. Click "Add Item" to add menu items.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {editingInventory.map((row) => (
+                    <div key={row.id} className="flex gap-3 items-center p-3 rounded-xl border border-border bg-surface-2">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface border border-border flex-shrink-0">
+                        {row.image_url
+                          ? <img src={row.image_url} alt={row.item_name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-muted text-xs">No img</div>
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-text truncate">{row.item_name}</p>
+                        <p className="text-[10px] text-muted">{row.category || '—'}</p>
+                      </div>
+                      <input
+                        type="number"
+                        value={row.price}
+                        onChange={(e) => setEditingInventory(prev => prev.map(i => i.id === row.id ? { ...i, price: Number(e.target.value) } : i))}
+                        className="w-20 text-xs px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-center outline-none focus:border-accent"
+                        placeholder="Price"
+                      />
+                      <input
+                        type="number"
+                        value={row.quantity}
+                        onChange={(e) => setEditingInventory(prev => prev.map(i => i.id === row.id ? { ...i, quantity: Number(e.target.value) } : i))}
+                        className="w-16 text-xs px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-center outline-none focus:border-accent"
+                        placeholder="Qty"
+                      />
+                      <button
+                        onClick={() => handleInventorySaveRow(row)}
+                        className="px-2 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors"
+                        title="Save this row"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => handleInventoryDeleteRow(row.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted hover:text-red-500 transition-colors"
+                        title="Remove item"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </Modal>
 

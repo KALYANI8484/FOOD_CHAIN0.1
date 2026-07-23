@@ -647,9 +647,10 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
 // 4. Inventory Sub-module Tab
 function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [items, setItems] = useState<VendorItem[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [maxLimit, setMaxLimit] = useState(0);
 
   // New Row Item State
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -659,14 +660,17 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
   const [adding, setAdding] = useState(false);
 
   const load = async () => {
-    const [{ data: v }, catRes] = await Promise.all([
+    const [{ data: v }, catRes, planRes] = await Promise.all([
       supabase.from('vendor_inventory').select('*').eq('vendor_id', vendor.id),
-      fetch('/api/master-categories').then(r => r.json())
+      fetch('/api/master-categories').then(r => r.json()),
+      supabase.from('subscription_plans').select('max_items').eq('name', vendor.plan_name).single()
     ]);
     setItems(v || []);
     setCategories(catRes.data || []);
+    setMaxLimit(planRes.data?.max_items || 5);
+    
     if (catRes.data && catRes.data.length > 0 && !selectedCategory) {
-      setSelectedCategory(catRes.data[0]);
+      setSelectedCategory(catRes.data[0].name);
     }
     setLoading(false);
   };
@@ -725,12 +729,8 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
       return;
     }
 
-    // Check Plan item capacity
-    let maxLimit = 5;
-    if (vendor.plan_name === 'Starter') maxLimit = 10;
-    else if (vendor.plan_name === 'Premium') maxLimit = 30;
-
     if (items.length >= maxLimit) {
+      show('Plan limit reached', 'error');
       return;
     }
 
@@ -780,10 +780,9 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
           <h1 className="text-3xl font-extrabold tracking-tight">Kitchen Inventory</h1>
           <p className="text-muted mt-1">Configure stock limits and active prices for client browsing</p>
         </div>
-        <Badge variant="accent">Mapped Limit: {items.length} / {vendor.plan_name === 'Starter' ? '10' : vendor.plan_name === 'Premium' ? '30' : '5'} Items</Badge>
+        <Badge variant="accent">Mapped Limit: {items.length} / {maxLimit} Items</Badge>
       </div>
 
-      {/* Mapping form panel */}
       <div className="card p-6 bg-surface border border-border animate-fade-in-up delay-100 space-y-4">
         <h3 className="font-extrabold text-base uppercase tracking-wider text-muted">Add New Menu Item</h3>
         <div className="grid sm:grid-cols-4 gap-4 items-end">
@@ -791,100 +790,87 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
             label="Category"
             value={selectedCategory}
             onChange={setSelectedCategory}
-            options={categories.map(c => ({ value: c, label: c }))}
+            options={categories.map(c => ({ value: c.name, label: c.name }))}
           />
           <Input label="Item Name" value={itemName} onChange={setItemName} placeholder="e.g. Idli" />
           <Input label="Price (₹)" type="number" value={String(customPrice)} onChange={(v) => setCustomPrice(Number(v))} />
           <Input label="Quantity" type="number" value={String(customQty)} onChange={(v) => setCustomQty(Number(v))} />
         </div>
         <div className="flex flex-col items-end pt-2 gap-2">
-          {items.length >= (vendor.plan_name === 'Starter' ? 10 : vendor.plan_name === 'Premium' ? 30 : 5) && (
+          {items.length >= maxLimit && (
             <p className="text-red-500 text-sm font-bold">You have reached your plan limit. Upgrade your subscription to add more items.</p>
           )}
           <Button 
             onClick={addNewItem} 
-            disabled={adding || items.length >= (vendor.plan_name === 'Starter' ? 10 : vendor.plan_name === 'Premium' ? 30 : 5) || !itemName.trim()}
+            disabled={adding || items.length >= maxLimit || !itemName.trim()}
           >
             Add Item
           </Button>
         </div>
       </div>
 
-      {/* Grid of existing items */}
       <div className="card overflow-hidden bg-surface border border-border animate-fade-in-up delay-200">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
                 <th className="px-6 py-4">Dish Name</th>
-                <th className="px-6 py-4">Inherited category</th>
-                <th className="px-6 py-4">Image Attachment</th>
-                <th className="px-6 py-4">Active Price</th>
-                <th className="px-6 py-4">Stock Quantity</th>
+                <th className="px-6 py-4">Category</th>
+                <th className="px-6 py-4">Image</th>
+                <th className="px-6 py-4">Price</th>
+                <th className="px-6 py-4">Stock</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 text-sm">
-              {items.map((item, idx) => (
-                <tr key={item.id} className="hover:bg-surface-2/20 transition-all">
-                  <td className="px-6 py-4 font-bold text-text">{item.item_name}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="accent">{item.category}</Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="relative border border-border rounded-xl p-1 bg-surface-2 flex items-center justify-center w-14 h-14 cursor-pointer overflow-hidden">
-                      {item.image_url ? (
-                        <img src={item.image_url} alt="" className="w-full h-full object-cover rounded" />
-                      ) : (
-                        <Upload size={14} className="text-muted" />
-                      )}
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        disabled={uploadingId === item.id}
-                        onChange={(e) => handleImageUpload(e, item.id)} 
-                        className="absolute inset-0 opacity-0 cursor-pointer" 
-                      />
-                      {uploadingId === item.id && (
-                        <div className="absolute inset-0 bg-surface/90 flex items-center justify-center"><Spinner /></div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+              {items.map((item, idx) => {
+                const isLocked = (item as any).price_locked;
+                return (
+                  <tr key={item.id} className="hover:bg-surface-2/20 transition-all">
+                    <td className="px-6 py-4 font-bold text-text">
+                        {item.item_name}
+                        {isLocked && <Badge variant="warning" className="ml-2 text-[8px]">LOCKED</Badge>}
+                    </td>
+                    <td className="px-6 py-4"><Badge variant="accent">{item.category}</Badge></td>
+                    <td className="px-6 py-4">
+                      <div className="relative border border-border rounded-xl p-1 bg-surface-2 flex items-center justify-center w-14 h-14 cursor-pointer overflow-hidden">
+                        {item.image_url ? <img src={item.image_url} alt="" className="w-full h-full object-cover rounded" /> : <Upload size={14} className="text-muted" />}
+                        <input type="file" accept="image/*" disabled={uploadingId === item.id} onChange={(e) => handleImageUpload(e, item.id)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        {uploadingId === item.id && <div className="absolute inset-0 bg-surface/90 flex items-center justify-center"><Spinner /></div>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
                       <input
                         type="number"
                         value={item.price}
-                        readOnly={(item as any).price_locked}
+                        disabled={isLocked}
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           setItems(prev => prev.map((itm, i) => i === idx ? { ...itm, price: val } : itm));
                         }}
-                        className={`w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold ${(item as any).price_locked ? 'opacity-70 bg-surface-2' : ''}`}
+                        className={`w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold ${isLocked ? 'opacity-50' : ''}`}
                       />
-                      {(item as any).price_locked && <Padlock size={14} className="text-muted" />}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setItems(prev => prev.map((itm, i) => i === idx ? { ...itm, quantity: val } : itm));
-                      }}
-                      className="w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold"
-                    />
-                    {item.quantity < 5 && <span className="text-[10px] text-red-500 font-bold block mt-1">Low Stock!</span>}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <Button size="sm" onClick={() => saveRow(item)}>Save</Button>
-                      <button onClick={() => removeRow(item.id)} className="text-muted hover:text-red-500 transition-colors p-2"><Trash2 size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setItems(prev => prev.map((itm, i) => i === idx ? { ...itm, quantity: val } : itm));
+                        }}
+                        className="w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold"
+                      />
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <Button size="sm" onClick={() => saveRow(item)}>Save</Button>
+                        {!isLocked && <button onClick={() => removeRow(item.id)} className="text-muted hover:text-red-500 transition-colors p-2"><Trash2 size={14} /></button>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
