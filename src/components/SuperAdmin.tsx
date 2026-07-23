@@ -1477,7 +1477,6 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   const [items, setItems] = useState<MasterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all');
   const [modal, setModal] = useState(false);
   const [editItem, setEditItem] = useState<MasterItem | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -1586,14 +1585,6 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none"
           />
         </div>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm font-semibold text-text focus:border-accent outline-none cursor-pointer"
-        >
-          <option value="all">All Categories</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 stagger">
