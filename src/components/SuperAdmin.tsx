@@ -612,7 +612,6 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       <PageHeader 
         title="Vendor Database" 
         subtitle={`${vendors.length} total vendors registered`} 
-        action={<Button onClick={() => setCreateMode(true)}><Plus size={16} /> Create Vendor</Button>}
       />
 
       {/* Filter Bar */}
