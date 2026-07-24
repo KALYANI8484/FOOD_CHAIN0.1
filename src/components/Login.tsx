@@ -1,52 +1,26 @@
 import { useEffect, useState } from 'react';
 import {
-  UtensilsCrossed, Shield, Users, Store, ShoppingBag,
-  Eye, EyeOff, ArrowRight, Lock, Mail, ChevronLeft,
+  UtensilsCrossed, Eye, EyeOff, ArrowRight, Lock, Mail, ChevronLeft,
 } from 'lucide-react';
 import { Button, Spinner } from './ui';
+import { supabase } from '../lib/supabase';
 
 type Role = 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
 interface LoginProps {
   onLogin: (role: Role, cred?: string) => void;
   onBack?: () => void;
-  initialRole?: Role;
 }
 
-const SUPER_ADMIN_EMAIL = '2711vikram@gmail.com';
-const SUPER_ADMIN_PASSWORD = 'Tatwavivek@271';
-
-const SUB_ADMIN_EMAIL = 'kalyani@123';
-const SUB_ADMIN_PASSWORD = '123456';
-
-const VENDOR_EMAIL = 'vendor@123';
-const VENDOR_PASSWORD = '1234567';
-
-const roles: { id: Role; label: string; desc: string; icon: typeof Shield; color: string; gradient: string }[] = [
-  { id: 'super_admin', label: 'Super Admin', desc: 'Full platform control', icon: Shield, color: 'text-orange-400', gradient: 'from-orange-500/20 to-red-500/10 border-orange-500/20' },
-  { id: 'sub_admin', label: 'Sub-Admin', desc: 'Vendor management', icon: Users, color: 'text-blue-400', gradient: 'from-blue-500/20 to-cyan-500/10 border-blue-500/20' },
-  { id: 'vendor', label: 'Vendor', desc: 'Order radar & inventory', icon: Store, color: 'text-green-400', gradient: 'from-green-500/20 to-emerald-500/10 border-green-500/20' },
-  { id: 'client', label: 'Client', desc: 'Order your favourite food', icon: ShoppingBag, color: 'text-purple-400', gradient: 'from-purple-500/20 to-pink-500/10 border-purple-500/20' },
-];
-
-export function Login({ onLogin, onBack, initialRole }: LoginProps) {
-  const [selected, setSelected] = useState<Role | null>(initialRole ?? null);
-
-  useEffect(() => {
-    if (initialRole) {
-      setSelected(initialRole);
-    }
-  }, [initialRole]);
-
+export function Login({ onLogin, onBack }: LoginProps) {
   return (
     <div className="min-h-screen noise relative overflow-hidden flex items-center justify-center p-6">
-      {/* Back to home */}
       {onBack && (
         <button onClick={onBack} className="absolute top-6 left-6 text-muted hover:text-text transition-colors text-sm flex items-center gap-1.5 group z-10">
           <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Home
         </button>
       )}
-      {/* BG orbs */}
+
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-[120px] top-[-80px] left-[-80px]"
           style={{ background: 'radial-gradient(circle, #A0A0D0, transparent 70%)' }} />
@@ -54,68 +28,53 @@ export function Login({ onLogin, onBack, initialRole }: LoginProps) {
           style={{ background: 'radial-gradient(circle, #8888BB, transparent 70%)' }} />
       </div>
 
-      <div className="relative w-full max-w-4xl">
-        {/* Logo */}
-        <div className="text-center mb-10 animate-fade-in-up">
+      <div className="relative w-full max-w-2xl">
+        <div className="text-center mb-8 animate-fade-in-up">
           <div className="inline-flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center">
               <UtensilsCrossed size={22} className="text-white" />
             </div>
             <span className="text-3xl font-bold tracking-tight">VIKRAM ADVERTISING</span>
           </div>
-          <p className="text-muted">Sign in to your workspace</p>
+          <p className="text-muted">Sign in to access your workspace</p>
         </div>
 
-        {!selected ? (
-          <RoleSelector onSelect={(r) => r === 'client' ? onLogin('client') : setSelected(r)} />
-        ) : (
-          <CredentialForm role={selected} onLogin={onLogin} onBack={() => setSelected(null)} />
-        )}
+        <CredentialForm onLogin={onLogin} />
       </div>
     </div>
   );
 }
 
-function RoleSelector({ onSelect }: { onSelect: (r: Role) => void }) {
-  return (
-    <div className="animate-scale-in">
-      <p className="text-center text-sm text-muted mb-6 uppercase tracking-wider font-semibold">Choose your role to continue</p>
-      <div className="grid sm:grid-cols-2 gap-4">
-        {roles.map((r, i) => (
-          <button
-            key={r.id}
-            onClick={() => onSelect(r.id)}
-            className={`group relative card p-6 text-left bg-gradient-to-br ${r.gradient} border hover-lift transition-all duration-300 animate-fade-in-up`}
-            style={{ animationDelay: `${i * 0.08}s` }}
-          >
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-2xl bg-surface-2 flex items-center justify-center ${r.color} group-hover:scale-110 transition-transform duration-300`}>
-                <r.icon size={26} />
-              </div>
-              <div className="flex-1">
-                <p className="text-xl font-bold">{r.label}</p>
-                <p className="text-sm text-muted mt-0.5">{r.desc}</p>
-              </div>
-              <ArrowRight size={18} className={`${r.color} opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300`} />
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Role, cred?: string) => void; onBack: () => void }) {
-  const meta = roles.find((r) => r.id === role)!;
+function CredentialForm({ onLogin }: { onLogin: (role: Role, cred?: string) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('foodchain-login-email');
+    const savedRemember = localStorage.getItem('foodchain-login-remember') === 'true';
+    if (savedRemember && savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (rememberMe && email) {
+      localStorage.setItem('foodchain-login-email', email);
+      localStorage.setItem('foodchain-login-remember', 'true');
+    } else {
+      localStorage.removeItem('foodchain-login-email');
+      localStorage.removeItem('foodchain-login-remember');
+    }
+  }, [rememberMe, email]);
 
   const handleResetPassword = async () => {
     setError('');
@@ -142,36 +101,48 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
 
   const handleLogin = async () => {
     setError('');
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (role === 'super_admin') {
-        const { data, error: dbError } = await supabase
-          .from('super_admins')
-          .select('*')
-          .eq('email', email.trim().toLowerCase())
-          .maybeSingle();
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPassword = password.trim();
 
-        if (dbError || !data || data.password !== password) {
-          setError('Invalid email or password');
-          return;
-        }
-        onLogin('super_admin', email.trim());
-
-      } else if (role === 'sub_admin') {
-        if (email.trim().toLowerCase() !== SUB_ADMIN_EMAIL || password !== SUB_ADMIN_PASSWORD) {
-          setError('Invalid email or password');
-          return;
-        }
-        onLogin('sub_admin', email.trim());
-
-      } else if (role === 'vendor') {
-        if (email.trim().toLowerCase() !== VENDOR_EMAIL || password !== VENDOR_PASSWORD) {
-          setError('Invalid email or password');
-          return;
-        }
-        onLogin('vendor', email.trim());
+      const superAdminResult = await supabase.from('super_admins').select('*').eq('email', cleanEmail).maybeSingle();
+      if (!superAdminResult.error && superAdminResult.data && superAdminResult.data.password === cleanPassword) {
+        onLogin('super_admin', cleanEmail);
+        return;
       }
+
+      const subAdminResult = await supabase.from('sub_admins').select('*').eq('email', cleanEmail).maybeSingle();
+      if (!subAdminResult.error && subAdminResult.data && subAdminResult.data.password === cleanPassword) {
+        onLogin('sub_admin', cleanEmail);
+        return;
+      }
+
+      const vendorResult = await supabase.from('vendors').select('*').eq('email', cleanEmail).maybeSingle();
+      if (!vendorResult.error && vendorResult.data && vendorResult.data.password === cleanPassword) {
+        onLogin('vendor', cleanEmail);
+        return;
+      }
+
+      if (cleanEmail === 'vendor@123' && cleanPassword === '1234567') {
+        onLogin('vendor', cleanEmail);
+        return;
+      }
+
+      if (cleanEmail === 'client@123' && cleanPassword === '123456') {
+        onLogin('client', cleanEmail);
+        return;
+      }
+
+      setError('Invalid email or password');
+    } catch (err: any) {
+      setError(err.message || 'Unable to sign in right now.');
     } finally {
       setLoading(false);
     }
@@ -184,10 +155,10 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
           <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Login
         </button>
 
-        <div className={`card p-8 bg-gradient-to-br ${meta.gradient} border`}>
+        <div className="card p-8 bg-gradient-to-br from-orange-500/20 to-red-500/10 border border-orange-500/20">
           <div className="flex items-center gap-3 mb-6">
-            <div className={`w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center ${meta.color}`}>
-              <meta.icon size={22} />
+            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-orange-400">
+              <Lock size={22} />
             </div>
             <div>
               <p className="font-bold text-lg">Reset Password</p>
@@ -233,74 +204,75 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
 
   return (
     <div className="max-w-md mx-auto animate-scale-in">
-      <button onClick={onBack} className="flex items-center gap-1.5 text-muted hover:text-text transition-colors text-sm mb-6 group">
-        <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> All roles
-      </button>
-
-      <div className={`card p-8 bg-gradient-to-br ${meta.gradient} border`}>
+      <div className="card p-8 bg-gradient-to-br from-white/80 to-[#F8F8FF] border border-white/60 shadow-[0_20px_60px_rgba(17,17,24,0.08)]">
         <div className="flex items-center gap-3 mb-6">
-          <div className={`w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center ${meta.color}`}>
-            <meta.icon size={22} />
+          <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-accent">
+            <Lock size={22} />
           </div>
           <div>
-            <p className="font-bold text-lg">{meta.label}</p>
-            <p className="text-xs text-muted">{meta.desc}</p>
+            <p className="font-bold text-lg text-text">Welcome back</p>
+            <p className="text-xs text-muted">Use your credentials to access your dashboard</p>
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Email
-            </label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    placeholder={role === 'super_admin' ? 'your-email@gmail.com' : 'your@email.com'}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
-                    autoComplete="username"
-                  />
-                </div>
-              </div>
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider">Email</label>
+            <div className="relative">
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="your@email.com"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
+                autoComplete="username"
+              />
+            </div>
+          </div>
 
-              {(
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted uppercase tracking-wider">Password</label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                    <input
-                      type={showPw ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-12 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
-                      autoComplete="current-password"
-                    />
-                    <button
-                      onClick={() => setShowPw(!showPw)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
-                    >
-                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  {role === 'super_admin' && (
-                    <div className="text-right pt-1">
-                      <button
-                        type="button"
-                        onClick={() => { setResetMode(true); setError(''); setResetSuccess(''); }}
-                        className="text-xs text-accent hover:underline font-semibold"
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider">Password</label>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-12 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
+                autoComplete="current-password"
+              />
+              <button
+                onClick={() => setShowPw(!showPw)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
+              >
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+            />
+            Remember me
+          </label>
+
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={() => { setResetMode(true); setError(''); setResetSuccess(''); }}
+              className="text-xs text-accent hover:underline font-semibold"
+            >
+              Forgot Password?
+            </button>
+          </div>
 
           {error && (
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
