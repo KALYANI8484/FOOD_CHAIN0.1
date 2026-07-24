@@ -20,7 +20,7 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
   );
 }
 
-type Tab = 'dashboard' | 'radar' | 'kanban' | 'inventory' | 'upgrade';
+type Tab = 'dashboard' | 'radar' | 'kanban' | 'upgrade';
 
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -123,7 +123,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'radar', label: 'Order Radar', icon: Radar },
     { id: 'kanban', label: 'Active Orders', icon: Navigation },
-    { id: 'inventory', label: 'My Inventory', icon: Package },
+
     { id: 'upgrade', label: 'Upgrade Plan', icon: CreditCard },
   ];
 
@@ -198,7 +198,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           {tab === 'dashboard' && <VendorDashboard vendor={vendor} />}
           {tab === 'radar' && <OrderRadar vendor={vendor} radarOrders={radarOrders} onTab={setTab} show={show} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
-          {tab === 'inventory' && <Inventory vendor={vendor} show={show} />}
+
           {tab === 'upgrade' && <UpgradePlan vendor={vendor} show={show} />}
         </div>
       </main>
@@ -675,237 +675,26 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
   );
 }
 
-// 4. Inventory Sub-module Tab
-function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [items, setItems] = useState<VendorItem[]>([]);
-  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-
-  // New Row Item State
-  const [selectedMasterId, setSelectedMasterId] = useState('');
-  const [customPrice, setCustomPrice] = useState(100);
-  const [customQty, setCustomQty] = useState(10);
-  const [adding, setAdding] = useState(false);
-
-  const load = async () => {
-    const [{ data: v }, { data: m }] = await Promise.all([
-      supabase.from('vendor_inventory').select('*').eq('vendor_id', vendor.id),
-      supabase.from('master_inventory').select('*')
-    ]);
-    setItems(v || []);
-    setMasterItems(m || []);
-    if (m && m.length > 0 && !selectedMasterId) {
-      setSelectedMasterId(m[0].id);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [vendor.id]);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, rowId: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingId(rowId);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error('Image upload failed');
-
-      await supabase.from('vendor_inventory').update({ image_url: data.url }).eq('id', rowId);
-      show('Image uploaded successfully!');
-      load();
-    } catch (err: any) {
-      alert(err.message || 'Image upload failed');
-    } finally {
-      setUploadingId(null);
-    }
-  };
-
-  const saveRow = async (row: VendorItem) => {
-    await supabase.from('vendor_inventory').update({
-      price: Number(row.price),
-      quantity: Number(row.quantity)
-    }).eq('id', row.id);
-    show('Saved inventory item');
-    load();
-  };
-
-  const removeRow = async (rowId: string) => {
-    await supabase.from('vendor_inventory').delete().eq('id', rowId);
-    show('Inventory item removed', 'info');
-    load();
-  };
-
-  const addNewItem = async () => {
-    const master = masterItems.find(x => x.id === selectedMasterId);
-    if (!master || !vendor) return;
-
-    const maxLimit = getVendorItemLimit(vendor);
-    if (maxLimit !== Infinity && items.length >= maxLimit) {
-      alert(`Plan limit reached! Max items permitted: ${maxLimit}`);
-      return;
-    }
-
-    setAdding(true);
-    await supabase.from('vendor_inventory').insert({
-      vendor_id: vendor.id,
-      master_item_id: master.id,
-      item_name: master.name,
-      category: master.category, // Auto inherits master category
-      price: customPrice,
-      quantity: customQty,
-      image_url: master.image_url
-    });
-
-    setAdding(false);
-    show('Dishes mapped to inventory!');
-    load();
-  };
-
-  if (loading) return <Spinner />;
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between animate-fade-in-up">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Kitchen Inventory</h1>
-          <p className="text-muted mt-1">Configure stock limits and active prices for client browsing</p>
-        </div>
-        <Badge variant="accent">Mapped Limit: {items.length} / {formatLimitLabel(getVendorItemLimit(vendor))} Items</Badge>
-      </div>
-
-      {/* Mapping form panel */}
-      <div className="card p-6 bg-surface border border-border animate-fade-in-up delay-100 space-y-4">
-        <h3 className="font-extrabold text-base uppercase tracking-wider text-muted">Link Master dish template</h3>
-        <div className="grid sm:grid-cols-3 gap-4 items-end">
-          <Select 
-            label="Choose Master Dish"
-            value={selectedMasterId}
-            onChange={setSelectedMasterId}
-            options={masterItems.map(m => ({ value: m.id, label: `${m.name} (${m.category})` }))}
-          />
-          <Input label="Custom Active Price (₹)" type="number" value={String(customPrice)} onChange={(v) => setCustomPrice(Number(v))} />
-          <Input label="Initial Quantity" type="number" value={String(customQty)} onChange={(v) => setCustomQty(Number(v))} />
-        </div>
-        <div className="flex flex-col gap-2 pt-2">
-          <div className="flex justify-end">
-            <Button 
-              onClick={addNewItem} 
-              disabled={adding || (getVendorItemLimit(vendor) !== Infinity && items.length >= getVendorItemLimit(vendor))}
-            >
-              Map to Menu
-            </Button>
-          </div>
-          {vendor && getVendorItemLimit(vendor) !== Infinity && items.length >= getVendorItemLimit(vendor) && (
-            <p className="text-sm text-red-600">
-              You have reached your plan limit. Upgrade your subscription to add more items.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Grid of existing items */}
-      <div className="card overflow-hidden bg-surface border border-border animate-fade-in-up delay-200">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
-                <th className="px-6 py-4">Dish Name</th>
-                <th className="px-6 py-4">Inherited category</th>
-                <th className="px-6 py-4">Image Attachment</th>
-                <th className="px-6 py-4">Active Price</th>
-                <th className="px-6 py-4">Stock Quantity</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60 text-sm">
-              {items.map((item, idx) => (
-                <tr key={item.id} className="hover:bg-surface-2/20 transition-all">
-                  <td className="px-6 py-4 font-bold text-text">{item.item_name}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="accent">{item.category}</Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="relative border border-border rounded-xl p-1 bg-surface-2 flex items-center justify-center w-14 h-14 cursor-pointer overflow-hidden">
-                      {item.image_url ? (
-                        <img src={item.image_url} alt="" className="w-full h-full object-cover rounded" />
-                      ) : (
-                        <Upload size={14} className="text-muted" />
-                      )}
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        disabled={uploadingId === item.id}
-                        onChange={(e) => handleImageUpload(e, item.id)} 
-                        className="absolute inset-0 opacity-0 cursor-pointer" 
-                      />
-                      {uploadingId === item.id && (
-                        <div className="absolute inset-0 bg-surface/90 flex items-center justify-center"><Spinner /></div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <input
-                      type="number"
-                      value={item.price}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setItems(prev => prev.map((itm, i) => i === idx ? { ...itm, price: val } : itm));
-                      }}
-                      className="w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setItems(prev => prev.map((itm, i) => i === idx ? { ...itm, quantity: val } : itm));
-                      }}
-                      className="w-20 px-2 py-1 rounded bg-surface border border-border text-sm font-semibold"
-                    />
-                    {item.quantity < 5 && <span className="text-[10px] text-red-500 font-bold block mt-1">Low Stock!</span>}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <Button size="sm" onClick={() => saveRow(item)}>Save</Button>
-                      <button onClick={() => removeRow(item.id)} className="text-muted hover:text-red-500 transition-colors p-2"><Trash2 size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 5. Upgrade Plan tab
+// 4. Upgrade Plan tab
 function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [addons, setAddons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('subscription_plans').select('*').eq('status', 'active');
-      setPlans(data || []);
+      const [{ data: pData }, { data: aData }] = await Promise.all([
+        supabase.from('subscription_plans').select('*').eq('status', 'active'),
+        supabase.from('addons').select('*')
+      ]);
+      setPlans(pData || []);
+      setAddons(aData || []);
       setLoading(false);
     })();
   }, []);
 
-  const requestUpgrade = async (planName: string) => {
+  const requestUpgrade = async (planName: string, isAddon = false) => {
     setSubmitting(true);
     await supabase.from('upgrade_requests').insert({
       vendor_id: vendor.id,
@@ -948,7 +737,7 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
                 <div className="border-t border-border/50 my-4" />
 
                 <ul className="text-xs space-y-2 text-muted font-medium">
-                  <li>• Max Inventory allowance: <span className="font-bold text-text">{p.max_items} Menu items</span></li>
+                  <li>• Max Master Category allowance: <span className="font-bold text-text">{p.max_items}</span></li>
                   <li>• Max Client capacity: <span className="font-bold text-text">{p.max_clients} unique clients</span></li>
                 </ul>
               </div>
@@ -966,6 +755,43 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
           );
         })}
       </div>
+
+      {addons.length > 0 && (
+        <div className="mt-12 animate-fade-in-up">
+          <PageHeader title="Available Add-ons" subtitle="Extend your limits and features" />
+          <div className="grid md:grid-cols-3 gap-6 stagger mt-6">
+            {addons.map((a) => (
+              <div key={a.id} className="card p-6 bg-surface border border-border flex flex-col justify-between hover-lift">
+                <div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-muted uppercase tracking-wide">Add-on Package</span>
+                  </div>
+                  
+                  <p className="text-2xl font-extrabold text-text mt-4">{a.name}</p>
+                  <p className="text-3xl font-extrabold text-accent mt-2">₹{a.price.toLocaleString()}</p>
+                  <p className="text-xs text-muted mt-1">Validity: +{a.validity_days} Days</p>
+
+                  <div className="border-t border-border/50 my-4" />
+
+                  <ul className="text-xs space-y-2 text-muted font-medium">
+                    <li>• Boost Client capacity: <span className="font-bold text-text">+{a.max_clients}</span></li>
+                  </ul>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-border/40">
+                  <Button 
+                    className="w-full" 
+                    disabled={submitting}
+                    onClick={() => requestUpgrade(a.name, true)}
+                  >
+                    Purchase Add-on
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
