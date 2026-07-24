@@ -1378,7 +1378,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         action={<Button onClick={() => setModal(true)}><Plus size={16} /> Add Master Item</Button>}
       />
 
-      <div className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-2xl border border-border">
+      <div className="flex bg-surface p-4 rounded-2xl border border-border">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
@@ -1388,14 +1388,6 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none"
           />
         </div>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm font-semibold text-text focus:border-accent outline-none cursor-pointer"
-        >
-          <option value="all">All Categories</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 stagger">
