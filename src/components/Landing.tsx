@@ -474,24 +474,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       {/* ── Master Inventory Grid ───────────────── */}
       <main className="max-w-7xl mx-auto px-6 py-14">
 
-        {/* Category filter */}
-        {!loadingItems && masterItems.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-center mb-10 reveal">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                  activeCategory === cat
-                    ? 'bg-amber-500 text-white shadow-md'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-600'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        )}
+
 
         {/* Items */}
         {loadingItems ? (

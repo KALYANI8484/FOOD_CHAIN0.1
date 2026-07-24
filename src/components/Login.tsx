@@ -46,14 +46,6 @@ function Field({
   );
 }
 
-/* ── Role badge ────────────────────────────────── */
-function RoleBadge({ icon: Icon, label, color }: { icon: typeof Shield; label: string; color: string }) {
-  return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${color}`}>
-      <Icon size={12} /> {label}
-    </div>
-  );
-}
 
 /* ── Main Component ────────────────────────────── */
 export function Login({
@@ -137,54 +129,7 @@ export function Login({
   };
 
   return (
-    <div className="min-h-screen flex" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-
-      {/* ── Left decorative panel ─────────────────── */}
-      <div className="hidden lg:flex lg:w-5/12 relative bg-gradient-to-br from-amber-500 via-orange-500 to-orange-600 flex-col justify-between p-12 overflow-hidden">
-        {/* Decorative blobs */}
-        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute bottom-0 right-0 w-64 h-64 rounded-full bg-black/10 blur-2xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-white/5 blur-3xl" />
-
-        {/* Brand */}
-        <div className="relative z-10">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 mb-4">
-            <Store size={24} className="text-white" />
-          </div>
-          <h1 className="text-3xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-            Vikram<br />Advertising
-          </h1>
-          <p className="text-white/70 text-sm mt-2">Unified Team Portal</p>
-        </div>
-
-        {/* Role cards */}
-        <div className="relative z-10 space-y-3">
-          <p className="text-white/60 text-xs font-bold uppercase tracking-widest mb-4">Who can sign in here?</p>
-          {[
-            { icon: Shield, label: 'Super Admin', desc: 'Full platform control · Email + Password', color: 'bg-white/20' },
-            { icon: Users, label: 'Sub-Admin', desc: 'Vendor management · Email + Password', color: 'bg-white/15' },
-            { icon: Store, label: 'Vendor', desc: 'Order radar · Phone + Date of Birth', color: 'bg-white/10' },
-          ].map(r => (
-            <div key={r.label} className={`flex items-start gap-3 p-3.5 rounded-2xl ${r.color} backdrop-blur-sm border border-white/20`}>
-              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0 mt-0.5">
-                <r.icon size={15} className="text-white" />
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm">{r.label}</p>
-                <p className="text-white/60 text-[11px] mt-0.5">{r.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Footer note */}
-        <p className="relative z-10 text-white/40 text-xs">
-          © 2026 Vikram Advertising · All rights reserved
-        </p>
-      </div>
-
-      {/* ── Right form panel ──────────────────────── */}
-      <div className="flex-1 flex flex-col justify-center items-center px-6 py-12 bg-[#F8F8FF] relative">
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F8FF] px-6 py-12" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
         {/* Back button */}
         <button
@@ -208,12 +153,6 @@ export function Login({
                   Team Sign-In
                 </h2>
                 <p className="text-gray-500 text-sm mt-1">Access your workspace below</p>
-              </div>
-
-              {/* Credential hint pills */}
-              <div className="flex flex-wrap gap-2">
-                <RoleBadge icon={Shield} label="Admin — Email" color="bg-orange-50 border-orange-200 text-orange-700" />
-                <RoleBadge icon={Store} label="Vendor — Phone + DOB" color="bg-green-50 border-green-200 text-green-700" />
               </div>
 
               <div className="space-y-4">
@@ -388,7 +327,6 @@ export function Login({
           )}
 
         </div>
-      </div>
     </div>
   );
 }
