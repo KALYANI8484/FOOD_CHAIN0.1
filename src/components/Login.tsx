@@ -75,63 +75,115 @@ export function Login({ onLogin, onBack, initialRole }: LoginProps) {
     </div>
   );
 }
+import React, { useState } from 'react';
+import { Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, UserPlus, ChevronLeft, User } from 'lucide-react';
+import { Button } from './ui/Button';
+import { Spinner } from './ui/Spinner';
 
-function RoleSelector({ onSelect }: { onSelect: (r: Role) => void }) {
-  return (
-    <div className="animate-scale-in">
-      <p className="text-center text-sm text-muted mb-6 uppercase tracking-wider font-semibold">Choose your role to continue</p>
-      <div className="grid sm:grid-cols-2 gap-4">
-        {roles.map((r, i) => (
-          <button
-            key={r.id}
-            onClick={() => onSelect(r.id)}
-            className={`group relative card p-6 text-left bg-gradient-to-br ${r.gradient} border hover-lift transition-all duration-300 animate-fade-in-up`}
-            style={{ animationDelay: `${i * 0.08}s` }}
-          >
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-2xl bg-surface-2 flex items-center justify-center ${r.color} group-hover:scale-110 transition-transform duration-300`}>
-                <r.icon size={26} />
-              </div>
-              <div className="flex-1">
-                <p className="text-xl font-bold">{r.label}</p>
-                <p className="text-sm text-muted mt-0.5">{r.desc}</p>
-              </div>
-              <ArrowRight size={18} className={`${r.color} opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300`} />
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+type AuthMode = 'login' | 'signup' | 'reset';
 
-function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Role, cred?: string) => void; onBack: () => void }) {
-  const meta = roles.find((r) => r.id === role)!;
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState('');
+export function Login({ onLogin, onBack }: { onLogin: (r: 'super_admin' | 'sub_admin' | 'vendor', cred?: string) => void; onBack: () => void }) {
+  const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const [resetMode, setResetMode] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetSuccess, setResetSuccess] = useState('');
+  // Login States
+  const [username, setUsername] = useState(''); // Email or Phone
+  const [password, setPassword] = useState(''); // Password or DOB
+  const [showPw, setShowPw] = useState(false);
+
+  // Sign-up States
+  const [signupForm, setSignupForm] = useState({
+    name: '',
+    phone: '',
+    dob: '',
+    address: '',
+    pincode: ''
+  });
+
+  const handleLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password: password.trim() })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.error || 'Invalid credentials');
+      } else {
+        onLogin(data.role, username.trim());
+      }
+    } catch (err: any) {
+      setError('Network error, please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = async () => {
+    setError('');
+    setSuccess('');
+    
+    if (!signupForm.name || !signupForm.phone || !signupForm.dob || !signupForm.address || !signupForm.pincode) {
+      setError('All fields are required');
+      return;
+    }
+    
+    if (!/^\d{8}$/.test(signupForm.dob)) {
+      setError('Date of Birth must be strictly DDMMYYYY (e.g., 19072004) with no slashes or dashes.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/vendors/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          owner_name: signupForm.name, 
+          phone: signupForm.phone, 
+          birthdate: signupForm.dob, 
+          address: signupForm.address, 
+          zip_code: signupForm.pincode 
+        })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.error || 'Failed to sign up');
+      } else {
+        setSuccess('Account created successfully! It is pending admin approval.');
+        setTimeout(() => setMode('login'), 3000);
+      }
+    } catch (err: any) {
+      setError('Network error, please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleResetPassword = async () => {
     setError('');
-    setResetSuccess('');
+    setSuccess('');
     setLoading(true);
     try {
       const res = await fetch('/api/super-admin/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail })
+        body: JSON.stringify({ email: username })
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Failed to reset password');
       } else {
-        setResetSuccess(data.message || 'Password reset successful!');
+        setSuccess(data.message || 'Password reset successful!');
       }
     } catch (err: any) {
       setError(err.message || 'Network error');
@@ -140,136 +192,48 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
     }
   };
 
-  const handleLogin = async () => {
-    setError('');
-    setLoading(true);
-
-    try {
-      if (role === 'super_admin') {
-        const { data, error: dbError } = await supabase
-          .from('super_admins')
-          .select('*')
-          .eq('email', email.trim().toLowerCase())
-          .maybeSingle();
-
-        if (dbError || !data || data.password !== password) {
-          setError('Invalid email or password');
-          return;
-        }
-        onLogin('super_admin', email.trim());
-
-      } else if (role === 'sub_admin') {
-        if (email.trim().toLowerCase() !== SUB_ADMIN_EMAIL || password !== SUB_ADMIN_PASSWORD) {
-          setError('Invalid email or password');
-          return;
-        }
-        onLogin('sub_admin', email.trim());
-
-      } else if (role === 'vendor') {
-        if (email.trim().toLowerCase() !== VENDOR_EMAIL || password !== VENDOR_PASSWORD) {
-          setError('Invalid email or password');
-          return;
-        }
-        onLogin('vendor', email.trim());
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (resetMode) {
-    return (
-      <div className="max-w-md mx-auto animate-scale-in">
-        <button onClick={() => setResetMode(false)} className="flex items-center gap-1.5 text-muted hover:text-text transition-colors text-sm mb-6 group">
-          <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Login
+  return (
+    <div className="min-h-screen bg-bg text-text p-6 flex flex-col pt-12 items-center">
+      <div className="w-full max-w-md animate-scale-in">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-muted hover:text-text transition-colors text-sm mb-8 group font-semibold">
+          <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Home
         </button>
 
-        <div className={`card p-8 bg-gradient-to-br ${meta.gradient} border`}>
-          <div className="flex items-center gap-3 mb-6">
-            <div className={`w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center ${meta.color}`}>
-              <meta.icon size={22} />
-            </div>
-            <div>
-              <p className="font-bold text-lg">Reset Password</p>
-              <p className="text-xs text-muted">A temporary password will be sent to your email.</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider">Email</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                <input
-                  type="email"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="your-email@gmail.com"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all font-semibold"
-                />
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                {error}
-              </p>
-            )}
-
-            {resetSuccess && (
-              <p className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
-                {resetSuccess}
-              </p>
-            )}
-
-            <Button className="w-full" size="lg" onClick={handleResetPassword} disabled={loading || !resetEmail}>
-              {loading ? <Spinner /> : <>Send Reset Password <Mail size={16} className="ml-1.5" /></>}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-md mx-auto animate-scale-in">
-      <button onClick={onBack} className="flex items-center gap-1.5 text-muted hover:text-text transition-colors text-sm mb-6 group">
-        <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> All roles
-      </button>
-
-      <div className={`card p-8 bg-gradient-to-br ${meta.gradient} border`}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className={`w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center ${meta.color}`}>
-            <meta.icon size={22} />
-          </div>
-          <div>
-            <p className="font-bold text-lg">{meta.label}</p>
-            <p className="text-xs text-muted">{meta.desc}</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Email
-            </label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    placeholder={role === 'super_admin' ? 'your-email@gmail.com' : 'your@email.com'}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
-                    autoComplete="username"
-                  />
+        <div className="card p-8 bg-surface-2 border border-border shadow-xl">
+          {mode === 'login' && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <h1 className="font-bold text-xl tracking-tight">Team Sign-In</h1>
+                  <p className="text-sm text-muted">Access your workspace</p>
                 </div>
               </div>
 
-              {(
+              <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted uppercase tracking-wider">Password</label>
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider">
+                    Email / Phone Number
+                  </label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                      placeholder="Email or Phone Number"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-bg border border-border focus:border-accent outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider">
+                    Password / DOB (DDMMYYYY)
+                  </label>
                   <div className="relative">
                     <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                     <input
@@ -277,9 +241,8 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-12 py-3 rounded-xl bg-surface-2 border border-border focus:border-accent outline-none transition-all"
-                      autoComplete="current-password"
+                      placeholder="Password or DDMMYYYY"
+                      className="w-full pl-10 pr-12 py-3 rounded-xl bg-bg border border-border focus:border-accent outline-none transition-all"
                     />
                     <button
                       onClick={() => setShowPw(!showPw)}
@@ -288,29 +251,128 @@ function CredentialForm({ role, onLogin, onBack }: { role: Role; onLogin: (r: Ro
                       {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
-                  {role === 'super_admin' && (
-                    <div className="text-right pt-1">
-                      <button
-                        type="button"
-                        onClick={() => { setResetMode(true); setError(''); setResetSuccess(''); }}
-                        className="text-xs text-accent hover:underline font-semibold"
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex justify-between items-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => { setMode('signup'); setError(''); setSuccess(''); }}
+                      className="text-xs text-accent hover:underline font-semibold flex items-center gap-1"
+                    >
+                      <UserPlus size={14}/> Apply as Vendor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setMode('reset'); setError(''); setSuccess(''); }}
+                      className="text-xs text-muted hover:text-text hover:underline font-semibold"
+                    >
+                      Forgot Admin Password?
+                    </button>
+                  </div>
                 </div>
-              )}
 
-          {error && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
+                {error && (
+                  <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 font-medium">
+                    {error}
+                  </p>
+                )}
+
+                <Button className="w-full h-12" onClick={handleLogin} disabled={loading || !username || !password}>
+                  {loading ? <Spinner /> : <>Sign In <ArrowRight size={16} className="ml-1.5" /></>}
+                </Button>
+              </div>
+            </div>
           )}
 
-          <Button className="w-full" size="lg" onClick={handleLogin} disabled={loading}>
-            {loading ? <Spinner /> : <>Sign In <ArrowRight size={16} /></>}
-          </Button>
+          {mode === 'signup' && (
+            <div className="space-y-5">
+              <div className="mb-4">
+                <h1 className="font-bold text-xl tracking-tight text-accent flex items-center gap-2">
+                  <UserPlus size={22} /> Vendor Registration
+                </h1>
+                <p className="text-sm text-muted">Join the platform to manage your store.</p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Full Name</label>
+                  <input type="text" value={signupForm.name} onChange={e => setSignupForm({...signupForm, name: e.target.value})} className="w-full px-4 py-2.5 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="Owner Name" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Phone Number (Username)</label>
+                  <input type="text" value={signupForm.phone} onChange={e => setSignupForm({...signupForm, phone: e.target.value})} className="w-full px-4 py-2.5 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="+91 99999..." />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Date of Birth (Password)</label>
+                  <input type="text" value={signupForm.dob} onChange={e => setSignupForm({...signupForm, dob: e.target.value})} className="w-full px-4 py-2.5 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors tracking-[0.2em]" placeholder="DDMMYYYY" maxLength={8} />
+                  <p className="text-[10px] text-muted mt-1 ml-1">Strictly 8 digits, no slashes (e.g. 19072004 for July 19, 2004)</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Address</label>
+                    <input type="text" value={signupForm.address} onChange={e => setSignupForm({...signupForm, address: e.target.value})} className="w-full px-4 py-2.5 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="Shop Address" />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Pin Code</label>
+                    <input type="text" value={signupForm.pincode} onChange={e => setSignupForm({...signupForm, pincode: e.target.value})} className="w-full px-4 py-2.5 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="110001" />
+                  </div>
+                </div>
+              </div>
+
+              {error && <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg font-medium">{error}</p>}
+              {success && <p className="text-sm text-green-500 bg-green-500/10 px-3 py-2 rounded-lg font-medium">{success}</p>}
+
+              <div className="pt-2 flex flex-col gap-2">
+                <Button className="w-full" onClick={handleSignup} disabled={loading}>
+                  {loading ? <Spinner /> : 'Submit Application'}
+                </Button>
+                <button onClick={() => { setMode('login'); setError(''); setSuccess(''); }} className="text-xs text-muted hover:text-text font-semibold p-2">
+                  Already have an account? Sign In
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mode === 'reset' && (
+            <div className="space-y-6">
+               <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center">
+                  <Mail size={22} className="text-accent" />
+                </div>
+                <div>
+                  <p className="font-bold text-lg">Reset Password</p>
+                  <p className="text-xs text-muted">A temporary password will be sent to your email.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider">Super Admin Email</label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                    <input
+                      type="email"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="your-email@gmail.com"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-bg border border-border focus:border-accent outline-none transition-all font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {error && <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg font-medium">{error}</p>}
+                {success && <p className="text-sm text-green-500 bg-green-500/10 px-3 py-2 rounded-lg font-medium">{success}</p>}
+
+                <Button className="w-full" onClick={handleResetPassword} disabled={loading || !username}>
+                  {loading ? <Spinner /> : <>Send Reset Link <ArrowRight size={16} className="ml-1.5" /></>}
+                </Button>
+
+                <div className="text-center pt-2">
+                  <button onClick={() => { setMode('login'); setError(''); setSuccess(''); }} className="text-xs text-muted hover:text-text font-semibold">
+                    Back to Sign In
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

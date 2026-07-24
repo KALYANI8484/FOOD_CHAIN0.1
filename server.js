@@ -320,6 +320,75 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Missing credentials' });
+  }
+  
+  try {
+    if (username.includes('@')) {
+      // Check SuperAdmin first
+      const superAdmin = await SuperAdmin.findOne({ email: username.toLowerCase(), password });
+      if (superAdmin) return res.json({ success: true, role: 'super_admin', data: superAdmin });
+
+      // Then check SubAdmin
+      const subAdmin = await SubAdmin.findOne({ email: username.toLowerCase(), password });
+      if (subAdmin) return res.json({ success: true, role: 'sub_admin', data: subAdmin });
+    } else {
+      // Check Vendor (username is phone, password is DOB)
+      const vendor = await Vendor.findOne({ phone: username, password });
+      if (vendor) {
+        if (vendor.status === 'pending_approval' || vendor.status === 'rejected') {
+          return res.status(403).json({ error: `Account status: ${vendor.status}` });
+        }
+        return res.json({ success: true, role: 'vendor', data: vendor });
+      }
+    }
+    
+    return res.status(401).json({ error: 'Invalid credentials' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/vendors/signup', async (req, res) => {
+  try {
+    const { owner_name, phone, birthdate, address, zip_code } = req.body;
+    
+    // Check if vendor with phone already exists
+    const existing = await Vendor.findOne({ phone });
+    if (existing) {
+      return res.status(400).json({ error: 'A vendor with this phone number already exists.' });
+    }
+    
+    // Password is strictly DOB in DDMMYYYY format as requested
+    const password = birthdate;
+    
+    const newVendor = new Vendor({
+      owner_name,
+      shop_name: `${owner_name}'s Shop`,
+      phone,
+      birthdate,
+      password,
+      address,
+      zip_code,
+      status: 'pending_approval'
+    });
+    
+    await newVendor.save();
+    
+    await Activity.create({
+      action: `New vendor ${owner_name} signed up`,
+      actor: phone
+    });
+    
+    res.json({ data: newVendor, error: null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Generic Database Handler matching Supabase JS queries
 app.post('/api/db', async (req, res) => {
   const { table, action, data, filters, sorts, limit, single } = req.body;
