@@ -1,49 +1,59 @@
 import { useEffect, useState } from 'react';
 import {
-  LayoutDashboard, Store, Package, CreditCard, FileText, Settings, Users,
-  ShoppingBag, DollarSign, CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp
+  Store, Package, CreditCard, FileText, Users,
+  CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
+  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
 import { VendorForm } from './VendorForm';
 
-type Tab = 'dashboard' | 'vendors' | 'approvals' | 'plans' | 'inventory' | 'orders' | 'guides' | 'sub_admins' | 'settings';
+type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins';
 
 export function SuperAdmin({ onExit }: { onExit: () => void }) {
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>('approvals');
   const { toast, show } = useToast();
 
-  const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'vendors', label: 'Vendor Database', icon: Store },
+  const navItems: { id: Tab; label: string; icon: any }[] = [
     { id: 'approvals', label: 'Team Approvals', icon: CheckCircle2 },
+    { id: 'vendors', label: 'Vendor Database', icon: Store },
     { id: 'plans', label: 'Pricing Plans', icon: CreditCard },
     { id: 'inventory', label: 'Master Inventory', icon: Package },
-    { id: 'orders', label: 'Order Watchlist', icon: ShoppingBag },
     { id: 'guides', label: 'Guide Documents', icon: FileText },
     { id: 'sub_admins', label: 'Sub-Admins', icon: Users },
-    { id: 'settings', label: 'Brand & Security', icon: Settings },
   ];
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-bg flex text-text">
+    <div className="min-h-screen bg-bg flex text-text relative">
+      {/* Mobile Header Toggle */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-surface border-b border-border z-30 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <Store size={18} className="text-accent" />
+          <p className="font-bold text-sm truncate text-text">VIKRAM ADVERTISING</p>
+        </div>
+        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text">
+           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-surface flex flex-col h-screen sticky top-0 z-20">
-        <div className="px-5 py-5 border-b border-border flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
+      <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center group-hover:rotate-12 transition-transform">
-            <ShoppingBag size={18} className="text-white" />
+            <Store size={18} className="text-white" />
           </div>
-          <div>
-            <p className="font-bold text-sm">VIKRAM ADVERTISING</p>
+          <div className="min-w-0">
+            <p className="font-bold text-sm truncate">VIKRAM ADVERTISING</p>
             <p className="text-xs text-muted">Super Admin Portal</p>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-14 lg:mt-0">
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
                 tab === item.id
                   ? 'bg-accent/10 text-accent font-semibold'
@@ -64,17 +74,14 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto h-screen bg-bg relative z-10">
+      <main className="flex-1 overflow-y-auto h-screen bg-bg relative z-10 pt-14 lg:pt-0">
         <div className="p-8 max-w-7xl mx-auto">
-          {tab === 'dashboard' && <DashboardTab show={show} />}
           {tab === 'vendors' && <VendorsTab show={show} />}
           {tab === 'approvals' && <ApprovalsTab show={show} />}
           {tab === 'plans' && <PlansTab show={show} />}
           {tab === 'inventory' && <InventoryTab show={show} />}
-          {tab === 'orders' && <OrdersTab show={show} />}
           {tab === 'guides' && <GuidesTab show={show} />}
           {tab === 'sub_admins' && <SubAdminsTab show={show} />}
-          {tab === 'settings' && <SettingsTab show={show} />}
         </div>
       </main>
 
@@ -877,10 +884,16 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       subscription_end: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     }).eq('id', v.id);
 
-    await supabase.from('activity_log').insert({
-      action: `Onboarded vendor approved: ${v.shop_name}`,
-      actor: 'Super Admin'
-    });
+    await supabase.from('activity_log').insert([
+      {
+        action: `Onboarded vendor approved: ${v.shop_name}`,
+        actor: 'Super Admin'
+      },
+      {
+        action: `Invoice generated for: ${v.shop_name}`,
+        actor: 'System'
+      }
+    ]);
 
     show(`Vendor ${v.shop_name} approved and activated!`);
     setSelectedVendor(null);

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import {
   LayoutDashboard, Package, ShoppingBag, CreditCard, Radar, Trash2,
   DollarSign, Clock, CheckCircle2, AlertCircle, Store, Lock as Padlock,
-  Navigation, AlertTriangle, Upload
+  Navigation, AlertTriangle, Upload, Menu, X
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
@@ -144,11 +144,24 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     );
   }
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-bg flex text-text">
+    <div className="min-h-screen bg-bg flex text-text relative">
+      {/* Mobile Header Toggle */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-surface border-b border-border z-30 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <Store size={18} className="text-accent" />
+          <p className="font-bold text-sm truncate text-text">{vendor.shop_name}</p>
+        </div>
+        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text">
+           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-surface flex flex-col h-screen sticky top-0 z-20">
-        <div className="px-5 py-5 border-b border-border flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
+      <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center group-hover:rotate-12 transition-transform">
             <Store size={18} className="text-white" />
           </div>
@@ -157,11 +170,11 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
             <p className="text-xs text-muted">Vendor Dashboard</p>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-14 lg:mt-0">
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
                 tab === item.id ? 'bg-accent/10 text-accent font-semibold' : 'text-muted hover:text-text hover:bg-surface-2'
               }`}
@@ -180,7 +193,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto h-screen relative z-10 bg-bg">
+      <main className="flex-1 overflow-y-auto h-screen relative z-10 bg-bg pt-14 lg:pt-0">
         <div className="p-8 max-w-7xl mx-auto">
           {tab === 'dashboard' && <VendorDashboard vendor={vendor} />}
           {tab === 'radar' && <OrderRadar vendor={vendor} radarOrders={radarOrders} onTab={setTab} show={show} />}
@@ -298,6 +311,25 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
                 Your customer limit was reached. Please upgrade to accept orders.
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Support & Suggestions */}
+      <div className="card p-6 bg-surface border border-border">
+        <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted flex items-center gap-2">
+          <AlertCircle size={16} /> Q&A / Platform Suggestions
+        </h3>
+        <div className="space-y-4">
+          <p className="text-sm text-muted">Have a question or a feature request? Submit it directly to the Super Admin team.</p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <input 
+              className="flex-1 px-4 py-2.5 rounded-xl bg-surface-2 border border-border outline-none focus:border-accent text-sm"
+              placeholder="Type your suggestion or question here..."
+            />
+            <Button onClick={() => alert('Suggestion submitted successfully. The Super Admin will review it shortly.')}>
+              Submit to Admin
+            </Button>
           </div>
         </div>
       </div>

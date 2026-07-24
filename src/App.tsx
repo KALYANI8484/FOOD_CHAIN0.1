@@ -4,9 +4,8 @@ import { Landing } from './components/Landing';
 import { SuperAdmin } from './components/SuperAdmin';
 import { SubAdmin } from './components/SubAdmin';
 import { Vendor } from './components/Vendor';
-import { Client } from './components/Client';
 
-type Screen = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
+type Screen = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor';
 
 function App() {
   const [screen, setScreen] = useState<Screen>('landing');
@@ -19,15 +18,10 @@ function App() {
   }, [screen]);
 
   const handleLoginSuccess = (
-    role: 'super_admin' | 'sub_admin' | 'vendor' | 'client',
-    cred?: string,
-    name?: string
+    role: 'super_admin' | 'sub_admin' | 'vendor',
+    cred?: string
   ) => {
-    if (role === 'client') {
-      if (name) setClientName(name);
-      if (cred) setClientPhone(cred);
-    }
-    if (role !== 'client' && cred) {
+    if (cred) {
       setSessionCred(cred);
     }
     setScreen(role);
@@ -46,13 +40,6 @@ function App() {
       {screen === 'super_admin' && <SuperAdmin onExit={() => setScreen('landing')} />}
       {screen === 'sub_admin' && <SubAdmin onExit={() => setScreen('landing')} adminEmail={sessionCred} />}
       {screen === 'vendor' && <Vendor onExit={() => setScreen('landing')} vendorPhone={sessionCred} />}
-      {screen === 'client' && (
-        <Client 
-          onExit={() => setScreen('landing')} 
-          initialName={clientName} 
-          initialPhone={clientPhone} 
-        />
-      )}
     </>
   );
 }

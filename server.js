@@ -468,6 +468,7 @@ app.post('/api/db', async (req, res) => {
         // Socket broadcast for new orders
         if (table === 'orders') {
           io.emit('newOrder', responseData);
+          console.log(`[SMS Notification Mock] Sent to vendors in ZIP ${data.client_zip}: "New Order Generated! OTP: ${data.otp} for ${data.item_name} near ${data.client_landmark || data.client_zip}"`);
           
           // Set 10 minutes timeout timer
           const timer = setTimeout(async () => {

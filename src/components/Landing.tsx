@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import {
   UtensilsCrossed, Zap, ArrowRight,
-  Clock, TrendingUp, Store, Lock
+  Clock, TrendingUp, Store, Lock, X
 } from 'lucide-react';
-import { Button, Badge } from './ui';
+import { Button, Badge, Spinner } from './ui';
 
 type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
+
+interface MasterItem {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  image_url: string;
+}
 
 export function Landing({ 
   onNavigate, 
@@ -14,10 +22,17 @@ export function Landing({
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  // Registration modal removed to streamline flow
-
   const [scrollY, setScrollY] = useState(0);
+
+  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+
+  const [checkoutItem, setCheckoutItem] = useState<MasterItem | null>(null);
+  const [checkoutForm, setCheckoutForm] = useState({
+    name: '', phone: '', zip: '', landmark: '', address: '', quantity: 1
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState('');
 
   useEffect(() => {
     const onScroll = () => { setScrolled(window.scrollY > 20); setScrollY(window.scrollY); };
@@ -30,13 +45,81 @@ export function Landing({
     };
   }, []);
 
-  const categories = [
-    { name: 'Tiffin', img: 'https://i.pinimg.com/736x/13/ac/3c/13ac3ce7b1db637177b34659d74fef73.jpg', price: '₹99' },
-    { name: 'Breakfast', img: 'https://i.pinimg.com/736x/db/73/5d/db735dfb9eca73033b7c127e46436ee3.jpg', price: '₹59' },
-    { name: 'Lunch/Dinner', img: 'https://i.pinimg.com/control1/1200x/f0/ce/0b/f0ce0bf92ce7748dda4ec368a4c5d51e.jpg', price: '₹149' },
-    { name: 'Vegetables', img: 'https://i.pinimg.com/736x/6a/04/e5/6a04e5d7d3b1bfd0c4d9ca06b2c041f0.jpg', price: '₹39' },
-    { name: 'Thali', img: 'https://i.pinimg.com/736x/5f/56/b3/5f56b35ba78d9678a79db6fa234ed8c0.jpg', price: '₹179' },
-  ];
+  useEffect(() => {
+    const fetchMaster = async () => {
+      try {
+        const res = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'master_inventory', action: 'select' })
+        });
+        const d = await res.json();
+        if (d.data) {
+          setMasterItems(d.data);
+        }
+      } catch (err) {
+        console.error('Failed to load master inventory', err);
+      } finally {
+        setLoadingItems(false);
+      }
+    };
+    fetchMaster();
+  }, []);
+
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!checkoutItem) return;
+    setSubmitting(true);
+    setOrderSuccess('');
+
+    try {
+      // Auto compute mock distance and OTP
+      const distance = parseFloat((Math.random() * 5 + 1).toFixed(1));
+      const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+      const orderData = {
+        client_name: checkoutForm.name,
+        client_phone: checkoutForm.phone,
+        client_zip: checkoutForm.zip,
+        client_landmark: checkoutForm.landmark,
+        client_address: checkoutForm.address,
+        item_name: checkoutItem.name,
+        item_id: checkoutItem.id,
+        price: checkoutItem.price,
+        quantity: checkoutForm.quantity,
+        status: 'pending',
+        otp,
+        distance_km: distance
+      };
+
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'orders', action: 'insert', data: orderData })
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      
+      setOrderSuccess(`Order placed successfully! Your OTP for delivery is ${otp}. Share this with the vendor upon delivery.`);
+      setTimeout(() => {
+        setCheckoutItem(null);
+        setOrderSuccess('');
+        setCheckoutForm({ name: '', phone: '', zip: '', landmark: '', address: '', quantity: 1 });
+      }, 10000);
+    } catch (err) {
+      alert('Failed to place order. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const scrollToCategories = () => {
+    document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const scrollToVendorPartners = () => {
+    document.getElementById('vendor-partners')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const benefits = [
     { icon: Zap, title: 'Manage Inventory', desc: 'Add, update or remove dishes instantly matching master templates.' },
@@ -50,14 +133,70 @@ export function Landing({
     { name: 'Premium', price: '₹1,499', validity: '90 Days', items: '30 Items', clients: '100 Clients', desc: 'Maximum reach and support' },
   ];
 
-  // Removed redundant handleRegisterSubmit
-
-  const scrollToVendorPartners = () => {
-    document.getElementById('vendor-partners')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
     <div className="min-h-screen landing-shell noise relative overflow-hidden text-text">
+      {/* Checkout Modal */}
+      {checkoutItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface-2 border border-border shadow-2xl rounded-2xl w-full max-w-md overflow-hidden relative animate-scale-in">
+            <button onClick={() => setCheckoutItem(null)} className="absolute top-4 right-4 text-muted hover:text-text z-10">
+              <X size={20} />
+            </button>
+            <div className="h-32 w-full relative">
+              <img src={checkoutItem.image_url || 'https://via.placeholder.com/400'} alt={checkoutItem.name} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-surface-2 to-transparent" />
+            </div>
+            <div className="p-6 pt-0 -mt-8 relative z-10">
+              <h3 className="text-2xl font-bold">{checkoutItem.name}</h3>
+              <p className="text-accent font-semibold mb-4">₹{checkoutItem.price} / plate</p>
+              
+              {orderSuccess ? (
+                <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-xl text-center">
+                  <p className="font-bold mb-2 text-lg">Success!</p>
+                  <p className="text-sm">{orderSuccess}</p>
+                </div>
+              ) : (
+                <form onSubmit={handleCheckoutSubmit} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Full Name</label>
+                      <input required type="text" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} className="w-full px-4 py-2 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="John Doe" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Phone Number</label>
+                      <input required type="tel" value={checkoutForm.phone} onChange={e => setCheckoutForm({...checkoutForm, phone: e.target.value})} className="w-full px-4 py-2 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="+91..." />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">ZIP / PIN Code</label>
+                      <input required type="text" value={checkoutForm.zip} onChange={e => setCheckoutForm({...checkoutForm, zip: e.target.value})} className="w-full px-4 py-2 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="110001" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Landmark</label>
+                      <input required type="text" value={checkoutForm.landmark} onChange={e => setCheckoutForm({...checkoutForm, landmark: e.target.value})} className="w-full px-4 py-2 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" placeholder="Near Metro" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Full Address</label>
+                    <textarea required value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full px-4 py-2 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors resize-none" rows={2} placeholder="Flat no, Building, Street..." />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted uppercase tracking-wider ml-1">Quantity</label>
+                    <input required type="number" min="1" max="20" value={checkoutForm.quantity} onChange={e => setCheckoutForm({...checkoutForm, quantity: parseInt(e.target.value) || 1})} className="w-full px-4 py-2 mt-1 rounded-lg bg-bg border border-border outline-none focus:border-accent transition-colors" />
+                  </div>
+                  <div className="pt-3">
+                    <Button type="submit" className="w-full" disabled={submitting}>
+                      {submitting ? <Spinner /> : `Place Order (₹${checkoutItem.price * checkoutForm.quantity})`}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Ambient glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div
@@ -92,7 +231,7 @@ export function Landing({
               Vendor Plans
             </button>
             <Button size="sm" onClick={() => onNavigate('login')}>
-              Login
+              Team Sign-In
             </Button>
           </div>
         </div>
@@ -121,7 +260,7 @@ export function Landing({
                 Experience kitchen-fresh catering from verified neighborhood chefs. Fast delivery, dynamic menu planning, and premium quality ingredients.
               </p>
               <div className="flex flex-row items-center justify-center gap-4 mt-10">
-                <Button size="lg" className="magnetic-hover" onClick={() => onNavigate('login')}>
+                <Button size="lg" className="magnetic-hover" onClick={scrollToCategories}>
                   Explore Master Menu
                 </Button>
                 <Button size="lg" variant="outline" className="magnetic-hover" onClick={scrollToVendorPartners}>
@@ -136,31 +275,37 @@ export function Landing({
       {/* Client Experience categories section */}
       <section id="categories" className="py-24 px-6 relative z-10">
         <div className="max-w-7xl mx-auto section-panel rounded-[40px] border border-white/40 p-8">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 stagger">
-            {categories.map((c) => (
-              <div
-                key={c.name}
-                onClick={() => onNavigate('login')}
-                className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border/50 frosted-glow"
-              >
-                <img
-                  src={c.img}
-                  alt={c.name}
-                  onClick={() => onNavigate('login')}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#111118]/75 via-[#111118]/25 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-5">
-                  <p className="font-bold text-white text-lg">{c.name}</p>
+          <h2 className="text-3xl font-extrabold mb-8 text-center text-text">Our Master Inventory</h2>
+          {loadingItems ? (
+            <div className="flex justify-center items-center py-20"><Spinner /></div>
+          ) : masterItems.length === 0 ? (
+            <div className="text-center py-10 text-muted">No items available in the Master Inventory yet.</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 stagger">
+              {masterItems.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => setCheckoutItem(c)}
+                  className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer hover-lift border border-border/50 frosted-glow"
+                >
+                  <img
+                    src={c.image_url || 'https://via.placeholder.com/400'}
+                    alt={c.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#111118]/75 via-[#111118]/25 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <p className="font-bold text-white text-lg">{c.name}</p>
+                    <p className="text-accent text-sm font-semibold">₹{c.price}</p>
+                  </div>
+                  <div className="absolute inset-0 bg-accent/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
+                    <p className="text-white text-xl font-extrabold mt-1">₹{c.price}</p>
+                    <span className="text-white/90 text-sm mt-3 flex items-center justify-center gap-1">Order now <ArrowRight size={14} /></span>
+                  </div>
                 </div>
-                <div className="absolute inset-0 bg-accent/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
-                  <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Starting Base Price</span>
-                  <p className="text-white text-3xl font-extrabold mt-1">{c.price}</p>
-                  <span className="text-white/90 text-xs mt-3 flex items-center gap-1">Order now <ArrowRight size={10} /></span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
