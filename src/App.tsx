@@ -10,7 +10,6 @@ type Screen = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'cl
 
 function App() {
   const [screen, setScreen] = useState<Screen>('landing');
-  const [clientZip, setClientZip] = useState('');
   const [sessionCred, setSessionCred] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -19,20 +18,19 @@ function App() {
     window.scrollTo(0, 0);
   }, [screen]);
 
-  const handleLoginSuccess = (role: 'super_admin' | 'sub_admin' | 'vendor' | 'client', cred?: string) => {
-    if (role === 'client' && cred) {
-      setClientZip(cred);
+  const handleLoginSuccess = (
+    role: 'super_admin' | 'sub_admin' | 'vendor' | 'client',
+    cred?: string,
+    name?: string
+  ) => {
+    if (role === 'client') {
+      if (name) setClientName(name);
+      if (cred) setClientPhone(cred);
     }
-    if (cred) {
+    if (role !== 'client' && cred) {
       setSessionCred(cred);
     }
     setScreen(role);
-  };
-
-  const handleClientLogin = (name: string, phone: string) => {
-    setClientName(name);
-    setClientPhone(phone);
-    setScreen('client');
   };
 
   return (
@@ -40,7 +38,6 @@ function App() {
       {screen === 'landing' && (
         <Landing
           onNavigate={(role) => setScreen(role)}
-          onClientLogin={handleClientLogin}
         />
       )}
       {screen === 'login' && (

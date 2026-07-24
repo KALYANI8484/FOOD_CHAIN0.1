@@ -110,6 +110,15 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     };
   }, [vendor]);
 
+  const getVendorItemLimit = (vendor: VendorType | null) => {
+    if (!vendor) return 5;
+    if (vendor.plan_name === 'Premium') return Infinity;
+    if (vendor.plan_name === 'Standard') return 25;
+    if (vendor.plan_name === 'Basic') return 10;
+    return 5;
+  };
+  const formatLimitLabel = (limit: number) => (limit === Infinity ? 'Unlimited' : String(limit));
+
   const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'radar', label: 'Order Radar', icon: Radar },
@@ -705,15 +714,10 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
 
   const addNewItem = async () => {
     const master = masterItems.find(x => x.id === selectedMasterId);
-    if (!master) return;
+    if (!master || !vendor) return;
 
-    // Check Plan item capacity
-    // Default cap: 5 items
-    let maxLimit = 5;
-    if (vendor.plan_name === 'Starter') maxLimit = 10;
-    else if (vendor.plan_name === 'Premium') maxLimit = 30;
-
-    if (items.length >= maxLimit) {
+    const maxLimit = getVendorItemLimit(vendor);
+    if (maxLimit !== Infinity && items.length >= maxLimit) {
       alert(`Plan limit reached! Max items permitted: ${maxLimit}`);
       return;
     }
@@ -743,7 +747,7 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
           <h1 className="text-3xl font-extrabold tracking-tight">Kitchen Inventory</h1>
           <p className="text-muted mt-1">Configure stock limits and active prices for client browsing</p>
         </div>
-        <Badge variant="accent">Mapped Limit: {items.length} / {vendor.plan_name === 'Starter' ? '10' : vendor.plan_name === 'Premium' ? '30' : '5'} Items</Badge>
+        <Badge variant="accent">Mapped Limit: {items.length} / {formatLimitLabel(getVendorItemLimit(vendor))} Items</Badge>
       </div>
 
       {/* Mapping form panel */}
@@ -759,13 +763,20 @@ function Inventory({ vendor, show }: { vendor: VendorType; show: (m: string, t?:
           <Input label="Custom Active Price (₹)" type="number" value={String(customPrice)} onChange={(v) => setCustomPrice(Number(v))} />
           <Input label="Initial Quantity" type="number" value={String(customQty)} onChange={(v) => setCustomQty(Number(v))} />
         </div>
-        <div className="flex justify-end pt-2">
-          <Button 
-            onClick={addNewItem} 
-            disabled={adding || items.length >= (vendor.plan_name === 'Starter' ? 10 : vendor.plan_name === 'Premium' ? 30 : 5)}
-          >
-            Map to Menu
-          </Button>
+        <div className="flex flex-col gap-2 pt-2">
+          <div className="flex justify-end">
+            <Button 
+              onClick={addNewItem} 
+              disabled={adding || (getVendorItemLimit(vendor) !== Infinity && items.length >= getVendorItemLimit(vendor))}
+            >
+              Map to Menu
+            </Button>
+          </div>
+          {vendor && getVendorItemLimit(vendor) !== Infinity && items.length >= getVendorItemLimit(vendor) && (
+            <p className="text-sm text-red-600">
+              You have reached your plan limit. Upgrade your subscription to add more items.
+            </p>
+          )}
         </div>
       </div>
 

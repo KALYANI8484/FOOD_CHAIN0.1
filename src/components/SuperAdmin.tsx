@@ -337,6 +337,22 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
   const [deleteInputName, setDeleteInputName] = useState('');
 
+  const getVendorPlan = (vendor: Vendor | null) => vendor ? plans.find((p) => p.id === vendor.plan_id) : undefined;
+  const getVendorItemLimit = (vendor: Vendor | null) => {
+    const plan = getVendorPlan(vendor);
+    if (!plan) return 5;
+    if (plan.max_items <= 0 || plan.name?.toLowerCase().includes('premium')) return Infinity;
+    return plan.max_items;
+  };
+  const getVendorLimitLabel = (vendor: Vendor | null) => {
+    const limit = getVendorItemLimit(vendor);
+    return limit === Infinity ? 'Unlimited' : String(limit);
+  };
+  const getVendorRemainingLabel = (vendor: Vendor | null, activeCount: number) => {
+    const limit = getVendorItemLimit(vendor);
+    return limit === Infinity ? 'Unlimited' : String(Math.max(0, limit - activeCount));
+  };
+
   // Editing inventory sub-module details
   const [editingInventory, setEditingInventory] = useState<VendorItem[]>([]);
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
@@ -525,10 +541,9 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
   const handleInventoryAddRow = async () => {
     if (!viewVendor) return;
-    const plan = plans.find(p => p.id === viewVendor.plan_id);
-    const limit = plan ? plan.max_items : 5;
+    const limit = getVendorItemLimit(viewVendor);
 
-    if (viewInventory.length >= limit) {
+    if (limit !== Infinity && viewInventory.length >= limit) {
       alert(`Limit Reached! Plan limit is ${limit} menu items.`);
       return;
     }
@@ -763,6 +778,16 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                   <p className="mt-2 text-sm text-slate-700">{viewVendor.address}</p>
                 </div>
               </div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-3xl bg-white p-4 border border-amber-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Plan Limits</p>
+                  <p className="mt-2 font-semibold text-slate-900">{getVendorLimitLabel(viewVendor)}</p>
+                </div>
+                <div className="rounded-3xl bg-white p-4 border border-amber-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Remaining Capacity</p>
+                  <p className="mt-2 font-semibold text-slate-900">{getVendorRemainingLabel(viewVendor, viewInventory.length)}</p>
+                </div>
+              </div>
             </div>
 
             <div className="rounded-3xl border border-amber-200 bg-white p-6">
@@ -771,8 +796,22 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                   <p className="text-sm font-semibold text-slate-900">Current Food Inventory</p>
                   <p className="text-xs text-slate-500 mt-1">A snapshot of active menu items linked to this vendor.</p>
                 </div>
-                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">{viewInventory.length} items</span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">{viewInventory.length} items</span>
+                  <Button
+                    size="sm"
+                    onClick={handleInventoryAddRow}
+                    disabled={viewInventory.length >= getVendorItemLimit(viewVendor)}
+                  >
+                    + Add Item
+                  </Button>
+                </div>
               </div>
+              {viewInventory.length >= getVendorItemLimit(viewVendor) && getVendorItemLimit(viewVendor) !== Infinity && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-4">
+                  You have reached your plan limit. Upgrade your subscription to add more items.
+                </div>
+              )}
 
               {viewInventory.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2">
