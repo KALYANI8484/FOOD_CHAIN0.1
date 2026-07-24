@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Store, Package, CreditCard, FileText, Users,
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X
+  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
@@ -737,117 +737,67 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
         )}
       </Modal>
 
-      {/* View Profile Drawer (includes Vendor Inventory Sub-Module edit grid) */}
-      <Drawer open={!!viewVendor} onClose={() => setViewVendor(null)} title="Vendor Profile">
+      {/* View Profile Modal */}
+      <Modal open={!!viewVendor} onClose={() => setViewVendor(null)} title="Vendor Profile" size="lg">
         {viewVendor && (
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-amber-200 bg-[#fcf5e7] p-6">
-              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-                <div className="flex items-center gap-4">
-                  {viewVendor.logo_url ? (
-                    <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-20 h-20 rounded-3xl object-cover border border-amber-200 shadow-sm" />
-                  ) : (
-                    <div className="w-20 h-20 rounded-3xl bg-[#fff1dc] flex items-center justify-center border border-amber-200 shadow-sm">
-                      <Store size={28} className="text-amber-600" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xl font-extrabold text-slate-900">{viewVendor.shop_name}</p>
-                    <p className="text-sm text-slate-600 mt-1">Owned by {viewVendor.owner_name}</p>
-                    <p className="text-xs text-slate-500 mt-1">{viewVendor.phone} · {viewVendor.email || 'No email provided'}</p>
-                  </div>
+          <div className="space-y-6 pb-2">
+            
+            {/* Header Profile Section */}
+            <div className="flex flex-col sm:flex-row items-center gap-6 p-6 rounded-3xl bg-gradient-to-br from-[#fcf5e7] to-[#fff8ef] border border-amber-200 shadow-sm">
+              {viewVendor.logo_url ? (
+                <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md shrink-0" />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center border-4 border-amber-100 shadow-md shrink-0">
+                  <Store size={36} className="text-amber-500" />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-3xl bg-white p-4 border border-amber-200">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500">Subscription Plan</p>
-                    <p className="mt-2 font-semibold text-slate-900">{viewVendor.plan_name || 'Free'}</p>
-                    <p className="text-xs text-slate-500 mt-1">{viewVendor.subscription_start || 'N/A'} → {viewVendor.subscription_end || 'N/A'}</p>
-                  </div>
-                  <div className="rounded-3xl bg-white p-4 border border-amber-200">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500">Registered Clients</p>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-900">{viewVendor.total_clients ?? 0}</p>
-                    <p className="text-xs text-slate-500 mt-1">Total clients captured in profile</p>
-                  </div>
+              )}
+              <div className="flex-1 text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-center sm:justify-start">
+                  <h2 className="text-2xl font-extrabold text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>{viewVendor.shop_name}</h2>
+                  <Badge variant={viewVendor.status === 'approved' ? 'success' : viewVendor.status === 'expired' ? 'error' : 'accent'}>
+                    {viewVendor.status === 'approved' ? 'Active' : viewVendor.status === 'expired' ? 'Expired' : 'Pending'}
+                  </Badge>
                 </div>
-              </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-3xl bg-white p-4 border border-amber-200">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Status</p>
-                  <p className="mt-2 font-semibold text-slate-900">{viewVendor.status === 'approved' ? 'Active' : viewVendor.status === 'expired' ? 'Expired' : 'Pending'}</p>
-                </div>
-                <div className="rounded-3xl bg-white p-4 border border-amber-200">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500">ZIP Code</p>
-                  <p className="mt-2 font-semibold text-slate-900">{viewVendor.zip_code}</p>
-                </div>
-                <div className="rounded-3xl bg-white p-4 border border-amber-200">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Address</p>
-                  <p className="mt-2 text-sm text-slate-700">{viewVendor.address}</p>
-                </div>
-              </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-3xl bg-white p-4 border border-amber-200">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Plan Limits</p>
-                  <p className="mt-2 font-semibold text-slate-900">{getVendorLimitLabel(viewVendor)}</p>
-                </div>
-                <div className="rounded-3xl bg-white p-4 border border-amber-200">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500">Remaining Capacity</p>
-                  <p className="mt-2 font-semibold text-slate-900">{getVendorRemainingLabel(viewVendor, viewInventory.length)}</p>
+                <p className="text-sm font-medium text-slate-600 mt-2">Owned by {viewVendor.owner_name}</p>
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5"><Phone size={14} className="text-amber-500" /> {viewVendor.phone}</span>
+                  {viewVendor.email && <span className="flex items-center gap-1.5"><Mail size={14} className="text-amber-500" /> {viewVendor.email}</span>}
+                  <span className="flex items-center gap-1.5"><MapPin size={14} className="text-amber-500" /> {viewVendor.zip_code}</span>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-amber-200 bg-white p-6">
-              <div className="flex items-center justify-between gap-4 mb-5">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Current Food Inventory</p>
-                  <p className="text-xs text-slate-500 mt-1">A snapshot of active menu items linked to this vendor.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">{viewInventory.length} items</span>
-                  <Button
-                    size="sm"
-                    onClick={handleInventoryAddRow}
-                    disabled={viewInventory.length >= getVendorItemLimit(viewVendor)}
-                  >
-                    + Add Item
-                  </Button>
-                </div>
+            {/* Key Metrics Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="rounded-2xl bg-white p-5 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center hover:border-amber-200 transition-colors">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Subscription</p>
+                <p className="font-extrabold text-slate-900 text-lg">{viewVendor.plan_name || 'Free'}</p>
               </div>
-              {viewInventory.length >= getVendorItemLimit(viewVendor) && getVendorItemLimit(viewVendor) !== Infinity && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-4">
-                  You have reached your plan limit. Upgrade your subscription to add more items.
-                </div>
-              )}
+              <div className="rounded-2xl bg-white p-5 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center hover:border-amber-200 transition-colors">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Clients</p>
+                <p className="font-extrabold text-slate-900 text-2xl">{viewVendor.total_clients ?? 0}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-5 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center hover:border-amber-200 transition-colors">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Plan Limits</p>
+                <p className="font-extrabold text-slate-900 text-lg">{getVendorLimitLabel(viewVendor)}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-5 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center hover:border-amber-200 transition-colors">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Capacity</p>
+                <p className="font-extrabold text-slate-900 text-lg">{getVendorRemainingLabel(viewVendor, viewInventory.length)}</p>
+              </div>
+            </div>
 
-              {viewInventory.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {viewInventory.map((item) => (
-                    <div key={item.id} className="flex gap-4 rounded-3xl border border-amber-200 bg-[#fff8ef] p-4">
-                      <div className="w-20 h-20 rounded-3xl overflow-hidden bg-slate-100 border border-amber-200">
-                        {item.image_url ? (
-                          <img src={item.image_url} alt={item.item_name} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-slate-500">No image</div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900 truncate">{item.item_name}</p>
-                        <p className="text-xs text-slate-500 mt-1 truncate">{item.category || 'Menu item'}</p>
-                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-700">
-                          <span className="rounded-full bg-white px-2 py-1 border border-amber-200">₹{item.price}</span>
-                          <span className="rounded-full bg-white px-2 py-1 border border-amber-200">Qty {item.quantity}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState icon={<Package size={20} />} title="No inventory items" />
-              )}
+            {/* Details Section */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2"><MapPin size={16} className="text-amber-500" /> Location Details</h3>
+              <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
+                {viewVendor.address}
+              </p>
             </div>
           </div>
         )}
-      </Drawer>
+      </Modal>
+
     </div>
   );
 }
