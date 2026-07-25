@@ -184,6 +184,8 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
       plan_name: formData.plan_name || null,
       logo_url: formData.logo_url || null,
       qr_url: formData.qr_url || null,
+      birthdate: formData.birthdate || null,
+      password: formData.password || null,
     });
 
     const { error } = await supabase.from('subadmin_requests').insert({

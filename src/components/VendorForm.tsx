@@ -19,35 +19,21 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
 
   const formatToDdMmYyyy = (value: string) => {
     if (!value) return '';
-    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (isoMatch) {
-      const [, year, month, day] = isoMatch;
+    // Strip all non-digit characters (e.g. -, /, spaces)
+    const digitsOnly = value.replace(/\D/g, '');
+    
+    // If it was entered as YYYY-MM-DD (or YYYYMMDD), convert to DDMMYYYY
+    if (value.match(/^(\d{4})-(\d{2})-(\d{2})$/)) {
+      const [, year, month, day] = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)!;
       return `${day}${month}${year}`;
     }
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-      return value.replace(/\//g, '');
-    }
-    if (/^\d{8}$/.test(value)) {
-      return value;
-    }
-    return value;
+    
+    return digitsOnly;
   };
 
   const normalizeDateInputValue = (value: string) => {
     if (!value) return '';
-    const displayMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (displayMatch) {
-      const [, day, month, year] = displayMatch;
-      return `${year}-${month}-${day}`;
-    }
-    const plainMatch = value.match(/^(\d{8})$/);
-    if (plainMatch) {
-      const day = value.slice(0, 2);
-      const month = value.slice(2, 4);
-      const year = value.slice(4);
-      return `${year}-${month}-${day}`;
-    }
-    return value;
+    return value.replace(/\D/g, '');
   };
 
   const [form, setForm] = useState({
@@ -98,6 +84,7 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     try {
       await onSubmit({
         ...form,
+        birthdate: birthdateForPassword,
         password: birthdateForPassword,
         logo_url: form.logo_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=Logo',
         qr_url: form.qr_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=QR',
@@ -140,11 +127,11 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
           required
         />
         <Input
-          label="Birthdate (DD-MM-YYYY)"
+          label="Birthdate (DDMMYYYY)"
           type="text"
           value={form.birthdate}
-          onChange={(v) => setForm({ ...form, birthdate: v })}
-          placeholder="e.g. 19-07-2004"
+          onChange={(v) => setForm({ ...form, birthdate: v.replace(/\D/g, '') })}
+          placeholder="e.g. 19072004"
           required
         />
         <div className="sm:col-span-2">
