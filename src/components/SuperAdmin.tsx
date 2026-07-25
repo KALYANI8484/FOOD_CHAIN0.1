@@ -1382,12 +1382,11 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
       {/* Add Add-on Modal */}
       <Modal open={addonModal} onClose={() => setAddonModal(false)} title="Add Subscription Add-on Package">
         <div className="space-y-4">
-          <Input 
+          <Select 
             label="Add-on Plan Name" 
-            placeholder="e.g. Extra Validity & Clients Boost" 
             value={addonForm.name} 
             onChange={(v) => setAddonForm({ ...addonForm, name: v })} 
-            required 
+            options={[{ value: '', label: '-- Select Existing Plan --' }, ...plans.map(p => ({ value: p.name, label: p.name }))]} 
           />
           <Input 
             label="Price (₹)" 
