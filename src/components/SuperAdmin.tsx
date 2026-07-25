@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   Store, Package, CreditCard, FileText, Users,
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft
+  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
 import { VendorForm } from './VendorForm';
 
-type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins';
+type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins' | 'pending_orders';
 
 export function SuperAdmin({ onExit }: { onExit: () => void }) {
   const [tab, setTab] = useState<Tab>('approvals');
@@ -21,6 +21,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
     { id: 'inventory', label: 'Master Inventory', icon: Package },
     { id: 'guides', label: 'Guide Documents', icon: FileText },
     { id: 'sub_admins', label: 'Sub-Admins', icon: Users },
+    { id: 'pending_orders', label: 'Pending Orders', icon: Clock },
   ];
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -80,6 +81,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
           {tab === 'inventory' && <InventoryTab show={show} />}
           {tab === 'guides' && <GuidesTab show={show} />}
           {tab === 'sub_admins' && <SubAdminsTab show={show} />}
+          {tab === 'pending_orders' && <PendingOrdersTab show={show} />}
         </div>
       </main>
 
@@ -2383,3 +2385,71 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   );
 }
 
+// 9. Pending Orders Tab
+function PendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    const { data } = await supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+    setOrders(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // Update timer every minute to calculate expiration
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader 
+        title="Pending & Missed Orders" 
+        subtitle="Monitor orders currently broadcasting or missed by vendors (passed 10 min)"
+      />
+
+      {orders.length === 0 ? (
+        <EmptyState icon={<Clock size={28} />} title="No pending orders" subtitle="All incoming orders have been accepted or fulfilled." />
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {orders.map(o => {
+            const elapsed = Date.now() - new Date(o.created_at).getTime();
+            const isMissed = elapsed > 10 * 60 * 1000;
+
+            return (
+              <div key={o.id} className={`card p-5 border flex flex-col justify-between ${isMissed ? 'bg-red-50/50 border-red-200' : 'bg-surface border-border'}`}>
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-extrabold text-lg text-text">#{o.id.substring(0,6).toUpperCase()}</h3>
+                    <Badge variant={isMissed ? 'error' : 'warning'}>
+                      {isMissed ? 'Missed by Vendors' : 'Broadcasting...'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2 text-sm text-text">
+                    <p><span className="text-muted text-xs">Item:</span> <span className="font-bold text-accent">{o.item_name}</span> (x{o.quantity})</p>
+                    <p><span className="text-muted text-xs">Category:</span> {o.master_category_name}</p>
+                    <div className="p-3 bg-surface-2 rounded-xl mt-3 space-y-1">
+                      <p className="font-bold text-text">{o.client_name} - {o.client_phone}</p>
+                      <p className="text-xs text-muted">{o.client_address}</p>
+                      <p className="text-xs font-semibold mt-1">PIN: {o.client_zip} | Landmark: {o.client_landmark}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-border/60 flex justify-between items-center text-xs text-muted">
+                  <span>Placed: {new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  <span className="font-bold text-text">Total: ₹{o.total_price}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
