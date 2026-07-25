@@ -140,10 +140,11 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
           required
         />
         <Input
-          label="Birthdate"
-          type="date"
+          label="Birthdate (DD-MM-YYYY)"
+          type="text"
           value={form.birthdate}
           onChange={(v) => setForm({ ...form, birthdate: v })}
+          placeholder="e.g. 19-07-2004"
           required
         />
         <div className="sm:col-span-2">
