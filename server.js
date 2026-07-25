@@ -102,6 +102,15 @@ const planSchema = new mongoose.Schema({
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
+const addonSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  name: { type: String, required: true },
+  price: { type: Number, required: true },
+  validity_days: { type: Number, required: true },
+  max_clients: { type: Number, required: true },
+  created_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
 const masterItemSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   name: { type: String, required: true },
@@ -133,6 +142,8 @@ const vendorSchema = new mongoose.Schema({
   subscription_start: { type: String, default: null },
   subscription_end: { type: String, default: null },
   total_clients: { type: Number, default: 0 },
+  addon_max_clients: { type: Number, default: 0 },
+  addon_name: { type: String, default: null },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
@@ -229,10 +240,13 @@ const Activity = mongoose.model('Activity', activitySchema, 'activity_log');
 const UpgradeRequest = mongoose.model('UpgradeRequest', upgradeRequestSchema, 'upgrade_requests');
 const ClientProfile = mongoose.model('ClientProfile', clientSchema, 'clients');
 
+const Addon = mongoose.model('Addon', addonSchema, 'addons');
+
 const models = {
   super_admins: SuperAdmin,
   sub_admins: SubAdmin,
   subscription_plans: Plan,
+  addons: Addon,
   master_inventory: MasterItem,
   vendors: Vendor,
   vendor_inventory: VendorItem,
@@ -283,13 +297,16 @@ async function checkPlanLimitOnDelivery(orderId) {
         vendorDoc.total_clients = clientCount;
         
         const planDoc = await Plan.findById(vendorDoc.plan_id);
-        if (planDoc && planDoc.max_clients > 0 && clientCount >= planDoc.max_clients) {
-          vendorDoc.status = 'expired';
-          await Activity.create({
-            action: `Vendor ${vendorDoc.shop_name} plan expired (Max clients limit of ${planDoc.max_clients} reached)`,
-            actor: 'System'
-          });
-          io.emit('vendorUpdated', { id: vendorDoc.id, status: 'expired' });
+        if (planDoc && planDoc.max_clients > 0) {
+          const totalLimit = planDoc.max_clients + (vendorDoc.addon_max_clients || 0);
+          if (clientCount >= totalLimit) {
+            vendorDoc.status = 'expired';
+            await Activity.create({
+              action: `Vendor ${vendorDoc.shop_name} plan expired (Max clients limit of ${totalLimit} reached)`,
+              actor: 'System'
+            });
+            io.emit('vendorUpdated', { id: vendorDoc.id, status: 'expired' });
+          }
         }
         await vendorDoc.save();
       }

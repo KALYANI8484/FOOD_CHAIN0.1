@@ -328,12 +328,13 @@ function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [addons, setAddons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [createMode, setCreateMode] = useState(false);
   const [editVendor, setEditVendor] = useState<Vendor | null>(null);
-  
   const [viewVendor, setViewVendor] = useState<Vendor | null>(null);
+  const [selectedAddon, setSelectedAddon] = useState('');
   const [viewInventory, setViewInventory] = useState<VendorItem[]>([]);
   
   const [search, setSearch] = useState('');
@@ -367,14 +368,16 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const inventoryLimit = currentPlan?.max_items ?? 5;
 
   const load = async () => {
-    const [{ data: v }, { data: p }, { data: m }] = await Promise.all([
+    const [{ data: v }, { data: p }, { data: m }, { data: a }] = await Promise.all([
       supabase.from('vendors').select('*').order('created_at', { ascending: false }),
       supabase.from('subscription_plans').select('*'),
-      supabase.from('master_inventory').select('*')
+      supabase.from('master_inventory').select('*'),
+      supabase.from('addons').select('*')
     ]);
     setVendors(v || []);
     setPlans(p || []);
     setMasterItems(m || []);
+    setAddons(a || []);
     setLoading(false);
   };
 
@@ -443,6 +446,36 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     show('Vendor updated successfully');
     setEditVendor(null);
     load();
+  };
+
+  const handleApplyAddon = async () => {
+    if (!editVendor || !selectedAddon) return;
+    const addon = addons.find(a => a.id === selectedAddon);
+    if (!addon) return;
+
+    if (addon.name !== editVendor.plan_name) {
+      alert(`Note: Applying an Add-on (${addon.name}) that may not match vendor's plan (${editVendor.plan_name}).`);
+    }
+
+    const currentEnd = editVendor.subscription_end ? new Date(editVendor.subscription_end) : new Date();
+    const newEnd = new Date(currentEnd.getTime() + addon.validity_days * 86400000).toISOString().slice(0, 10);
+    const newAddonMax = (editVendor.addon_max_clients || 0) + addon.max_clients;
+
+    await supabase.from('vendors').update({
+      subscription_end: newEnd,
+      addon_max_clients: newAddonMax,
+      addon_name: addon.name
+    }).eq('id', editVendor.id);
+
+    await supabase.from('activity_log').insert({
+      action: `Add-on ${addon.name} applied to ${editVendor.shop_name}`,
+      actor: 'Super Admin'
+    });
+
+    show(`Add-on applied! Validity extended by ${addon.validity_days} days.`);
+    load();
+    setEditVendor(null);
+    setSelectedAddon('');
   };
 
   const handlePrepareEdit = async (v: Vendor) => {
@@ -700,12 +733,34 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       {/* Edit Vendor Modal */}
       <Modal open={!!editVendor} onClose={() => setEditVendor(null)} title="Modify Vendor Record" size="xl">
         {editVendor && (
-          <VendorForm 
-            initialData={editVendor} 
-            submitLabel="Save Changes" 
-            onSubmit={handleEditSubmit} 
-            onCancel={() => setEditVendor(null)} 
-          />
+          <div className="space-y-6">
+            <VendorForm 
+              initialData={editVendor} 
+              submitLabel="Save Changes" 
+              onSubmit={handleEditSubmit} 
+              onCancel={() => setEditVendor(null)} 
+            />
+            
+            <div className="p-5 border border-accent/20 bg-[#f9f1e5] rounded-xl space-y-3 mt-4">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Apply Add-on Package</h3>
+              <p className="text-xs text-slate-500">Purchase or assign an Add-on to extend this vendor's validity and client limits.</p>
+              <div className="flex flex-col sm:flex-row gap-3 items-end">
+                <div className="flex-1 w-full">
+                  <select 
+                    value={selectedAddon} 
+                    onChange={(e) => setSelectedAddon(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-slate-800 text-sm focus:border-amber-400 outline-none"
+                  >
+                    <option value="">-- Select an Add-on to Apply --</option>
+                    {addons.filter(a => !editVendor.plan_name || a.name === editVendor.plan_name).map(a => (
+                      <option key={a.id} value={a.id}>{a.name} (+{a.validity_days} days, +{a.max_clients} clients)</option>
+                    ))}
+                  </select>
+                </div>
+                <Button onClick={handleApplyAddon} disabled={!selectedAddon}>Apply Add-on</Button>
+              </div>
+            </div>
+          </div>
         )}
       </Modal>
 
