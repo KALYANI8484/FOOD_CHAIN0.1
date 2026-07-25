@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Store, Plus, Users, Clock, CheckCircle2,
   Activity as ActivityIcon, AlertCircle, FileText, Eye, Pencil, Search,
-  ArrowRight, Package
+  ArrowRight, Package, Trash2
 } from 'lucide-react';
 import { supabase, type Vendor, type Activity, type VendorItem } from '../lib/supabase';
 import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer } from './ui';
 import { VendorForm } from './VendorForm';
 
-type Tab = 'dashboard' | 'vendors' | 'pending' | 'guides' | 'activity';
+type Tab = 'dashboard' | 'vendors' | 'pending' | 'guides';
 
 export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmail: string }) {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -16,10 +16,9 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
 
   const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'vendors', label: 'My Vendors', icon: Store },
+    { id: 'vendors', label: 'Vendors', icon: Store },
     { id: 'pending', label: 'Correction Inbox', icon: AlertCircle },
     { id: 'guides', label: 'SOP Guides', icon: FileText },
-    { id: 'activity', label: 'Activity Log', icon: ActivityIcon },
   ];
 
   return (
@@ -60,11 +59,10 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
 
       <main className="flex-1 overflow-y-auto h-screen bg-bg relative z-10">
         <div className="p-8 max-w-7xl mx-auto">
-          {tab === 'dashboard' && <SubDashboard onTab={setTab} />}
-          {tab === 'vendors' && <MyVendors show={show} />}
+          {tab === 'dashboard' && <SubDashboard onTab={setTab} adminEmail={adminEmail} />}
+          {tab === 'vendors' && <MyVendors show={show} adminEmail={adminEmail} />}
           {tab === 'pending' && <CorrectionInbox show={show} />}
           {tab === 'guides' && <SubGuides />}
-          {tab === 'activity' && <SubActivity />}
         </div>
       </main>
 
@@ -73,42 +71,36 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
   );
 }
 
-function SubDashboard({ onTab }: { onTab: (t: Tab) => void }) {
-  const [kpis, setKpis] = useState({ active: 0, pending: 0, rejected: 0 });
+function SubDashboard({ onTab, adminEmail }: { onTab: (t: Tab) => void; adminEmail: string }) {
+  const [kpis, setKpis] = useState({ approved: 0, pending: 0, rejected: 0 });
   const [loading, setLoading] = useState(true);
-  const [activities, setActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [{ data: v }, { data: a }] = await Promise.all([
-        supabase.from('vendors').select('*'),
-        supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(5),
-      ]);
-      const list = v || [];
-      // Sub-Admin specific metrics
+      const { data } = await supabase.from('subadmin_requests').select('*').eq('subadmin_email', adminEmail);
+      const list = data || [];
       setKpis({
-        active: list.filter((x: any) => x.status === 'approved').length,
-        pending: list.filter((x: any) => x.status === 'pending_approval').length,
+        approved: list.filter((x: any) => x.status === 'approved').length,
+        pending: list.filter((x: any) => x.status === 'pending').length,
         rejected: list.filter((x: any) => x.status === 'rejected').length
       });
-      setActivities(a || []);
       setLoading(false);
     })();
-  }, []);
+  }, [adminEmail]);
 
   if (loading) return <Spinner />;
 
   const kpiCards = [
-    { label: 'My Onboarded Vendors', value: kpis.active, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { label: 'Approved Requests', value: kpis.approved, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
     { label: 'Pending Approvals', value: kpis.pending, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { label: 'Action Required', value: kpis.rejected, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { label: 'Rejected Requests', value: kpis.rejected, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
   ];
 
   return (
     <div className="space-y-8">
       <div className="animate-fade-in-up">
         <h1 className="text-3xl font-extrabold tracking-tight">Dashboard Overview</h1>
-        <p className="text-muted mt-1">Review onboarding progress and vendor submission approvals</p>
+        <p className="text-muted mt-1">Review your vendor modification requests</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger">
@@ -123,9 +115,9 @@ function SubDashboard({ onTab }: { onTab: (t: Tab) => void }) {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Left: Quick Actions */}
-        <div className="lg:col-span-1 card p-6 bg-surface border border-border animate-fade-in-up delay-200">
+      <div className="grid lg:grid-cols-2 gap-8">
+        {/* Quick Actions */}
+        <div className="card p-6 bg-surface border border-border animate-fade-in-up delay-200">
           <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted">Quick Actions</h3>
           <div className="space-y-3">
             <button 
@@ -133,8 +125,8 @@ function SubDashboard({ onTab }: { onTab: (t: Tab) => void }) {
               className="w-full flex items-center justify-between p-4 rounded-2xl bg-surface-2 border border-border hover:border-accent/40 text-left transition-all"
             >
               <div className="flex items-center gap-3">
-                <Plus size={16} className="text-accent" />
-                <span className="text-sm font-bold">Onboard New Vendor</span>
+                <Store size={16} className="text-accent" />
+                <span className="text-sm font-bold">Manage Vendors</span>
               </div>
               <ArrowRight size={14} className="text-muted" />
             </button>
@@ -146,93 +138,42 @@ function SubDashboard({ onTab }: { onTab: (t: Tab) => void }) {
                 <AlertCircle size={16} className="text-red-500" />
                 <span className="text-sm font-bold">Correction Inbox</span>
               </div>
-              {kpis.rejected > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{kpis.rejected}</span>}
               <ArrowRight size={14} className="text-muted" />
             </button>
           </div>
-        </div>
-
-        {/* Right: Activity Log */}
-        <div className="lg:col-span-2 card p-6 bg-surface border border-border animate-fade-in-up delay-300">
-          <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted">Recent Activity</h3>
-          {activities.length === 0 ? (
-            <EmptyState icon={<ActivityIcon size={24} />} title="No recent activity" />
-          ) : (
-            <div className="space-y-3">
-              {activities.map((a) => (
-                <div key={a.id} className="flex items-start gap-3 p-3 rounded-2xl bg-surface-2/40 hover:bg-surface-2 transition-all">
-                  <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center shrink-0 border border-border">
-                    <ActivityIcon size={14} className="text-accent" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-text truncate">{a.action}</p>
-                    <p className="text-[10px] text-muted mt-0.5">{a.actor} · {new Date(a.created_at).toLocaleTimeString()}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 }
 
-function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'error' | 'info') => void; adminEmail: string }) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [addons, setAddons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [createMode, setCreateMode] = useState(false);
   const [editVendor, setEditVendor] = useState<Vendor | null>(null);
   const [viewVendor, setViewVendor] = useState<Vendor | null>(null);
   const [viewInventory, setViewInventory] = useState<VendorItem[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedAddon, setSelectedAddon] = useState('');
+  const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
 
   const load = async () => {
-    const { data } = await supabase.from('vendors').select('*').order('created_at', { ascending: false });
-    setVendors(data || []);
+    const [{ data: v }, { data: a }] = await Promise.all([
+      supabase.from('vendors').select('*').order('created_at', { ascending: false }),
+      supabase.from('addons').select('*')
+    ]);
+    setVendors(v || []);
+    setAddons(a || []);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const handleCreateSubmit = async (formData: any) => {
-    const payload = {
-      owner_name: formData.owner_name,
-      phone: formData.phone,
-      email: formData.email || null,
-      shop_name: formData.shop_name,
-      address: formData.address,
-      zip_code: formData.zip_code,
-      plan_id: formData.plan_id || null,
-      plan_name: formData.plan_name || null,
-      logo_url: formData.logo_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=Logo',
-      qr_url: formData.qr_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=QR',
-      status: 'pending_approval',
-      submitted_by: 'Sub-Admin',
-      created_at: new Date().toISOString()
-    };
-
-    const { error } = await supabase.from('vendors').insert(payload);
-
-    if (error) {
-      show('Failed to submit vendor: ' + (error.message || 'Unknown error'), 'error');
-      return;
-    }
-
-    await supabase.from('activity_log').insert({
-      action: `Onboarded vendor submitted: ${formData.shop_name}`,
-      actor: 'Sub-Admin'
-    });
-
-    show('Vendor submitted for Super Admin review', 'success');
-    setCreateMode(false);
-    await load();
-  };
-
   const handleEditSubmit = async (formData: any) => {
     if (!editVendor) return;
-    const { error } = await supabase.from('vendors').update({
+    const payload = JSON.stringify({
       owner_name: formData.owner_name,
       phone: formData.phone,
       email: formData.email || null,
@@ -243,21 +184,66 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       plan_name: formData.plan_name || null,
       logo_url: formData.logo_url || null,
       qr_url: formData.qr_url || null,
-    }).eq('id', editVendor.id);
+    });
+
+    const { error } = await supabase.from('subadmin_requests').insert({
+      subadmin_email: adminEmail,
+      vendor_id: editVendor.id,
+      vendor_name: editVendor.shop_name,
+      action_type: 'edit',
+      payload: payload
+    });
 
     if (error) {
-      show('Failed to update vendor', 'error');
+      show('Failed to submit edit request', 'error');
       return;
     }
 
-    await supabase.from('activity_log').insert({
-      action: `Vendor details modified: ${formData.shop_name}`,
-      actor: 'Sub-Admin'
+    show('Edit request submitted to Super Admin for approval', 'success');
+    setEditVendor(null);
+  };
+
+  const handleApplyAddon = async () => {
+    if (!editVendor || !selectedAddon) return;
+    const addon = addons.find(a => a.id === selectedAddon);
+    if (!addon) return;
+
+    const payload = JSON.stringify({ addon_id: addon.id, addon_name: addon.name, validity_days: addon.validity_days, max_clients: addon.max_clients });
+    const { error } = await supabase.from('subadmin_requests').insert({
+      subadmin_email: adminEmail,
+      vendor_id: editVendor.id,
+      vendor_name: editVendor.shop_name,
+      action_type: 'add-on',
+      payload: payload
     });
 
-    show('Vendor updated successfully');
+    if (error) {
+      show('Failed to submit add-on request', 'error');
+      return;
+    }
+
+    show('Add-on request submitted to Super Admin for approval', 'success');
     setEditVendor(null);
-    load();
+    setSelectedAddon('');
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmVendor) return;
+    const { error } = await supabase.from('subadmin_requests').insert({
+      subadmin_email: adminEmail,
+      vendor_id: deleteConfirmVendor.id,
+      vendor_name: deleteConfirmVendor.shop_name,
+      action_type: 'delete',
+      payload: null
+    });
+
+    if (error) {
+      show('Failed to submit delete request', 'error');
+      return;
+    }
+
+    show('Delete request submitted to Super Admin for approval', 'success');
+    setDeleteConfirmVendor(null);
   };
 
   const handleViewProfile = async (v: Vendor) => {
@@ -278,12 +264,9 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
     <div className="space-y-6">
       <div className="flex items-center justify-between animate-fade-in-up">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Onboarded Vendors</h1>
-          <p className="text-muted mt-1">Submit new vendor profiles and view status</p>
+          <h1 className="text-3xl font-extrabold tracking-tight">Vendors</h1>
+          <p className="text-muted mt-1">Manage vendor profiles and submit requests</p>
         </div>
-        <Button onClick={() => setCreateMode(true)}>
-          <Plus size={16} /> Create Vendor
-        </Button>
       </div>
 
       {/* Top Bar Filters */}
@@ -367,6 +350,13 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
                       >
                         <Pencil size={14} />
                       </button>
+                      <button
+                        onClick={() => setDeleteConfirmVendor(v)}
+                        className="p-2 rounded-lg bg-surface-2 text-red-500/70 hover:text-red-500 hover:bg-red-500/10 transition-all border border-border/40"
+                        title="Delete Vendor"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -377,20 +367,56 @@ function MyVendors({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
         {filtered.length === 0 && <EmptyState icon={<Store size={28} />} title="No vendors found" subtitle="Onboard your first restaurant to get started" />}
       </div>
 
-      {/* Creation Modal */}
-      <Modal open={createMode} onClose={() => setCreateMode(false)} title="Onboard New Vendor" size="xl">
-        <VendorForm submitLabel="Submit for Approval" onSubmit={handleCreateSubmit} onCancel={() => setCreateMode(false)} />
-      </Modal>
-
       {/* Edit Modal */}
       <Modal open={!!editVendor} onClose={() => setEditVendor(null)} title="Modify Vendor Details" size="xl">
         {editVendor && (
-          <VendorForm 
-            initialData={editVendor} 
-            submitLabel="Save Changes" 
-            onSubmit={handleEditSubmit} 
-            onCancel={() => setEditVendor(null)} 
-          />
+          <div className="space-y-6">
+            <VendorForm 
+              initialData={editVendor} 
+              submitLabel="Save Changes" 
+              onSubmit={handleEditSubmit} 
+              onCancel={() => setEditVendor(null)} 
+            />
+            
+            <div className="p-5 border border-accent/20 bg-[#f9f1e5] rounded-xl space-y-3 mt-4">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Apply Add-on Package</h3>
+              <p className="text-xs text-slate-500">Submit a request to assign an Add-on to extend this vendor's validity and client limits.</p>
+              <div className="flex flex-col sm:flex-row gap-3 items-end">
+                <div className="flex-1 w-full">
+                  <select 
+                    value={selectedAddon} 
+                    onChange={(e) => setSelectedAddon(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-slate-800 text-sm focus:border-amber-400 outline-none"
+                  >
+                    <option value="">-- Select an Add-on to Apply --</option>
+                    {addons.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} (+{a.validity_days} days, +{a.max_clients} clients)</option>
+                    ))}
+                  </select>
+                </div>
+                <Button onClick={handleApplyAddon} disabled={!selectedAddon}>Request Add-on</Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Vendor Confirm Modal */}
+      <Modal open={!!deleteConfirmVendor} onClose={() => setDeleteConfirmVendor(null)} title="Delete Vendor Account">
+        {deleteConfirmVendor && (
+          <div className="space-y-4">
+            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
+              <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-red-700">Request Vendor Deletion</p>
+                <p className="text-xs text-red-600/80 mt-1">This will send a delete request to the Super Admin for vendor <strong>{deleteConfirmVendor.shop_name}</strong>.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="ghost" onClick={() => setDeleteConfirmVendor(null)}>Cancel</Button>
+              <Button variant="outline" className="text-red-500 border-red-200 hover:bg-red-50" onClick={handleDeleteConfirm}>Submit Delete Request</Button>
+            </div>
+          </div>
         )}
       </Modal>
 
@@ -659,43 +685,3 @@ function SubGuides() {
   );
 }
 
-function SubActivity() {
-  const [logs, setLogs] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
-      setLogs(data || []);
-      setLoading(false);
-    })();
-  }, []);
-
-  if (loading) return <Spinner />;
-
-  return (
-    <div className="space-y-6">
-      <div className="animate-fade-in-up">
-        <h1 className="text-3xl font-extrabold tracking-tight">System Audit logs</h1>
-        <p className="text-muted mt-1">Review recently registered administrative actions</p>
-      </div>
-
-      <div className="card overflow-hidden bg-surface border border-border animate-fade-in-up delay-100">
-        <div className="p-6 divide-y divide-border/60">
-          {logs.map((l) => (
-            <div key={l.id} className="py-4 flex items-start gap-4 hover:bg-surface-2/20 transition-all px-2 rounded-xl">
-              <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0 border border-border">
-                <ActivityIcon size={14} className="text-accent" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text leading-snug">{l.action}</p>
-                <p className="text-xs text-muted mt-0.5">{l.actor || 'System'} · {new Date(l.created_at).toLocaleString()}</p>
-              </div>
-            </div>
-          ))}
-          {logs.length === 0 && <EmptyState icon={<ActivityIcon size={24} />} title="Audit log empty" />}
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -850,22 +850,26 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
 // 3. Team Approvals Module Tab
 function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [activeTab, setActiveTab] = useState<'vendors' | 'upgrades'>('vendors');
+  const [activeTab, setActiveTab] = useState<'vendors' | 'upgrades' | 'subadmin'>('vendors');
   const [vendorRequests, setVendorRequests] = useState<Vendor[]>([]);
   const [upgradeRequests, setUpgradeRequests] = useState<UpgradeRequest[]>([]);
+  const [subadminRequests, setSubadminRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedUpgrade, setSelectedUpgrade] = useState<UpgradeRequest | null>(null);
+  const [selectedSubadminReq, setSelectedSubadminReq] = useState<any | null>(null);
   const [rejectMode, setRejectMode] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState('');
 
   const load = async () => {
-    const [{ data: v }, { data: u }] = await Promise.all([
+    const [{ data: v }, { data: u }, { data: s }] = await Promise.all([
       supabase.from('vendors').select('*').eq('status', 'pending_approval'),
-      supabase.from('upgrade_requests').select('*').eq('status', 'pending')
+      supabase.from('upgrade_requests').select('*').eq('status', 'pending'),
+      supabase.from('subadmin_requests').select('*').eq('status', 'pending')
     ]);
     setVendorRequests(v || []);
     setUpgradeRequests(u || []);
+    setSubadminRequests(s || []);
     setLoading(false);
   };
 
@@ -959,9 +963,44 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     load();
   };
 
+  const handleApproveSubadminReq = async (req: any) => {
+    if (req.action_type === 'delete') {
+      await supabase.from('vendors').delete().eq('id', req.vendor_id);
+      await supabase.from('activity_log').insert({ action: `Vendor deleted by Sub-Admin request: ${req.vendor_name}`, actor: 'Super Admin' });
+    } else if (req.action_type === 'edit') {
+      const updates = JSON.parse(req.payload);
+      await supabase.from('vendors').update(updates).eq('id', req.vendor_id);
+      await supabase.from('activity_log').insert({ action: `Vendor edited by Sub-Admin request: ${req.vendor_name}`, actor: 'Super Admin' });
+    } else if (req.action_type === 'add-on') {
+      const addonDetails = JSON.parse(req.payload);
+      const { data: v } = await supabase.from('vendors').select('*').eq('id', req.vendor_id).maybeSingle();
+      if (v) {
+        const currentEnd = new Date(v.subscription_end || Date.now());
+        const newEnd = new Date(currentEnd.getTime() + addonDetails.validity_days * 86400000);
+        await supabase.from('vendors').update({
+          subscription_end: newEnd.toISOString().slice(0, 10),
+          client_limit: (v.client_limit || 0) + addonDetails.max_clients
+        }).eq('id', req.vendor_id);
+        await supabase.from('activity_log').insert({ action: `Add-on ${addonDetails.addon_name} applied by Sub-Admin request to ${req.vendor_name}`, actor: 'Super Admin' });
+      }
+    }
+
+    await supabase.from('subadmin_requests').update({ status: 'approved' }).eq('id', req.id);
+    show(`Sub-Admin request approved (${req.action_type})`);
+    setSelectedSubadminReq(null);
+    load();
+  };
+
+  const handleRejectSubadminReq = async (req: any) => {
+    await supabase.from('subadmin_requests').update({ status: 'rejected' }).eq('id', req.id);
+    show('Sub-Admin request rejected');
+    setSelectedSubadminReq(null);
+    load();
+  };
+
   if (loading) return <Spinner />;
 
-  const pendingCount = vendorRequests.length + upgradeRequests.length;
+  const pendingCount = vendorRequests.length + upgradeRequests.length + subadminRequests.length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -990,6 +1029,12 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           className={`pb-3 text-sm font-bold uppercase tracking-wider relative ${activeTab === 'upgrades' ? 'text-accent border-b-2 border-accent' : 'text-muted'}`}
         >
           Upgrade Requests ({upgradeRequests.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('subadmin')}
+          className={`pb-3 text-sm font-bold uppercase tracking-wider relative ${activeTab === 'subadmin' ? 'text-accent border-b-2 border-accent' : 'text-muted'}`}
+        >
+          Sub-Admin Requests ({subadminRequests.length})
         </button>
       </div>
 
@@ -1063,7 +1108,41 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           </table>
           {upgradeRequests.length === 0 && <EmptyState icon={<CreditCard size={24} />} title="No upgrade requests" />}
         </div>
-      )}
+      ) : activeTab === 'subadmin' ? (
+        <div className="card overflow-hidden bg-surface border border-border">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
+                <th className="px-6 py-4">Vendor</th>
+                <th className="px-6 py-4">Sub-Admin</th>
+                <th className="px-6 py-4">Action Requested</th>
+                <th className="px-6 py-4">Date</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {subadminRequests.map((req) => (
+                <tr key={req.id} className="hover:bg-surface-2/30 transition-colors">
+                  <td className="px-6 py-4 font-bold text-text">{req.vendor_name}</td>
+                  <td className="px-6 py-4 text-muted">{req.subadmin_email}</td>
+                  <td className="px-6 py-4">
+                    <Badge variant={req.action_type === 'delete' ? 'error' : req.action_type === 'edit' ? 'warning' : 'accent'}>
+                      {req.action_type.toUpperCase()}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 text-muted text-xs">{new Date(req.created_at).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 text-right">
+                    <Button size="sm" onClick={() => setSelectedSubadminReq(req)}>
+                      Review Request
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {subadminRequests.length === 0 && <EmptyState icon={<Store size={24} />} title="No Sub-Admin requests" />}
+        </div>
+      ) : null}
 
       {/* View vendor request details panel */}
       <Drawer open={!!selectedVendor} onClose={() => setSelectedVendor(null)} title="Onboarding Review Panel">
@@ -1138,6 +1217,57 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               </Button>
               <Button onClick={() => handleApproveUpgrade(selectedUpgrade)}>
                 Verify & Activate Plan
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Sub-Admin Request Modal */}
+      <Modal open={!!selectedSubadminReq} onClose={() => setSelectedSubadminReq(null)} title="Review Sub-Admin Request">
+        {selectedSubadminReq && (
+          <div className="space-y-6">
+            <div className="bg-surface-2 p-4 rounded-xl border border-border space-y-3 text-sm">
+              <p><span className="text-xs text-muted block">Vendor Shop</span> <span className="font-bold text-text">{selectedSubadminReq.vendor_name}</span></p>
+              <p><span className="text-xs text-muted block">Sub-Admin Email</span> <span className="font-semibold text-text">{selectedSubadminReq.subadmin_email}</span></p>
+              <p>
+                <span className="text-xs text-muted block">Requested Action</span>
+                <Badge variant={selectedSubadminReq.action_type === 'delete' ? 'error' : selectedSubadminReq.action_type === 'edit' ? 'warning' : 'accent'}>
+                  {selectedSubadminReq.action_type.toUpperCase()}
+                </Badge>
+              </p>
+              
+              {selectedSubadminReq.action_type === 'delete' && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg mt-2 text-red-700 text-xs">
+                  <strong>Warning:</strong> Approving this request will permanently delete this vendor and all associated data.
+                </div>
+              )}
+
+              {selectedSubadminReq.action_type === 'add-on' && (
+                <div className="p-3 bg-accent/10 border border-accent/30 rounded-lg mt-2 text-sm text-text">
+                  <p className="font-bold mb-1">Add-on Details:</p>
+                  <pre className="text-xs whitespace-pre-wrap font-mono text-muted">
+                    {JSON.stringify(JSON.parse(selectedSubadminReq.payload), null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {selectedSubadminReq.action_type === 'edit' && (
+                <div className="p-3 bg-surface border border-border rounded-lg mt-2 text-sm text-text">
+                  <p className="font-bold mb-1">Proposed Vendor Updates:</p>
+                  <pre className="text-xs whitespace-pre-wrap font-mono text-muted">
+                    {JSON.stringify(JSON.parse(selectedSubadminReq.payload), null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-border">
+              <Button variant="danger" onClick={() => handleRejectSubadminReq(selectedSubadminReq)}>
+                Reject
+              </Button>
+              <Button onClick={() => handleApproveSubadminReq(selectedSubadminReq)}>
+                Approve Request
               </Button>
             </div>
           </div>

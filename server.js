@@ -242,6 +242,19 @@ const ClientProfile = mongoose.model('ClientProfile', clientSchema, 'clients');
 
 const Addon = mongoose.model('Addon', addonSchema, 'addons');
 
+const subadminRequestSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  subadmin_email: { type: String, required: true },
+  vendor_id: { type: String, required: true },
+  vendor_name: { type: String, required: true },
+  action_type: { type: String, required: true },
+  payload: { type: String, default: null },
+  status: { type: String, default: 'pending' },
+  created_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
+const SubadminRequest = mongoose.model('SubadminRequest', subadminRequestSchema, 'subadmin_requests');
+
 const models = {
   super_admins: SuperAdmin,
   sub_admins: SubAdmin,
@@ -255,6 +268,7 @@ const models = {
   settings: Settings,
   activity_log: Activity,
   upgrade_requests: UpgradeRequest,
+  subadmin_requests: SubadminRequest,
   clients: ClientProfile
 };
 
