@@ -94,34 +94,11 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
 
     const birthdateForPassword = formatToDdMmYyyy(form.birthdate);
 
-    if (!initialData) {
-      if (!form.password || !form.confirm_password) {
-        alert('Password and confirmation are required.');
-        return;
-      }
-      if (form.password !== form.confirm_password) {
-        alert('Password and confirmation must match.');
-        return;
-      }
-      if (form.password !== birthdateForPassword) {
-        alert('Password must match the vendor birthdate in DDMMYYYY format.');
-        return;
-      }
-    } else if (form.password || form.confirm_password) {
-      if (form.password !== form.confirm_password) {
-        alert('Password and confirmation must match.');
-        return;
-      }
-      if (form.password !== birthdateForPassword) {
-        alert('Password must match the vendor birthdate in DDMMYYYY format.');
-        return;
-      }
-    }
-
     setSubmitting(true);
     try {
       await onSubmit({
         ...form,
+        password: birthdateForPassword,
         logo_url: form.logo_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=Logo',
         qr_url: form.qr_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=QR',
         plan_name: selectedPlan?.name || null,
@@ -166,61 +143,9 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
           label="Birthdate"
           type="date"
           value={form.birthdate}
-          onChange={(v) => {
-            const formatted = formatToDdMmYyyy(v);
-            setForm({
-              ...form,
-              birthdate: v,
-              password: initialData ? form.password : formatted,
-              confirm_password: initialData ? form.confirm_password : formatted,
-            });
-          }}
+          onChange={(v) => setForm({ ...form, birthdate: v })}
           required
         />
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-text block">
-            Password {!initialData && <span className="text-accent">*</span>}
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder={initialData ? 'Leave blank to keep existing password' : 'DDMMYYYY'}
-              required={!initialData}
-              className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm pr-12"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-text block">
-            Confirm Password {!initialData && <span className="text-accent">*</span>}
-          </label>
-          <div className="relative">
-            <input
-              type={showConfirmPassword ? 'text' : 'password'}
-              value={form.confirm_password}
-              onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
-              placeholder={initialData ? 'Repeat password if changing' : 'Repeat birthdate'}
-              required={!initialData}
-              className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm pr-12"
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
-            >
-              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-        </div>
         <div className="sm:col-span-2">
           <Input
             label="Full Address"
