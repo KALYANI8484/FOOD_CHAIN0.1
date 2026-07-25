@@ -87,8 +87,8 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         // Avoid duplicate additions
         if (prev.some((o) => o.id === newOrder.id)) return prev;
         
-        // Play Chime alert if order is in vendor's zip code
-        if (newOrder.client_zip === vendor.zip_code) {
+        // Play Chime alert if order is in vendor's zip code (first 3 digits match)
+        if (newOrder.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3)) {
           playPOSChime();
         }
         return [newOrder, ...prev];
@@ -405,7 +405,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         
         {radarOrders.map((o) => {
-          const isZipMatch = o.client_zip === vendor.zip_code;
+          const isZipMatch = o.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3);
           const isPlanMatch = o.master_category_name === vendor.plan_name;
           const isActive = vendor.status === 'approved';
           const isExpired = vendor.status === 'expired';

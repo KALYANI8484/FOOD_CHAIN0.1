@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Store, Package, CreditCard, FileText, Users,
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag
+  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
