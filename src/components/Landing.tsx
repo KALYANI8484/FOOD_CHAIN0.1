@@ -78,9 +78,9 @@ interface OrderModalProps {
 
 function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
   const [step, setStep] = useState<ModalStep>(1);
-  const [subItems, setSubItems] = useState<VendorItem[]>([]);
+  const [subItems, setSubItems] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
-  const [selectedItem, setSelectedItem] = useState<VendorItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [otp, setOtp] = useState('');
@@ -96,7 +96,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            table: 'vendor_inventory',
+            table: 'sub_inventory',
             action: 'select',
             filters: { master_item_id: master.id }
           })
@@ -115,6 +115,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
       alert('All fields are required'); return;
     }
     setSubmitting(true);
+    const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
     try {
       const res = await fetch('/api/db', {
         method: 'POST',
@@ -128,19 +129,19 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
             client_address: form.address,
             client_zip: form.zip,
             client_landmark: form.landmark,
-            item_name: selectedItem.item_name,
+            item_name: selectedItem.name,
             item_id: selectedItem.id,
-            master_item_id: master.id,
-            master_category: master.category,
+            master_category_name: master.name,
             price: selectedItem.price,
             quantity: qty,
             status: 'pending',
+            otp: generatedOtp
           }
         })
       });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
-      setOtp(d.data?.otp || '????');
+      setOtp(generatedOtp);
       setStep(3);
       onOrderPlaced();
     } catch (e: any) {

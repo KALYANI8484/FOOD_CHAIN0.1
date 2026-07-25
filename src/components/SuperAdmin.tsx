@@ -4,7 +4,7 @@ import {
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
   Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag
 } from 'lucide-react';
-import { supabase, type Vendor, type Plan, type MasterItem, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
+import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
 import { VendorForm } from './VendorForm';
 
@@ -1568,6 +1568,128 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
   );
 }
 
+// 5.1 Sub Inventory View
+function SubInventoryView({ master, show, onClose }: { master: MasterItem, show: (m: string, t?: 'success'|'error'|'info') => void, onClose: () => void }) {
+  const [items, setItems] = useState<SubInventory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [editItem, setEditItem] = useState<SubInventory | null>(null);
+  
+  const [form, setForm] = useState({
+    name: '',
+    price: 0,
+    quantity: 10,
+    image_url: ''
+  });
+
+  const load = async () => {
+    const { data } = await supabase.from('sub_inventory').select('*').eq('master_inventory_id', master.id).order('created_at', { ascending: false });
+    setItems(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.name || form.price < 0) return;
+    if (items.length >= 70) {
+      show('Maximum of 70 sub-inventory items allowed per master category.', 'error');
+      return;
+    }
+    
+    await supabase.from('sub_inventory').insert({
+      master_inventory_id: master.id,
+      name: form.name,
+      price: Number(form.price),
+      quantity: Number(form.quantity),
+      image_url: form.image_url || null
+    });
+
+    show(`Sub-Item ${form.name} created successfully!`);
+    setModal(false);
+    setForm({ name: '', price: 0, quantity: 10, image_url: '' });
+    load();
+  };
+
+  const handleEditSave = async () => {
+    if (!editItem) return;
+    await supabase.from('sub_inventory').update({
+      name: editItem.name,
+      price: Number(editItem.price),
+      quantity: Number(editItem.quantity),
+      image_url: editItem.image_url
+    }).eq('id', editItem.id);
+
+    show('Sub-Item updated');
+    setEditItem(null);
+    load();
+  };
+
+  const handleDelete = async (item: SubInventory) => {
+    if (confirm(`Warning: Are you sure you want to delete ${item.name}?`)) {
+      await supabase.from('sub_inventory').delete().eq('id', item.id);
+      show(`Sub-Item ${item.name} removed`, 'info');
+      load();
+    }
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center gap-4">
+        <button onClick={onClose} className="p-2 hover:bg-surface-2 rounded-xl transition-colors"><ChevronLeft size={20} /></button>
+        <PageHeader 
+          title={`Sub-Inventory: ${master.name}`} 
+          subtitle={`Manage items inside the ${master.category} category (${items.length}/70)`} 
+          action={<Button onClick={() => setModal(true)} disabled={items.length >= 70}><Plus size={16} /> Add Sub-Item</Button>}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {items.map(item => (
+          <div key={item.id} className="card bg-surface border border-border p-4 flex flex-col justify-between">
+            <h3 className="font-bold">{item.name}</h3>
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-accent font-bold">₹{item.price}</span>
+              <div className="flex gap-2">
+                <button onClick={() => setEditItem(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-text"><Edit2 size={14} /></button>
+                <button onClick={() => handleDelete(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-red-500"><Trash2 size={14} /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {items.length === 0 && <EmptyState icon={<Package size={28} />} title="No sub-items found" />}
+
+      <Modal open={modal} onClose={() => setModal(false)} title="Create Sub-Item">
+        <div className="space-y-4">
+          <Input label="Item Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Price (₹)" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} required />
+            <Input label="Default Qty" type="number" value={String(form.quantity)} onChange={(v) => setForm({ ...form, quantity: Number(v) })} required />
+          </div>
+          <Button className="w-full mt-4" onClick={handleCreate}>Save Sub-Item</Button>
+        </div>
+      </Modal>
+
+      {editItem && (
+        <Modal open={true} onClose={() => setEditItem(null)} title="Edit Sub-Item">
+          <div className="space-y-4">
+            <Input label="Item Name" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Price (₹)" type="number" value={String(editItem.price)} onChange={(v) => setEditItem({ ...editItem, price: Number(v) })} required />
+              <Input label="Quantity" type="number" value={String(editItem.quantity)} onChange={(v) => setEditItem({ ...editItem, quantity: Number(v) })} required />
+            </div>
+            <Button className="w-full mt-4" onClick={handleEditSave}>Update Item</Button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // 5. Master Inventory Module Tab
 function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [items, setItems] = useState<MasterItem[]>([]);
@@ -1577,6 +1699,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   const [modal, setModal] = useState(false);
   const [editItem, setEditItem] = useState<MasterItem | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedMaster, setSelectedMaster] = useState<MasterItem | null>(null);
   
   const [form, setForm] = useState({
     name: '',
@@ -1599,9 +1722,9 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const MAX_SIZE = 10 * 1024 * 1024; // 10 MB maximum application limit
+    const MAX_SIZE = 15 * 1024 * 1024; // 15 MB maximum application limit
     if (file.size > MAX_SIZE) {
-      alert(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum application limit of 10 MB.`);
+      alert(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum application limit of 15 MB.`);
       return;
     }
 
@@ -1680,6 +1803,10 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
   if (loading) return <Spinner />;
 
+  if (selectedMaster) {
+    return <SubInventoryView master={selectedMaster} show={show} onClose={() => setSelectedMaster(null)} />;
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader 
@@ -1702,7 +1829,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 stagger">
         {filtered.map((item) => (
-          <div key={item.id} className="card overflow-hidden bg-surface border border-border flex flex-col justify-between hover-lift group">
+          <div key={item.id} onClick={() => setSelectedMaster(item)} className="card overflow-hidden bg-surface border border-border flex flex-col justify-between hover-lift group cursor-pointer">
             <div className="relative aspect-[4/3] overflow-hidden">
               {item.image_url ? (
                 <img src={item.image_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
@@ -1721,8 +1848,8 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
                 <span className="text-lg font-extrabold text-accent">₹{item.base_price}</span>
                 <div className="flex gap-2">
-                  <button onClick={() => setEditItem(item)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-text" title="Edit"><Edit2 size={12} /></button>
-                  <button onClick={() => handleDelete(item)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500" title="Delete"><Trash2 size={12} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setEditItem(item); }} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-text" title="Edit"><Edit2 size={12} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(item); }} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500" title="Delete"><Trash2 size={12} /></button>
                 </div>
               </div>
             </div>

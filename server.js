@@ -122,6 +122,16 @@ const masterItemSchema = new mongoose.Schema({
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
+const subInventorySchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  master_inventory_id: { type: String, required: true },
+  name: { type: String, required: true },
+  price: { type: Number, required: true },
+  quantity: { type: Number, required: true },
+  image_url: { type: String, default: null },
+  created_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
 const vendorSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   owner_name: { type: String, required: true },
@@ -176,7 +186,8 @@ const orderSchema = new mongoose.Schema({
   distance_km: { type: Number, default: null },
   created_at: { type: String, default: () => new Date().toISOString() },
   accepted_at: { type: String, default: null },
-  delivered_at: { type: String, default: null }
+  delivered_at: { type: String, default: null },
+  master_category_name: { type: String, default: null }
 }, schemaOptions);
 
 const guideSchema = new mongoose.Schema({
@@ -231,6 +242,7 @@ const SuperAdmin = mongoose.model('SuperAdmin', superAdminSchema, 'super_admins'
 const SubAdmin = mongoose.model('SubAdmin', subAdminSchema, 'sub_admins');
 const Plan = mongoose.model('Plan', planSchema, 'subscription_plans');
 const MasterItem = mongoose.model('MasterItem', masterItemSchema, 'master_inventory');
+const SubInventory = mongoose.model('SubInventory', subInventorySchema, 'sub_inventory');
 const Vendor = mongoose.model('Vendor', vendorSchema, 'vendors');
 const VendorItem = mongoose.model('VendorItem', vendorItemSchema, 'vendor_inventory');
 const Order = mongoose.model('Order', orderSchema, 'orders');
@@ -261,6 +273,7 @@ const models = {
   subscription_plans: Plan,
   addons: Addon,
   master_inventory: MasterItem,
+  sub_inventory: SubInventory,
   vendors: Vendor,
   vendor_inventory: VendorItem,
   orders: Order,

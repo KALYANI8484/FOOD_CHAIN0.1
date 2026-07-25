@@ -23,6 +23,16 @@ export type MasterItem = {
   created_at: string;
 };
 
+export type SubInventory = {
+  id: string;
+  master_inventory_id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image_url: string | null;
+  created_at: string;
+};
+
 export type Vendor = {
   id: string;
   owner_name: string;
@@ -78,6 +88,7 @@ export type Order = {
   created_at: string;
   accepted_at: string | null;
   delivered_at: string | null;
+  master_category_name: string | null;
 };
 
 export type Guide = {

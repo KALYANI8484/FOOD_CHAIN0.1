@@ -374,6 +374,10 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
       show('Please enter the client OTP to confirm', 'error');
       return;
     }
+    if (otpAttempt !== order.otp) {
+      show('Invalid OTP. Order claim failed.', 'error');
+      return;
+    }
 
     const { error } = await supabase.from('orders').update({
       vendor_id: vendor.id,
@@ -402,6 +406,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
         
         {radarOrders.map((o) => {
           const isZipMatch = o.client_zip === vendor.zip_code;
+          const isPlanMatch = o.master_category_name === vendor.plan_name;
           const isActive = vendor.status === 'approved';
           const isExpired = vendor.status === 'expired';
           const remaining = timers[o.id] ?? 600;
@@ -424,10 +429,15 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
           } else if (vendor.plan_name === 'Free' || !vendor.plan_name) {
             btnLabel = 'Paid Plan Required';
             disabled = true;
+          } else if (!isPlanMatch) {
+            btnLabel = 'Subscription Plan Mismatch';
+            disabled = true;
           } else if (!isActive) {
             btnLabel = 'Awaiting Activation';
             disabled = true;
           }
+
+          if (!isPlanMatch) return null; // completely hide orders if subscription doesn't match
 
           return (
             <div 
@@ -451,14 +461,18 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
                 </div>
 
                 <div className="my-4 space-y-2 text-xs text-muted">
-                  <p>Client: <span className="font-semibold text-text">{o.client_name}</span></p>
+                  <p>Client Name: <span className="italic">Hidden until claimed</span></p>
                   <p>Zip Code: <span className="font-semibold text-text">{o.client_zip}</span></p>
                   {o.client_landmark && <p>Landmark: <span className="font-semibold text-text">{o.client_landmark}</span></p>}
-                  {isZipMatch && (vendor.plan_name !== 'Free' && vendor.plan_name) && (
+                  <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-100 flex justify-between items-center">
+                    <span className="text-[10px] uppercase font-bold text-amber-600 tracking-wider">Claim OTP</span>
+                    <span className="text-sm font-extrabold tracking-widest text-amber-900">{o.otp}</span>
+                  </div>
+                  {isZipMatch && isPlanMatch && isActive && (
                     <div className="pt-2">
                       <input
                         type="text"
-                        placeholder="Enter Client OTP to Claim *"
+                        placeholder="Enter OTP to Claim *"
                         value={otpInputs[o.id] || ''}
                         onChange={(e) => setOtpInputs({ ...otpInputs, [o.id]: e.target.value })}
                         className="w-full px-3 py-2 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none text-xs font-semibold"
