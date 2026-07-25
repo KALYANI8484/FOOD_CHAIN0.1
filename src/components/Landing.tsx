@@ -299,7 +299,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                   <span className="text-gray-600">{selectedItem?.item_name} × {qty}</span>
                   <span className="font-extrabold text-amber-700">₹{price}</span>
                 </div>
-                <p className="text-[10px] text-amber-600 mt-2">🔐 A 4-digit OTP will be generated. Share it with your vendor on delivery to complete the handover.</p>
+                <p className="text-[10px] text-amber-600 mt-2">⏳ We will connect you to nearby vendors. Once a vendor claims your order, they will contact you.</p>
               </div>
             </div>
           )}
@@ -316,10 +316,9 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                 </h3>
                 <p className="text-gray-500 text-sm mt-1">Your order has been broadcast to nearby vendors.</p>
               </div>
-              <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white">
-                <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Your Delivery OTP</p>
-                <p className="text-5xl font-extrabold tracking-[0.25em]">{otp}</p>
-                <p className="text-xs opacity-75 mt-3">Share this code with your vendor when they arrive to complete the delivery handover.</p>
+              <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white animate-pulse">
+                <p className="text-sm font-bold uppercase tracking-widest opacity-90 mb-2">Connecting to nearby vendors...</p>
+                <p className="text-xs opacity-80 mt-1">Once a vendor accepts your order, they will contact you shortly.</p>
               </div>
               <p className="text-xs text-gray-400">This window will close automatically in a moment...</p>
             </div>

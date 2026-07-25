@@ -404,9 +404,8 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {radarOrders.map((o) => {
+        {radarOrders.filter(o => o.master_category_name === vendor.plan_name).map((o) => {
           const isZipMatch = o.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3);
-          const isPlanMatch = o.master_category_name === vendor.plan_name;
           const isActive = vendor.status === 'approved';
           const isExpired = vendor.status === 'expired';
           const remaining = timers[o.id] ?? 600;
@@ -429,15 +428,10 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
           } else if (vendor.plan_name === 'Free' || !vendor.plan_name) {
             btnLabel = 'Paid Plan Required';
             disabled = true;
-          } else if (!isPlanMatch) {
-            btnLabel = 'Subscription Plan Mismatch';
-            disabled = true;
           } else if (!isActive) {
             btnLabel = 'Awaiting Activation';
             disabled = true;
           }
-
-          if (!isPlanMatch) return null; // completely hide orders if subscription doesn't match
 
           return (
             <div 
@@ -461,21 +455,21 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
                 </div>
 
                 <div className="my-4 space-y-2 text-xs text-muted">
-                  <p>Client Name: <span className="italic">Hidden until claimed</span></p>
-                  <p>Zip Code: <span className="font-semibold text-text">{o.client_zip}</span></p>
-                  {o.client_landmark && <p>Landmark: <span className="font-semibold text-text">{o.client_landmark}</span></p>}
-                  <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-100 flex justify-between items-center">
-                    <span className="text-[10px] uppercase font-bold text-amber-600 tracking-wider">Claim OTP</span>
-                    <span className="text-sm font-extrabold tracking-widest text-amber-900">{o.otp}</span>
+                  <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100/50">
+                    <p className="text-amber-900 font-semibold mb-1">New Broadcast Notification</p>
+                    <p className="text-amber-800">Client's OTP: <span className="font-extrabold">{o.otp}</span></p>
+                    {o.client_landmark && <p className="text-amber-800">Landmark: <span className="font-medium">{o.client_landmark}</span></p>}
+                    <p className="text-[10px] text-amber-600/70 mt-1">Full info will display in Active Orders once confirmed.</p>
                   </div>
-                  {isZipMatch && isPlanMatch && isActive && (
-                    <div className="pt-2">
+                  
+                  {isZipMatch && isActive && (
+                    <div className="pt-3">
                       <input
                         type="text"
-                        placeholder="Enter OTP to Claim *"
+                        placeholder="Insert client's OTP here to claim *"
                         value={otpInputs[o.id] || ''}
                         onChange={(e) => setOtpInputs({ ...otpInputs, [o.id]: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-surface-2 border border-border text-text placeholder:text-muted/50 focus:border-accent outline-none text-xs font-semibold"
+                        className="w-full px-4 py-3 rounded-xl bg-surface-2 border-2 border-border text-text placeholder:text-muted/60 focus:border-accent outline-none text-sm font-bold shadow-sm transition-all text-center tracking-widest"
                       />
                     </div>
                   )}
@@ -518,16 +512,15 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
           );
         })}
 
-        {radarOrders.length === 0 && (
+        {radarOrders.filter(o => o.master_category_name === vendor.plan_name).length === 0 && (
           <div className="col-span-full">
             <EmptyState 
               icon={<Radar size={32} className="text-muted" />} 
               title="Radar search is silent" 
-              subtitle="No active client orders are currently broadcasting in Indiranagar zone." 
+              subtitle="No active client orders are currently broadcasting for your subscription plan." 
             />
           </div>
         )}
-
       </div>
     </div>
   );
