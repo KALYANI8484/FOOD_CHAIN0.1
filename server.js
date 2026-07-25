@@ -373,7 +373,10 @@ app.post('/api/vendors/signup', async (req, res) => {
       password,
       address,
       zip_code,
-      status: 'pending_approval'
+      status: 'approved',
+      plan_name: 'Free',
+      subscription_start: new Date().toISOString(),
+      subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
     });
     
     await newVendor.save();

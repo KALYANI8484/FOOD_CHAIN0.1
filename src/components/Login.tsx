@@ -105,8 +105,8 @@ export function Login({
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Registration failed');
       else {
-        setSuccess('Application submitted! Your account is pending Super Admin approval. You will be notified once approved.');
-        setTimeout(() => switchMode('login'), 5000);
+        setSuccess('Account created successfully! Redirecting to login...');
+        setTimeout(() => switchMode('login'), 2000);
       }
     } catch { setError('Network error — please try again'); }
     finally { setLoading(false); }
@@ -150,7 +150,7 @@ export function Login({
                   <ShieldCheck size={26} className="text-white" />
                 </div>
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Team Sign-In
+                  Login / Sign-In
                 </h2>
                 <p className="text-gray-500 text-sm mt-1">Access your workspace below</p>
               </div>
@@ -216,7 +216,7 @@ export function Login({
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Vendor Sign-Up
                 </h2>
-                <p className="text-gray-500 text-sm mt-1">Register your kitchen on the platform. Admin approval required.</p>
+                <p className="text-gray-500 text-sm mt-1">Register your kitchen to start receiving orders instantly.</p>
               </div>
 
               {/* Credential rule callout */}

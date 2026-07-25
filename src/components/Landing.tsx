@@ -465,7 +465,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               Vendor's Plan
             </a>
             <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
-              Team Sign-In
+              Login / Sign-In
             </button>
           </nav>
         </div>
@@ -582,7 +582,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <ul className="space-y-3">
                 <li>
                   <button onClick={() => onNavigate('login')} className="flex items-center gap-2 text-sm text-gray-600 hover:text-amber-600 transition-colors">
-                    <Lock size={14} /> Team Sign-In
+                    <Lock size={14} /> Login / Sign-In
                   </button>
                 </li>
                 <li>
