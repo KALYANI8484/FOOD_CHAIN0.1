@@ -752,7 +752,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                     className="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-slate-800 text-sm focus:border-amber-400 outline-none"
                   >
                     <option value="">-- Select an Add-on to Apply --</option>
-                    {addons.filter(a => !editVendor.plan_name || a.name === editVendor.plan_name).map(a => (
+                    {addons.map(a => (
                       <option key={a.id} value={a.id}>{a.name} (+{a.validity_days} days, +{a.max_clients} clients)</option>
                     ))}
                   </select>
