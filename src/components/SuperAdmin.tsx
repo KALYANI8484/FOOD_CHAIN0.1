@@ -30,7 +30,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
       {/* Mobile Header Toggle */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-surface border-b border-border z-30 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
-          <Store size={18} className="text-accent" />
+          <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
           <p className="font-bold text-sm truncate text-text">VIKRAM ADVERTISING</p>
         </div>
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text">
@@ -40,10 +40,8 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
 
       {/* Sidebar */}
       <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center group-hover:rotate-12 transition-transform">
-            <Store size={18} className="text-white" />
-          </div>
+        <div className="px-5 py-4 border-b border-border hidden lg:flex items-center gap-3 cursor-pointer group" onClick={onExit}>
+          <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain shrink-0" />
           <div className="min-w-0">
             <p className="font-bold text-sm truncate">VIKRAM ADVERTISING</p>
             <p className="text-xs text-muted">Super Admin Portal</p>
@@ -744,13 +742,6 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
             
             {/* Header Profile Section */}
             <div className="flex flex-col sm:flex-row items-center gap-6 p-6 rounded-3xl bg-gradient-to-br from-[#fcf5e7] to-[#fff8ef] border border-amber-200 shadow-sm">
-              {viewVendor.logo_url ? (
-                <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md shrink-0" />
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center border-4 border-amber-100 shadow-md shrink-0">
-                  <Store size={36} className="text-amber-500" />
-                </div>
-              )}
               <div className="flex-1 text-center sm:text-left">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-center sm:justify-start">
                   <h2 className="text-2xl font-extrabold text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>{viewVendor.shop_name}</h2>
@@ -1104,14 +1095,21 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 // 4. Subscription Plans Module Tab
 function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [addons, setAddons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
+  const [addonModal, setAddonModal] = useState(false);
   const [form, setForm] = useState({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10 });
+  const [addonForm, setAddonForm] = useState({ name: '', price: 99, validity_days: 30, max_clients: 50 });
   const [editPlan, setEditPlan] = useState<Plan | null>(null);
 
   const load = async () => {
-    const { data } = await supabase.from('subscription_plans').select('*').order('price');
-    setPlans(data || []);
+    const [{ data: pData }, { data: aData }] = await Promise.all([
+      supabase.from('subscription_plans').select('*').order('price'),
+      supabase.from('addons').select('*').order('created_at', { ascending: false })
+    ]);
+    setPlans(pData || []);
+    setAddons(aData || []);
     setLoading(false);
   };
 
@@ -1136,6 +1134,26 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
     show(`Plan ${form.name} created successfully!`);
     setModal(false);
     setForm({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10 });
+    load();
+  };
+
+  const handleCreateAddon = async () => {
+    if (!addonForm.name || addonForm.price < 0) return;
+    await supabase.from('addons').insert({
+      name: addonForm.name,
+      price: Number(addonForm.price),
+      validity_days: Number(addonForm.validity_days),
+      max_clients: Number(addonForm.max_clients)
+    });
+
+    await supabase.from('activity_log').insert({
+      action: `New add-on package created: ${addonForm.name}`,
+      actor: 'Super Admin'
+    });
+
+    show(`Add-on package ${addonForm.name} created successfully!`);
+    setAddonModal(false);
+    setAddonForm({ name: '', price: 99, validity_days: 30, max_clients: 50 });
     load();
   };
 
@@ -1171,6 +1189,18 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
     }
   };
 
+  const handleDeleteAddon = async (addonId: string, addonName: string) => {
+    if (confirm(`Are you sure you want to remove the ${addonName} add-on?`)) {
+      await supabase.from('addons').delete().eq('id', addonId);
+      await supabase.from('activity_log').insert({
+        action: `Add-on package deleted: ${addonName}`,
+        actor: 'Super Admin'
+      });
+      show(`Add-on ${addonName} removed successfully`, 'info');
+      load();
+    }
+  };
+
   if (loading) return <Spinner />;
 
   return (
@@ -1178,7 +1208,12 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
       <PageHeader 
         title="Subscription Pricing plans" 
         subtitle="Configure limits and pricing cards" 
-        action={<Button onClick={() => setModal(true)}><Plus size={16} /> Add Plan</Button>}
+        action={
+          <div className="flex items-center gap-3">
+            <Button onClick={() => setAddonModal(true)} variant="outline"><Plus size={16} /> Add Add-on</Button>
+            <Button onClick={() => setModal(true)}><Plus size={16} /> Add Plan</Button>
+          </div>
+        }
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger">
@@ -1227,6 +1262,52 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
         ))}
       </div>
 
+      {/* Subscription Add-ons Section */}
+      <div className="pt-8 border-t border-border/80 mt-10 space-y-6">
+        <div>
+          <h2 className="text-xl font-extrabold text-text">Subscription Add-on Packages</h2>
+          <p className="text-xs text-muted mt-1">Provide permission for vendors with active plans to extend validity or increase maximum client limits when reached.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger">
+          {addons.map((a) => (
+            <div key={a.id} className="card p-6 bg-surface border border-border relative hover:border-accent/40 transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-accent uppercase tracking-wide">Add-on Extension</span>
+                  <button 
+                    onClick={() => handleDeleteAddon(a.id, a.name)} 
+                    className="p-1 rounded hover:bg-surface-2 text-muted hover:text-red-500 transition-colors"
+                    title="Remove Add-on"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                
+                <h3 className="font-extrabold text-lg text-text mt-3">{a.name}</h3>
+                <p className="text-3xl font-extrabold text-text mt-2">₹{Number(a.price).toLocaleString()}</p>
+                <p className="text-xs text-muted mt-1">+ {a.validity_days} Additional Days Validity</p>
+
+                <div className="border-t border-border/60 my-4" />
+
+                <ul className="space-y-2 text-sm text-text font-medium">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                    <span>Max Client Connect: <span className="font-bold text-accent">+{a.max_clients} clients</span></span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          ))}
+
+          {addons.length === 0 && (
+            <div className="col-span-full p-8 text-center bg-surface-2/40 border border-dashed border-border rounded-2xl">
+              <p className="text-sm text-muted">No Add-on packages created yet. Click "+ Add Add-on" beside "+ Add Plan" to create one.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Add Plan Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="Add Pricing Plan">
         <div className="space-y-4">
@@ -1239,6 +1320,45 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
             <Button onClick={handleCreate}>Save Plan</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Add-on Modal */}
+      <Modal open={addonModal} onClose={() => setAddonModal(false)} title="Add Subscription Add-on Package">
+        <div className="space-y-4">
+          <Input 
+            label="Add-on Plan Name" 
+            placeholder="e.g. Extra Validity & Clients Boost" 
+            value={addonForm.name} 
+            onChange={(v) => setAddonForm({ ...addonForm, name: v })} 
+            required 
+          />
+          <Input 
+            label="Price (₹)" 
+            type="number" 
+            value={String(addonForm.price)} 
+            onChange={(v) => setAddonForm({ ...addonForm, price: Number(v) })} 
+            required 
+          />
+          <Input 
+            label="Validity Extension (Days)" 
+            type="number" 
+            value={String(addonForm.validity_days)} 
+            onChange={(v) => setAddonForm({ ...addonForm, validity_days: Number(v) })} 
+            required 
+          />
+          <Input 
+            label="Maximum Clients That Can Connect" 
+            type="number" 
+            value={String(addonForm.max_clients)} 
+            onChange={(v) => setAddonForm({ ...addonForm, max_clients: Number(v) })} 
+            required 
+          />
+
+          <div className="flex gap-2 justify-end pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => setAddonModal(false)}>Cancel</Button>
+            <Button onClick={handleCreateAddon}>Save Add-on</Button>
           </div>
         </div>
       </Modal>
@@ -1294,6 +1414,12 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const MAX_SIZE = 10 * 1024 * 1024; // 10 MB maximum application limit
+    if (file.size > MAX_SIZE) {
+      alert(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum application limit of 10 MB.`);
+      return;
+    }
 
     setUploading(true);
     try {
@@ -1461,6 +1587,16 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               <input type="file" accept="image/*" disabled={uploading} onChange={(e) => handleImageUpload(e)} className="absolute inset-0 opacity-0 cursor-pointer" />
               {uploading && <div className="absolute inset-0 bg-surface/90 flex items-center justify-center rounded-xl"><Spinner /></div>}
             </div>
+
+            <div className="text-xs bg-surface-2/60 border border-border/80 rounded-xl p-3 text-muted space-y-1">
+              <p className="font-bold text-text text-[11px] uppercase tracking-wider">Photo Upload Specifications:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                <li><strong className="text-text">JPEG Size Range:</strong> 2 MB – 5 MB (Compressed)</li>
+                <li><strong className="text-text">PNG Size Range:</strong> 5 MB – 15 MB (Uncompressed)</li>
+                <li><strong className="text-text">Target Resolution:</strong> 1920×1080 (Full HD) or 2048×1536</li>
+                <li><strong className="text-text">Max Application Limit:</strong> 10 MB maximum</li>
+              </ul>
+            </div>
           </div>
 
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
@@ -1509,6 +1645,16 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
                 )}
                 <input type="file" accept="image/*" disabled={uploading} onChange={(e) => handleImageUpload(e, true)} className="absolute inset-0 opacity-0 cursor-pointer" />
                 {uploading && <div className="absolute inset-0 bg-surface/90 flex items-center justify-center rounded-xl"><Spinner /></div>}
+              </div>
+
+              <div className="text-xs bg-surface-2/60 border border-border/80 rounded-xl p-3 text-muted space-y-1">
+                <p className="font-bold text-text text-[11px] uppercase tracking-wider">Photo Upload Specifications:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                  <li><strong className="text-text">JPEG Size Range:</strong> 2 MB – 5 MB (Compressed)</li>
+                  <li><strong className="text-text">PNG Size Range:</strong> 5 MB – 15 MB (Uncompressed)</li>
+                  <li><strong className="text-text">Target Resolution:</strong> 1920×1080 (Full HD) or 2048×1536</li>
+                  <li><strong className="text-text">Max Application Limit:</strong> 10 MB maximum</li>
+                </ul>
               </div>
             </div>
 

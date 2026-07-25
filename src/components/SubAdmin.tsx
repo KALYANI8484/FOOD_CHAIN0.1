@@ -25,10 +25,8 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
   return (
     <div className="min-h-screen bg-bg flex text-text">
       <aside className="w-64 border-r border-border bg-surface flex flex-col h-screen sticky top-0 z-20">
-        <div className="px-5 py-5 border-b border-border flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center group-hover:rotate-12 transition-transform">
-            <Users size={18} className="text-white" />
-          </div>
+        <div className="px-5 py-4 border-b border-border flex items-center gap-3 cursor-pointer group" onClick={onExit}>
+          <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain shrink-0" />
           <div>
             <p className="font-bold text-sm">VIKRAM ADVERTISING</p>
             <p className="text-xs text-muted">Sub-Admin Portal</p>

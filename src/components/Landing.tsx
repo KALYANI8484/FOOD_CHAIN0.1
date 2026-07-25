@@ -452,10 +452,8 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       {/* ── Header ─────────────────────────────── */}
       <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100' : 'bg-[#F8F8FF]/80'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-md">
-              <UtensilsCrossed size={18} className="text-white" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Vikram Advertising" className="h-11 w-auto object-contain" />
             <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
               Vikram Advertising
             </span>
@@ -546,10 +544,8 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         <div className="max-w-7xl mx-auto px-6 py-14">
           <div className="grid md:grid-cols-3 gap-12 items-start">
             <div className="reveal reveal-left">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow">
-                  <UtensilsCrossed size={18} className="text-white" />
-                </div>
+              <div className="flex items-center gap-3 mb-4">
+                <img src="/logo.png" alt="Vikram Advertising" className="h-12 w-auto object-contain" />
                 <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>Vikram Advertising</span>
               </div>
               <p className="text-gray-500 text-sm leading-relaxed">Connecting verified local kitchen vendors with guests through a seamless, real-time ordering platform.</p>

@@ -32,8 +32,11 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Multer storage in memory
-const upload = multer({ storage: multer.memoryStorage() });
+// Multer storage in memory with 10 MB limit
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10 MB limit
+});
 
 // Connect to MongoDB
 let MONGODB_URI = process.env.MONGODB_URI;
@@ -297,7 +300,16 @@ async function checkPlanLimitOnDelivery(orderId) {
 }
 
 // Upload file to AWS S3
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+app.post('/api/upload', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File size exceeds maximum limit of 10 MB.' });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     const fileKey = `${crypto.randomUUID()}-${req.file.originalname}`;

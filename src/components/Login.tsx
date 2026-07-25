@@ -146,9 +146,7 @@ export function Login({
           {mode === 'login' && (
             <div className="space-y-6">
               <div>
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-200 mb-5">
-                  <ShieldCheck size={26} className="text-white" />
-                </div>
+                <img src="/logo.png" alt="Vikram Advertising" className="h-16 w-auto object-contain mb-5" />
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Login / Sign-In
                 </h2>
@@ -210,9 +208,7 @@ export function Login({
           {mode === 'signup' && (
             <div className="space-y-5">
               <div>
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-200 mb-5">
-                  <UserPlus size={26} className="text-white" />
-                </div>
+                <img src="/logo.png" alt="Vikram Advertising" className="h-16 w-auto object-contain mb-5" />
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Vendor Sign-Up
                 </h2>
