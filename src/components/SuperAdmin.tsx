@@ -1076,7 +1076,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           </table>
           {vendorRequests.length === 0 && <EmptyState icon={<CheckCircle2 size={24} />} title="No new vendor requests" />}
         </div>
-      ) : (
+      ) : activeTab === 'upgrades' ? (
         <div className="card overflow-hidden bg-surface border border-border">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
