@@ -5,7 +5,7 @@ import { SuperAdmin } from './components/SuperAdmin';
 import { SubAdmin } from './components/SubAdmin';
 import { Vendor } from './components/Vendor';
 
-type Screen = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor';
+type Screen = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
 function App() {
   const [screen, setScreen] = useState<Screen>('landing');

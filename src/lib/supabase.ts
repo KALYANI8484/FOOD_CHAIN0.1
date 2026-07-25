@@ -43,6 +43,8 @@ export type Vendor = {
   subscription_start: string | null;
   subscription_end: string | null;
   total_clients: number;
+  addon_max_clients?: number;
+  addon_name?: string | null;
   created_at: string;
 };
 

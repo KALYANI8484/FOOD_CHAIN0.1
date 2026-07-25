@@ -399,6 +399,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [loadingItems, setLoadingItems] = useState(true);
   const [totalOrders, setTotalOrders] = useState<number | null>(null);
   const [totalVendors, setTotalVendors] = useState<number | null>(null);
+  const [vendorPlanFile, setVendorPlanFile] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedMaster, setSelectedMaster] = useState<MasterItem | null>(null);
 
@@ -413,19 +414,51 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   useEffect(() => {
     (async () => {
       try {
-        const [iR, oR, vR] = await Promise.all([
+        const [iR, oR, vR, gR] = await Promise.all([
           fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'master_inventory', action: 'select' }) }),
           fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'orders', action: 'select' }) }),
           fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'vendors', action: 'select' }) }),
+          fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'guides', action: 'select' }) }),
         ]);
-        const [id, od, vd] = await Promise.all([iR.json(), oR.json(), vR.json()]);
+        const [id, od, vd, gd] = await Promise.all([iR.json(), oR.json(), vR.json(), gR.json()]);
         if (id.data) setMasterItems(id.data);
         if (od.data) setTotalOrders(od.data.length);
         if (vd.data) setTotalVendors(vd.data.length);
+        if (gd.data) {
+          const plans = gd.data.filter((g: any) => g.allowed_roles?.includes('vendor_plan'));
+          if (plans.length > 0) {
+            // Get the most recently uploaded plan
+            const latest = plans.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+            setVendorPlanFile(latest.file_data);
+          }
+        }
       } catch (e) { console.error(e); }
       finally { setLoadingItems(false); }
     })();
   }, []);
+
+  const handleVendorPlanClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (vendorPlanFile) {
+      // Create a temporary link to open base64 data in new tab, or just use window.open for pdf/image
+      // Some browsers block huge data URIs in window.open, so we can construct a Blob
+      try {
+        const arr = vendorPlanFile.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+        const blob = new Blob([u8arr], { type: mime });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      } catch (err) {
+        window.open(vendorPlanFile, '_blank');
+      }
+    } else {
+      alert("Vendor plan document is currently unavailable.");
+    }
+  };
 
   const categories = ['All', ...Array.from(new Set(masterItems.map(m => m.category)))];
   const filtered = activeCategory === 'All' ? masterItems : masterItems.filter(m => m.category === activeCategory);
@@ -459,9 +492,9 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             </span>
           </div>
           <nav className="flex items-center gap-3">
-            <a href="#contact" className="text-sm font-semibold text-gray-600 hover:text-amber-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-amber-50">
+            <button onClick={handleVendorPlanClick} className="text-sm font-semibold text-gray-600 hover:text-amber-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-amber-50">
               Vendor's Plan
-            </a>
+            </button>
             <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
               Login / Sign-In
             </button>

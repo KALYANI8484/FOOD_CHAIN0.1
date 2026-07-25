@@ -26,6 +26,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   const [tab, setTab] = useState<Tab>('dashboard');
   const [vendor, setVendor] = useState<VendorType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast, show } = useToast();
   
   // Sockets & Live broadcast radar list
@@ -143,8 +144,6 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       </div>
     );
   }
-
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-bg flex text-text relative">

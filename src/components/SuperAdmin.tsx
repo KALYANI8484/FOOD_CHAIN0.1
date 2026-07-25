@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Store, Package, CreditCard, FileText, Users,
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin
+  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
@@ -1934,8 +1934,10 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.type !== 'application/pdf') { show('Please select a PDF file', 'error'); return; }
-    if (file.size > 2 * 1024 * 1024) { show('File too large (max 2MB)', 'error'); return; }
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size must be under 15MB');
+      return;
+    }
     setPdfFile(file);
     const reader = new FileReader();
     reader.onload = () => setPdfData(reader.result as string);
@@ -1944,7 +1946,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
 
   const handleCreate = async () => {
     if (!form.title || !pdfData) {
-      alert('Title and PDF file are required.');
+      alert('Title and file are required.');
       return;
     }
     setUploading(true);
@@ -1959,7 +1961,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
     });
 
     setUploading(false);
-    show('SOP Document uploaded successfully!');
+    show('Document uploaded successfully!');
     setModal(false);
     setForm({ title: '', category: 'vendor', keywords: '' });
     setPdfFile(null);
@@ -2018,7 +2020,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       </div>
 
       {/* Upload Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Upload PDF Guideline">
+      <Modal open={modal} onClose={() => setModal(false)} title="Upload Document">
         <div className="space-y-4">
           <Input label="Title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} required />
           <Select 
@@ -2073,13 +2075,25 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
                 />
                 Show to Clients
               </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={visibilityRoles.includes('vendor_plan')}
+                  onChange={(e) => {
+                    if (e.target.checked) setVisibilityRoles([...visibilityRoles, 'vendor_plan']);
+                    else setVisibilityRoles(visibilityRoles.filter(r => r !== 'vendor_plan'));
+                  }}
+                  className="accent-accent"
+                />
+                Show to Vendor's Plan
+              </label>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 block">PDF Document File</label>
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 block">Document File</label>
             <div className="relative border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-surface-2/20 hover:bg-surface-2/40 transition-colors">
-              <input type="file" accept="application/pdf" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+              <input type="file" accept="application/pdf, image/jpeg, image/png" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
               {pdfFile ? (
                 <div className="text-center">
                   <FileText size={24} className="text-accent mx-auto mb-1 animate-bounce" />
@@ -2088,7 +2102,8 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
               ) : (
                 <div className="text-center">
                   <Upload size={20} className="text-muted mx-auto mb-1" />
-                  <p className="text-[10px] text-muted">Upload PDF under 2MB</p>
+                  <p className="text-[10px] text-muted">Upload PDF, JPEG, PNG (Max 15MB)</p>
+                  <p className="text-[9px] text-muted mt-1">Ideal: 1920x1080 for images</p>
                 </div>
               )}
             </div>
