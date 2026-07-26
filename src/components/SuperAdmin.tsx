@@ -2008,7 +2008,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 }
 
 // 6. Orders Watchlist Tab
-function PendingOrdersTab({ show: _show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+function OrdersTab({ show: _show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
