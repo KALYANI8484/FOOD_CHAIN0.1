@@ -1299,7 +1299,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
     ]);
     setPlans(pData || []);
     setAddons(aData || []);
-    setMasterCategories((mData || []).map((m: any) => m.name));
+    setMasterCategories(Array.from(new Set((mData || []).map((m: any) => m.name))).filter(Boolean) as string[]);
     setLoading(false);
   };
 
@@ -1356,6 +1356,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
       validity_days: Number(editPlan.validity_days),
       max_items: Number(editPlan.max_items),
       max_clients: Number(editPlan.max_clients),
+      master_category_name: editPlan.master_category_name || null,
     }).eq('id', editPlan.id);
 
     await supabase.from('activity_log').insert({
@@ -1432,6 +1433,12 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
                   <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                   <span>Max Inventory: <span className="font-bold text-accent">{p.max_items} Items</span></span>
                 </li>
+                {p.master_category_name && (
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                    <span>Linked Category: <span className="font-bold text-accent">{p.master_category_name}</span></span>
+                  </li>
+                )}
                 <li className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                   <span>Max Client Limit: <span className="font-bold text-accent">{p.max_clients} unique clients</span></span>
@@ -1568,6 +1575,12 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
             <Input label="Validity Days" type="number" value={String(editPlan.validity_days)} onChange={(v) => setEditPlan({ ...editPlan, validity_days: Number(v) })} required />
             <Input label="Max Inventory Items" type="number" value={String(editPlan.max_items)} onChange={(v) => setEditPlan({ ...editPlan, max_items: Number(v) })} required />
             <Input label="Max Client Limits" type="number" value={String(editPlan.max_clients)} onChange={(v) => setEditPlan({ ...editPlan, max_clients: Number(v) })} required />
+            <Select
+              label="Linked Master Category"
+              value={editPlan.master_category_name || ''}
+              onChange={(v) => setEditPlan({ ...editPlan, master_category_name: v })}
+              options={[{ label: '-- Select Master Category --', value: '' }, ...masterCategories.map(c => ({ label: c, value: c }))]}
+            />
 
             <div className="flex gap-2 justify-end pt-4 border-t border-border">
               <Button variant="outline" onClick={() => setEditPlan(null)}>Cancel</Button>
