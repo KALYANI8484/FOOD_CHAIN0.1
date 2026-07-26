@@ -2414,8 +2414,20 @@ function PendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' 
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    const { data } = await supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-    setOrders(data || []);
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'select',
+          filters: { status: 'pending' },
+          admin_override: true
+        })
+      });
+      const d = await res.json();
+      setOrders((d.data || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    } catch (e) { console.error(e); }
     setLoading(false);
   };
 

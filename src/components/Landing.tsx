@@ -98,7 +98,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
           body: JSON.stringify({
             table: 'sub_inventory',
             action: 'select',
-            filters: { master_item_id: master.id }
+            filters: { master_inventory_id: master.id }
           })
         });
         const d = await res.json();
@@ -208,7 +208,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                   <button
                     onClick={() => {
                       // Create a synthetic vendor item from master
-                      setSelectedItem({ id: master.id, item_name: master.name, price: master.price ?? master.base_price, quantity: 99, image_url: master.image_url, master_item_id: master.id, vendor_id: '' });
+                      setSelectedItem({ id: master.id, name: master.name, price: master.price ?? master.base_price, quantity: 99, image_url: master.image_url, master_item_id: master.id, vendor_id: '' });
                       setStep(2);
                     }}
                     className="mt-4 px-5 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors"
@@ -230,12 +230,12 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                     >
                       <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
                         {item.image_url
-                          ? <img src={item.image_url} alt={item.item_name} className="w-full h-full object-cover" loading="lazy" />
+                          ? <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
                           : <div className="w-full h-full flex items-center justify-center text-gray-300"><UtensilsCrossed size={20} /></div>
                         }
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900 truncate">{item.item_name}</p>
+                        <p className="font-bold text-gray-900 truncate">{item.name}</p>
                         <p className="text-amber-600 font-extrabold text-sm">₹{item.price}</p>
                         {item.quantity < 5 && (
                           <span className="text-[10px] font-bold text-red-500">Only {item.quantity} left!</span>

@@ -492,7 +492,7 @@ app.post('/api/db', async (req, res) => {
         if (table === 'orders') {
           docs = docs.map(d => {
             const obj = d.toJSON();
-            if (obj.status === 'pending') {
+            if (obj.status === 'pending' && !req.body.admin_override) {
               obj.client_name = 'Hidden (Provide OTP)';
               obj.client_phone = 'Hidden (Provide OTP)';
               obj.client_address = 'Hidden (Provide OTP)';
