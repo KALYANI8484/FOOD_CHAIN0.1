@@ -470,6 +470,11 @@ app.post('/api/db', async (req, res) => {
           queryConditions[field] = { $in: filter.value };
         }
       }
+    } else if (filters && typeof filters === 'object') {
+      for (const [key, val] of Object.entries(filters)) {
+        let field = key === 'id' ? '_id' : key;
+        queryConditions[field] = val;
+      }
     }
 
     let responseData;

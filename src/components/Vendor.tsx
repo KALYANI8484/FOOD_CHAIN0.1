@@ -75,8 +75,12 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 
     // Load initial pending orders
     (async () => {
-      const { data } = await supabase.from('orders').select('*').eq('status', 'pending');
-      setRadarOrders(data || []);
+      const res = await fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'orders', action: 'select', filters: { status: 'pending' } })
+      });
+      const d = await res.json();
+      setRadarOrders(d.data || []);
     })();
 
     // Establish WebSocket Connection
@@ -220,10 +224,13 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
   useEffect(() => {
     (async () => {
       const [{ data: o }, { data: i }] = await Promise.all([
-        supabase.from('orders').select('*').eq('vendor_id', vendor.id),
+        fetch('/api/db', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'orders', action: 'select', filters: { vendor_id: vendor.id } })
+        }).then(r => r.json()),
         supabase.from('vendor_inventory').select('*').eq('vendor_id', vendor.id),
       ]);
-      setOrders(o || []);
+      setOrders(o?.data || []);
       setItems(i || []);
       setLoading(false);
     })();
@@ -385,15 +392,24 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
       return;
     }
 
-    const { error } = await supabase.from('orders').update({
-      vendor_id: vendor.id,
-      status: 'accepted',
-      otp_attempt: otpAttempt,
-      accepted_at: new Date().toISOString()
-    } as any).eq('id', order.id);
+    const res = await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orders',
+        action: 'update',
+        filters: { _id: order.id },
+        data: {
+          vendor_id: vendor.id,
+          status: 'accepted',
+          otp_attempt: otpAttempt,
+          accepted_at: new Date().toISOString()
+        }
+      })
+    });
+    const d = await res.json();
 
-    if (error) {
-      show(error.message || 'Failed to confirm order', 'error');
+    if (d.error) {
+      show(d.error || 'Failed to confirm order', 'error');
       return;
     }
 
@@ -541,15 +557,27 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
 
   const load = async () => {
     // Fetch only active orders belonging to this vendor
-    const { data } = await supabase.from('orders').select('*').eq('vendor_id', vendor.id).order('created_at', { ascending: false });
-    setOrders(data || []);
+    const res = await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orders', action: 'select', filters: { vendor_id: vendor.id },
+        sorts: [{ field: 'created_at', ascending: false }]
+      })
+    });
+    const d = await res.json();
+    setOrders(d.data || []);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [vendor.id]);
 
   const transitionOrder = async (orderId: string, nextStatus: string) => {
-    await supabase.from('orders').update({ status: nextStatus }).eq('id', orderId);
+    await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orders', action: 'update', filters: { _id: orderId }, data: { status: nextStatus }
+      })
+    });
     show(`Order shifted to ${nextStatus.replace(/_/g, ' ')}`);
     load();
   };
@@ -566,10 +594,13 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
       return;
     }
 
-    await supabase.from('orders').update({
-      status: 'delivered',
-      delivered_at: new Date().toISOString()
-    }).eq('id', selectedOrder.id);
+    await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orders', action: 'update', filters: { _id: selectedOrder.id },
+        data: { status: 'delivered', delivered_at: new Date().toISOString() }
+      })
+    });
 
     show('Order delivered successfully! Payment processed.');
     setSelectedOrder(null);

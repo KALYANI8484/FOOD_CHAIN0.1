@@ -113,12 +113,12 @@ function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   const load = async () => {
     const [{ data: v }, { data: o }, { data: a }, { data: p }] = await Promise.all([
       supabase.from('vendors').select('*'),
-      supabase.from('orders').select('*'),
+      fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'orders', action: 'select' }) }).then(r => r.json()),
       supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(5),
       supabase.from('subscription_plans').select('*')
     ]);
     setVendors(v || []);
-    setOrders(o || []);
+    setOrders(o?.data || []);
     setLogs(a || []);
     setPlans(p || []);
     setLoading(false);
@@ -130,11 +130,13 @@ function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     const targetVendor = vendors.find(v => v.id === vendorId);
     if (!targetVendor) return;
 
-    await supabase.from('orders').update({
-      vendor_id: vendorId,
-      status: 'preparing',
-      accepted_at: new Date().toISOString()
-    }).eq('id', orderId);
+    await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orders', action: 'update', filters: { _id: orderId },
+        data: { vendor_id: vendorId, status: 'preparing', accepted_at: new Date().toISOString() }
+      })
+    });
 
     await supabase.from('activity_log').insert({
       action: `Order manually assigned to ${targetVendor.shop_name}`,
@@ -2006,15 +2008,18 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 }
 
 // 6. Orders Watchlist Tab
-function OrdersTab({ show: _show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  void _show;
+function PendingOrdersTab({ show: _show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-      setOrders(data || []);
+      const res = await fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'orders', action: 'select', sorts: [{ field: 'created_at', ascending: false }], admin_override: true })
+      });
+      const d = await res.json();
+      setOrders(d.data || []);
       setLoading(false);
     })();
   }, []);
