@@ -632,8 +632,14 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
             {preparing.map(o => (
               <div key={o.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-3 shadow-sm hover:border-accent/30 transition-all">
                 <div>
-                  <p className="font-bold text-sm text-text">{o.item_name}</p>
-                  <p className="text-[10px] text-muted">Client: {o.client_name} | {o.client_address}</p>
+                  <p className="font-bold text-base text-text">{o.item_name}</p>
+                  <div className="mt-2 p-2.5 rounded-lg bg-surface border border-border/50 space-y-1 text-xs text-text">
+                    <p><span className="text-muted font-medium">Name:</span> <span className="font-bold">{o.client_name || 'N/A'}</span></p>
+                    <p><span className="text-muted font-medium">Phone:</span> <span className="font-bold text-accent">{o.client_phone || 'N/A'}</span></p>
+                    <p><span className="text-muted font-medium">Address:</span> {o.client_address || 'N/A'}</p>
+                    <p><span className="text-muted font-medium">PIN Code:</span> {o.client_zip || 'N/A'}</p>
+                    {o.client_landmark && <p><span className="text-muted font-medium">Landmark:</span> {o.client_landmark}</p>}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   {o.status === 'accepted' ? (
@@ -663,8 +669,14 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
             {outForDelivery.map(o => (
               <div key={o.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-3 shadow-sm hover:border-accent/30 transition-all">
                 <div>
-                  <p className="font-bold text-sm text-text">{o.item_name}</p>
-                  <p className="text-[10px] text-muted">Address: {o.client_address}</p>
+                  <p className="font-bold text-base text-text">{o.item_name}</p>
+                  <div className="mt-2 p-2.5 rounded-lg bg-surface border border-border/50 space-y-1 text-xs text-text">
+                    <p><span className="text-muted font-medium">Name:</span> <span className="font-bold">{o.client_name || 'N/A'}</span></p>
+                    <p><span className="text-muted font-medium">Phone:</span> <span className="font-bold text-accent">{o.client_phone || 'N/A'}</span></p>
+                    <p><span className="text-muted font-medium">Address:</span> {o.client_address || 'N/A'}</p>
+                    <p><span className="text-muted font-medium">PIN Code:</span> {o.client_zip || 'N/A'}</p>
+                    {o.client_landmark && <p><span className="text-muted font-medium">Landmark:</span> {o.client_landmark}</p>}
+                  </div>
                 </div>
                 <Button size="sm" className="w-full bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => transitionOrder(o.id, 'delivered')}>
                   Complete Handover
@@ -684,9 +696,15 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
           </div>
           <div className="space-y-3 min-h-[300px] max-h-[400px] overflow-y-auto pr-1">
             {delivered.map(o => (
-              <div key={o.id} className="p-3.5 rounded-xl bg-surface-2/50 border border-border/60">
-                <p className="font-bold text-xs text-muted">{o.item_name}</p>
-                <p className="text-[10px] text-muted mt-0.5">Delivered to: {o.client_name}</p>
+              <div key={o.id} className="p-3.5 rounded-xl bg-surface-2/50 border border-border/60 space-y-1 text-xs">
+                <p className="font-bold text-sm text-text">{o.item_name}</p>
+                <div className="text-xs text-muted space-y-0.5 pt-1 border-t border-border/30">
+                  <p><span className="font-medium">Name:</span> <span className="font-bold text-text">{o.client_name || 'N/A'}</span></p>
+                  <p><span className="font-medium">Phone:</span> {o.client_phone || 'N/A'}</p>
+                  <p><span className="font-medium">Address:</span> {o.client_address || 'N/A'}</p>
+                  <p><span className="font-medium">PIN Code:</span> {o.client_zip || 'N/A'}</p>
+                  {o.client_landmark && <p><span className="font-medium">Landmark:</span> {o.client_landmark}</p>}
+                </div>
               </div>
             ))}
             {delivered.length === 0 && <p className="text-xs text-muted italic text-center py-8">No completed orders today</p>}
