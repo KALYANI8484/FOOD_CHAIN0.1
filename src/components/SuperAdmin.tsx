@@ -1283,20 +1283,23 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [addons, setAddons] = useState<any[]>([]);
+  const [masterCategories, setMasterCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [addonModal, setAddonModal] = useState(false);
-  const [form, setForm] = useState({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10 });
+  const [form, setForm] = useState({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10, master_category_name: '' });
   const [addonForm, setAddonForm] = useState({ name: '', price: 99, validity_days: 30, max_clients: 50 });
   const [editPlan, setEditPlan] = useState<Plan | null>(null);
 
   const load = async () => {
-    const [{ data: pData }, { data: aData }] = await Promise.all([
+    const [{ data: pData }, { data: aData }, { data: mData }] = await Promise.all([
       supabase.from('subscription_plans').select('*').order('price'),
-      supabase.from('addons').select('*').order('created_at', { ascending: false })
+      supabase.from('addons').select('*').order('created_at', { ascending: false }),
+      supabase.from('master_inventory').select('name')
     ]);
     setPlans(pData || []);
     setAddons(aData || []);
+    setMasterCategories((mData || []).map((m: any) => m.name));
     setLoading(false);
   };
 
@@ -1310,6 +1313,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
       validity_days: Number(form.validity_days),
       max_items: Number(form.max_items),
       max_clients: Number(form.max_clients),
+      master_category_name: form.master_category_name || null,
       status: 'active'
     });
 
@@ -1320,7 +1324,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
 
     show(`Plan ${form.name} created successfully!`);
     setModal(false);
-    setForm({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10 });
+    setForm({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10, master_category_name: '' });
     load();
   };
 
@@ -1503,6 +1507,12 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
           <Input label="Validity Days" type="number" value={String(form.validity_days)} onChange={(v) => setForm({ ...form, validity_days: Number(v) })} required />
           <Input label="Max Inventory Items" type="number" value={String(form.max_items)} onChange={(v) => setForm({ ...form, max_items: Number(v) })} required />
           <Input label="Max Client Limits" type="number" value={String(form.max_clients)} onChange={(v) => setForm({ ...form, max_clients: Number(v) })} required />
+          <Select
+            label="Linked Master Category"
+            value={form.master_category_name}
+            onChange={(v) => setForm({ ...form, master_category_name: v })}
+            options={[{ label: '-- Select Master Category --', value: '' }, ...masterCategories.map(c => ({ label: c, value: c }))]}
+          />
 
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>

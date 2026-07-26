@@ -8,6 +8,7 @@ export type Plan = {
   validity_days: number;
   max_items: number;
   max_clients: number;
+  master_category_name?: string | null;
   status: string;
   created_at: string;
 };

@@ -25,6 +25,7 @@ type Tab = 'dashboard' | 'radar' | 'kanban' | 'upgrade';
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [vendor, setVendor] = useState<VendorType | null>(null);
+  const [activePlan, setActivePlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast, show } = useToast();
@@ -39,6 +40,10 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       const queryPhone = vendorPhone || '+919876543210';
       const { data } = await supabase.from('vendors').select('*').eq('phone', queryPhone).maybeSingle();
       setVendor(data);
+      if (data && data.plan_id) {
+        const { data: pData } = await supabase.from('subscription_plans').select('*').eq('id', data.plan_id).maybeSingle();
+        setActivePlan(pData);
+      }
       setLoading(false);
     })();
   }, [vendorPhone]);
@@ -195,7 +200,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       <main className="flex-1 overflow-y-auto h-screen relative z-10 bg-bg pt-14 lg:pt-0">
         <div className="p-8 max-w-7xl mx-auto">
           {tab === 'dashboard' && <VendorDashboard vendor={vendor} />}
-          {tab === 'radar' && <OrderRadar vendor={vendor} radarOrders={radarOrders} onTab={setTab} show={show} />}
+          {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
 
           {tab === 'upgrade' && <UpgradePlan vendor={vendor} show={show} />}
@@ -339,12 +344,13 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
 // 2. Order Radar Module Tab
 interface OrderRadarProps {
   vendor: VendorType;
+  activePlan: Plan | null;
   radarOrders: Order[];
-  onTab: (t: Tab) => void;
+  onTab: (tab: Tab) => void;
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
 }
 
-function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
+function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadarProps) {
   const [timers, setTimers] = useState<Record<string, number>>({});
   const [otpInputs, setOtpInputs] = useState<Record<string, string>>({});
 
@@ -404,7 +410,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {radarOrders.filter(o => o.master_category_name === vendor.plan_name).map((o) => {
+        {radarOrders.filter(o => o.master_category_name === (activePlan?.master_category_name || vendor.plan_name)).map((o) => {
           const isZipMatch = o.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3);
           const isActive = vendor.status === 'approved';
           const isExpired = vendor.status === 'expired';
@@ -512,7 +518,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show }: OrderRadarProps) {
           );
         })}
 
-        {radarOrders.filter(o => o.master_category_name === vendor.plan_name).length === 0 && (
+        {radarOrders.filter(o => o.master_category_name === (activePlan?.master_category_name || vendor.plan_name)).length === 0 && (
           <div className="col-span-full">
             <EmptyState 
               icon={<Radar size={32} className="text-muted" />} 

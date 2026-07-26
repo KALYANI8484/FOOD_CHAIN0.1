@@ -98,6 +98,7 @@ const planSchema = new mongoose.Schema({
   validity_days: { type: Number, required: true },
   max_items: { type: Number, required: true },
   max_clients: { type: Number, required: true },
+  master_category_name: { type: String, default: null },
   status: { type: String, default: 'active' },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
