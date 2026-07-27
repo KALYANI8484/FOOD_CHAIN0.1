@@ -946,8 +946,6 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
           </div>
         </div>
       )}
-
-      </div>
     </div>
   );
 }
