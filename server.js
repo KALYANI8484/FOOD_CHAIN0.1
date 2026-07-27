@@ -620,6 +620,12 @@ app.post('/api/db', async (req, res) => {
           if (!vendorDoc.plan_name || vendorDoc.plan_name === 'Free') {
             return res.status(403).json({ error: 'Free plan members are not allowed to confirm orders. Please upgrade your plan.' });
           }
+          const todayIso = new Date().toISOString().slice(0, 10);
+          if (vendorDoc.subscription_end && vendorDoc.subscription_end < todayIso) {
+            vendorDoc.status = 'expired';
+            await vendorDoc.save();
+            return res.status(403).json({ error: 'Your subscription validity date has expired. Please upgrade or renew your plan.' });
+          }
           if (vendorDoc.status !== 'approved') {
             return res.status(403).json({ error: 'Your vendor account is not approved or is inactive.' });
           }

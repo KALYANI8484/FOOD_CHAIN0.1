@@ -203,7 +203,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 
       <main className="flex-1 overflow-y-auto h-screen relative z-10 bg-bg pt-14 lg:pt-0">
         <div className="p-8 max-w-7xl mx-auto">
-          {tab === 'dashboard' && <VendorDashboard vendor={vendor} />}
+          {tab === 'dashboard' && <VendorDashboard vendor={vendor} onTab={setTab} />}
           {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
 
@@ -216,13 +216,17 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   );
 }
 
-function VendorDashboard({ vendor }: { vendor: VendorType }) {
+function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Tab) => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [items, setItems] = useState<VendorItem[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [suggestionText, setSuggestionText] = useState('');
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isDateExpired = vendor.subscription_end ? vendor.subscription_end < todayIso : false;
+  const isPlanExpired = vendor.status === 'expired' || isDateExpired;
 
   const loadSuggestions = async () => {
     try {
@@ -354,7 +358,9 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
                 <p className="text-xs text-muted uppercase font-bold">Active plan</p>
                 <p className="text-xl font-extrabold text-accent">{vendor.plan_name || 'Free'}</p>
               </div>
-              <Badge variant={vendor.status === 'approved' ? 'success' : 'error'}>{vendor.status.toUpperCase()}</Badge>
+              <Badge variant={isPlanExpired ? 'error' : vendor.status === 'approved' ? 'success' : 'warning'}>
+                {isPlanExpired ? 'EXPIRED' : vendor.status.toUpperCase()}
+              </Badge>
             </div>
             
             <div className="text-xs text-muted space-y-1 pt-3 border-t border-border/50">
@@ -362,10 +368,23 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
               <div className="flex justify-between"><span>Days Remaining</span><span className="font-semibold text-text">Until: {vendor.subscription_end || '—'}</span></div>
             </div>
             
-            {vendor.status === 'expired' && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs leading-normal">
-                <p className="font-bold flex items-center gap-1"><AlertCircle size={12} /> Subscription Expired</p>
-                Your customer limit was reached. Please upgrade to accept orders.
+            {isPlanExpired && (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-600 rounded-xl text-xs space-y-2.5">
+                <p className="font-bold flex items-center gap-1.5 text-red-600 text-xs uppercase tracking-wider">
+                  <AlertCircle size={14} /> Plan Expired
+                </p>
+                <p className="text-xs text-red-600/90 leading-relaxed font-medium">
+                  Your plan is expired. Please renew or purchase a new plan to continue accepting client orders.
+                </p>
+                {onTab && (
+                  <Button 
+                    size="sm" 
+                    className="w-full mt-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 shadow-sm"
+                    onClick={() => onTab('upgrade')}
+                  >
+                    Renew / Purchase New Plan
+                  </Button>
+                )}
               </div>
             )}
           </div>
