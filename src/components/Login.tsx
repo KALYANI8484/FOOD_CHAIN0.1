@@ -175,14 +175,7 @@ export function Login({
                       onClick={() => switchMode('signup')}
                       className="text-xs text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1 hover:underline"
                     >
-                      <UserPlus size={13} /> New vendor? Apply here
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => switchMode('reset')}
-                      className="text-xs text-gray-400 hover:text-gray-600 font-semibold hover:underline"
-                    >
-                      Forgot password?
+                      <UserPlus size={13} /> Registration
                     </button>
                   </div>
                 </div>
@@ -235,7 +228,7 @@ export function Login({
                 />
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <Field label="Shop Address" placeholder="Street, Area..." value={sf.address} onChange={patch('address')} icon={MapPin} />
+                    <Field label="Address" placeholder="Street, Area..." value={sf.address} onChange={patch('address')} icon={MapPin} />
                   </div>
                   <div className="col-span-1">
                     <Field label="PIN Code" placeholder="110001" value={sf.pincode} onChange={patch('pincode')} icon={Hash} maxLength={6} />
