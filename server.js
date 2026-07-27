@@ -8,8 +8,14 @@ import multer from 'multer';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const awsRegion = (process.env.AWS_REGION || 'ap-south-1').includes('ap-south-1') ? 'ap-south-1' : (process.env.AWS_REGION || 'ap-south-1').replace(/[^a-z0-9-]/gi, '');
 const s3 = new S3Client({
@@ -362,7 +368,7 @@ async function checkPlanLimitOnDelivery(orderId) {
   }
 }
 
-// Upload file to AWS S3
+// Upload file (AWS S3 with Local Disk Storage Fallback)
 app.post('/api/upload', (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
@@ -375,37 +381,67 @@ app.post('/api/upload', (req, res, next) => {
 }, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const fileKey = `${crypto.randomUUID()}-${req.file.originalname}`;
+    const sanitizeName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileKey = `${crypto.randomUUID()}-${sanitizeName}`;
     const bucketName = process.env.AWS_BUCKET_NAME;
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: fileKey,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype,
-      })
-    );
+    // Try S3 first if Bucket is explicitly configured
+    if (bucketName && bucketName.trim() !== '') {
+      try {
+        await s3.send(
+          new PutObjectCommand({
+            Bucket: bucketName,
+            Key: fileKey,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+          })
+        );
+        const url = `/api/uploads/${fileKey}`;
+        return res.json({ url });
+      } catch (s3Err) {
+        console.warn('S3 upload error, falling back to local disk storage:', s3Err.message);
+      }
+    }
+
+    // Fallback: Save file directly to server disk in public/uploads
+    const uploadsDir = path.join(__dirname, 'public', 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const localFilePath = path.join(uploadsDir, fileKey);
+    fs.writeFileSync(localFilePath, req.file.buffer);
 
     const url = `/api/uploads/${fileKey}`;
-    res.json({ url });
+    return res.json({ url });
   } catch (err) {
-    console.error('S3 Upload error:', err);
+    console.error('File upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Image Proxy Endpoint to stream S3 objects securely
+// Image Proxy & Local File Stream Endpoint
 app.get('/api/uploads/:key', async (req, res) => {
   try {
     const fileKey = req.params.key;
-    const bucketName = process.env.AWS_BUCKET_NAME;
-    const command = new GetObjectCommand({ Bucket: bucketName, Key: fileKey });
-    const s3Res = await s3.send(command);
-    if (s3Res.ContentType) {
-      res.setHeader('Content-Type', s3Res.ContentType);
+    const localFilePath = path.join(__dirname, 'public', 'uploads', fileKey);
+
+    // Stream from local disk if file exists locally
+    if (fs.existsSync(localFilePath)) {
+      return res.sendFile(localFilePath);
     }
-    s3Res.Body.pipe(res);
+
+    // Try fetching from S3 if configured
+    const bucketName = process.env.AWS_BUCKET_NAME;
+    if (bucketName && bucketName.trim() !== '') {
+      const command = new GetObjectCommand({ Bucket: bucketName, Key: fileKey });
+      const s3Res = await s3.send(command);
+      if (s3Res.ContentType) {
+        res.setHeader('Content-Type', s3Res.ContentType);
+      }
+      return s3Res.Body.pipe(res);
+    }
+
+    res.status(404).send('Image not found');
   } catch (err) {
     console.error('Image proxy fetch error:', err);
     res.status(404).send('Image not found');
