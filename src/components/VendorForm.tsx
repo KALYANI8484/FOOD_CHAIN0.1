@@ -115,9 +115,10 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
         <Input
           label="Phone Number"
           value={form.phone}
-          onChange={(v) => setForm({ ...form, phone: v })}
+          onChange={(v) => setForm({ ...form, phone: v.replace(/\D/g, '').slice(0, 10) })}
           required
-          placeholder="e.g. +919876543210"
+          maxLength={10}
+          placeholder="10-digit mobile number"
         />
         <Input
           label="Email Address"

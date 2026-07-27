@@ -171,6 +171,7 @@ export function Input({
   type = 'text',
   placeholder,
   required,
+  maxLength,
 }: {
   label?: string;
   value: string;
@@ -178,6 +179,7 @@ export function Input({
   type?: string;
   placeholder?: string;
   required?: boolean;
+  maxLength?: number;
 }) {
   return (
     <div className="space-y-2">
@@ -189,6 +191,7 @@ export function Input({
       <input
         type={type}
         value={value}
+        maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}

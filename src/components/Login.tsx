@@ -217,7 +217,15 @@ export function Login({
 
               <div className="space-y-3">
                 <Field label="Full Name" placeholder="Owner / Shop Name" value={sf.name} onChange={patch('name')} icon={UserPlus} />
-                <Field label="Phone Number (will be your username)" placeholder="+91 99999 99999" value={sf.phone} onChange={patch('phone')} icon={Phone} />
+                <Field
+                  label="Phone Number (will be your username)"
+                  placeholder="10-digit mobile number"
+                  value={sf.phone}
+                  onChange={(v) => patch('phone')(v.replace(/\D/g, '').slice(0, 10))}
+                  icon={Phone}
+                  maxLength={10}
+                  hint="Strictly 10 digits — numbers only."
+                />
                 <Field
                   label="Date of Birth (will be your password)"
                   placeholder="DDMMYYYY  e.g. 19072004"

@@ -284,7 +284,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Full Name" placeholder="Your name" icon={User} value={form.name} onChange={patch('name')} />
-                <FormField label="Phone" placeholder="+91..." icon={Phone} value={form.phone} onChange={patch('phone')} type="tel" />
+                <FormField label="Phone" placeholder="10-digit mobile no." icon={Phone} value={form.phone} onChange={(v) => patch('phone')(v.replace(/\D/g, '').slice(0, 10))} type="tel" maxLength={10} />
               </div>
               <FormField label="Full Address" placeholder="Flat, Building, Street, Area..." icon={MapPin} value={form.address} onChange={patch('address')} />
               <div className="grid grid-cols-2 gap-3">

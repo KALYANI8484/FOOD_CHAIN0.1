@@ -250,7 +250,7 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
     { label: 'Today\'s Orders', value: successfulOrders.length, desc: 'Completed deliveries', icon: ShoppingBag, color: 'text-green-600', bg: 'bg-green-500/10' },
     { label: 'Pending Fulfillment', value: pendingFulfillment, desc: 'Kitchen active prep', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-500/10' },
     { label: 'Today\'s Earnings', value: `₹${revenue.toLocaleString()}`, desc: 'Delivered revenue', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-500/10' },
-    { label: 'Low Stock Alerts', value: lowStockCount, desc: 'Items with quantity < 5', icon: AlertTriangle, color: lowStockCount > 0 ? 'text-red-500' : 'text-muted', bg: lowStockCount > 0 ? 'bg-red-500/10' : 'bg-surface-2' },
+    { label: 'Total Orders Placed', value: orders.length, desc: 'Total orders count', icon: ShoppingBag, color: 'text-purple-600', bg: 'bg-purple-500/10' },
   ];
 
   return (
@@ -850,9 +850,46 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
                 </div>
               </div>
             ))}
+      {/* ── Plan Activation Section ── */}
+      <div className="mt-10 pt-8 border-t border-border animate-fade-in-up">
+        <PageHeader title="Plan Activation" subtitle="Manage your current plan status, validity, and active subscriptions" />
+        <div className="card p-6 bg-surface border border-border mt-4 shadow-sm">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-bold text-text">{vendor.plan_name || 'Free Tier'}</h3>
+                <Badge variant={vendor.status === 'approved' ? 'success' : vendor.status === 'expired' ? 'error' : 'warning'}>
+                  {vendor.status === 'approved' ? 'Active' : vendor.status === 'expired' ? 'Expired' : 'Pending Verification'}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted mt-1">Shop: <strong className="text-text">{vendor.shop_name}</strong> | Owner: <strong className="text-text">{vendor.owner_name}</strong></p>
+            </div>
+            {vendor.subscription_end && (
+              <div className="text-left md:text-right">
+                <p className="text-xs text-muted font-medium">Subscription Validity</p>
+                <p className="text-sm font-bold text-text mt-0.5">
+                  {new Date(vendor.subscription_start || Date.now()).toLocaleDateString()} — {new Date(vendor.subscription_end).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-border/60">
+            <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
+              <p className="text-xs text-muted font-medium">Activation Status</p>
+              <p className="text-lg font-bold text-accent capitalize mt-1">{vendor.status || 'Active'}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
+              <p className="text-xs text-muted font-medium">Max Clients Allowed</p>
+              <p className="text-lg font-bold text-text mt-1">{vendor.total_clients || 0} Clients</p>
+            </div>
+            <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
+              <p className="text-xs text-muted font-medium">Registered Zip Code</p>
+              <p className="text-lg font-bold text-text mt-1">Zone {vendor.zip_code}</p>
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
