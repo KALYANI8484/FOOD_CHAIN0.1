@@ -116,10 +116,10 @@ const addonSchema = new mongoose.Schema({
 const masterItemSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   name: { type: String, required: true },
-  category: { type: String, required: true },
+  category: { type: String, default: 'General' },
   image_url: { type: String, default: null },
-  base_price: { type: Number, required: true },
-  quantity: { type: Number, required: true },
+  base_price: { type: Number, default: 0 },
+  quantity: { type: Number, default: 1 },
   description: { type: String, default: null },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
@@ -269,6 +269,21 @@ const subadminRequestSchema = new mongoose.Schema({
 
 const SubadminRequest = mongoose.model('SubadminRequest', subadminRequestSchema, 'subadmin_requests');
 
+const vendorSuggestionSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  vendor_id: { type: String, default: null },
+  shop_name: { type: String, default: null },
+  owner_name: { type: String, default: null },
+  phone: { type: String, default: null },
+  message: { type: String, required: true },
+  status: { type: String, default: 'Pending' },
+  admin_reply: { type: String, default: '' },
+  created_at: { type: String, default: () => new Date().toISOString() },
+  updated_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
+const VendorSuggestion = mongoose.model('VendorSuggestion', vendorSuggestionSchema, 'vendor_suggestions');
+
 const models = {
   super_admins: SuperAdmin,
   sub_admins: SubAdmin,
@@ -284,6 +299,7 @@ const models = {
   activity_log: Activity,
   upgrade_requests: UpgradeRequest,
   subadmin_requests: SubadminRequest,
+  vendor_suggestions: VendorSuggestion,
   clients: ClientProfile
 };
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Store, Package, CreditCard, FileText, Users,
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock
+  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
@@ -847,17 +847,18 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
           </div>
         )}
       </Modal>
-
     </div>
   );
 }
 
-// 3. Team Approvals Module Tab
+// 3. Team Approvals Module
 function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [activeTab, setActiveTab] = useState<'vendors' | 'upgrades' | 'subadmin'>('vendors');
   const [vendorRequests, setVendorRequests] = useState<Vendor[]>([]);
   const [upgradeRequests, setUpgradeRequests] = useState<UpgradeRequest[]>([]);
   const [subadminRequests, setSubadminRequests] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedUpgrade, setSelectedUpgrade] = useState<UpgradeRequest | null>(null);
@@ -866,18 +867,69 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   const [feedbackNote, setFeedbackNote] = useState('');
 
   const load = async () => {
-    const [{ data: v }, { data: u }, { data: s }] = await Promise.all([
+    const [{ data: v }, { data: u }, { data: s }, suggRes] = await Promise.all([
       supabase.from('vendors').select('*').eq('status', 'pending_approval'),
       supabase.from('upgrade_requests').select('*').eq('status', 'pending'),
-      supabase.from('subadmin_requests').select('*').eq('status', 'pending')
+      supabase.from('subadmin_requests').select('*').eq('status', 'pending'),
+      fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'vendor_suggestions', action: 'select' })
+      }).then(r => r.json())
     ]);
     setVendorRequests(v || []);
     setUpgradeRequests(u || []);
     setSubadminRequests(s || []);
+    setSuggestions(suggRes?.data || []);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleReplySuggestion = async (id: string) => {
+    const replyText = replyInputs[id];
+    if (!replyText || !replyText.trim()) return;
+    await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'vendor_suggestions',
+        action: 'update',
+        filters: { _id: id },
+        data: { admin_reply: replyText.trim(), status: 'Responded', updated_at: new Date().toISOString() }
+      })
+    });
+    setReplyInputs(prev => ({ ...prev, [id]: '' }));
+    show('Reply sent to vendor successfully!');
+    load();
+  };
+
+  const handleResolveSuggestion = async (id: string) => {
+    await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'vendor_suggestions',
+        action: 'update',
+        filters: { _id: id },
+        data: { status: 'Resolved', updated_at: new Date().toISOString() }
+      })
+    });
+    show('Suggestion marked as resolved!');
+    load();
+  };
+
+  const handleDeleteSuggestion = async (id: string) => {
+    if (confirm('Are you sure you want to delete this suggestion?')) {
+      await fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'vendor_suggestions',
+          action: 'delete',
+          filters: { _id: id }
+        })
+      });
+      show('Suggestion removed', 'info');
+      load();
+    }
+  };
 
   const handleApproveVendor = async (v: Vendor) => {
     // Approve vendor and activate dates
@@ -951,52 +1003,43 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       actor: 'Super Admin'
     });
 
-    show(`Vendor plan upgraded to ${u.requested_plan}`);
+    show(`Upgrade request for ${u.vendor_name} approved!`);
     setSelectedUpgrade(null);
     load();
   };
 
   const handleRejectUpgrade = async (u: UpgradeRequest) => {
     await supabase.from('upgrade_requests').update({
-      status: 'rejected',
-      payment_status: 'Rejected'
+      status: 'rejected'
     }).eq('id', u.id);
 
-    show('Upgrade request rejected');
+    await supabase.from('activity_log').insert({
+      action: `Upgrade request rejected for: ${u.vendor_name}`,
+      actor: 'Super Admin'
+    });
+
+    show('Upgrade request rejected', 'info');
     setSelectedUpgrade(null);
     load();
   };
 
-  const handleApproveSubadminReq = async (req: any) => {
-    if (req.action_type === 'delete') {
-      await supabase.from('vendors').delete().eq('id', req.vendor_id);
-      await supabase.from('activity_log').insert({ action: `Vendor deleted by Sub-Admin request: ${req.vendor_name}`, actor: 'Super Admin' });
-    } else if (req.action_type === 'edit') {
-      const updates = JSON.parse(req.payload);
-      await supabase.from('vendors').update(updates).eq('id', req.vendor_id);
-      await supabase.from('activity_log').insert({ action: `Vendor edited by Sub-Admin request: ${req.vendor_name}`, actor: 'Super Admin' });
-    } else if (req.action_type === 'add-on') {
-      const addonDetails = JSON.parse(req.payload);
-      const { data: v } = await supabase.from('vendors').select('*').eq('id', req.vendor_id).maybeSingle();
-      if (v) {
-        const currentEnd = new Date(v.subscription_end || Date.now());
-        const newEnd = new Date(currentEnd.getTime() + addonDetails.validity_days * 86400000);
-        await supabase.from('vendors').update({
-          subscription_end: newEnd.toISOString().slice(0, 10),
-          client_limit: (v.client_limit || 0) + addonDetails.max_clients
-        }).eq('id', req.vendor_id);
-        await supabase.from('activity_log').insert({ action: `Add-on ${addonDetails.addon_name} applied by Sub-Admin request to ${req.vendor_name}`, actor: 'Super Admin' });
-      }
-    }
-
+  const handleApproveSubadmin = async (req: any) => {
     await supabase.from('subadmin_requests').update({ status: 'approved' }).eq('id', req.id);
-    show(`Sub-Admin request approved (${req.action_type})`);
+    await supabase.from('activity_log').insert({
+      action: `Sub-Admin request approved for: ${req.name}`,
+      actor: 'Super Admin'
+    });
+    show(`Sub-Admin request for ${req.name} approved!`);
     setSelectedSubadminReq(null);
     load();
   };
 
-  const handleRejectSubadminReq = async (req: any) => {
+  const handleRejectSubadmin = async (req: any) => {
     await supabase.from('subadmin_requests').update({ status: 'rejected' }).eq('id', req.id);
+    await supabase.from('activity_log').insert({
+      action: `Sub-Admin request rejected for: ${req.name}`,
+      actor: 'Super Admin'
+    });
     show('Sub-Admin request rejected');
     setSelectedSubadminReq(null);
     load();
@@ -1004,13 +1047,13 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
   if (loading) return <Spinner />;
 
-  const pendingCount = vendorRequests.length + upgradeRequests.length + subadminRequests.length;
+  const pendingCount = suggestions.filter((s: any) => s.status === 'Pending').length + upgradeRequests.length + subadminRequests.length;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader 
         title="Team Approvals Queue" 
-        subtitle="Manage registrations and subscription upgrades submitted by team members"
+        subtitle="Manage vendor Q&A, suggestions, and subscription upgrades"
         action={
           pendingCount > 0 ? (
             <span className="h-6 px-2.5 rounded-full bg-red-500 text-white font-extrabold text-xs flex items-center justify-center animate-pulse">
@@ -1026,7 +1069,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           onClick={() => setActiveTab('vendors')}
           className={`pb-3 text-sm font-bold uppercase tracking-wider relative ${activeTab === 'vendors' ? 'text-accent border-b-2 border-accent' : 'text-muted'}`}
         >
-          New Vendor Submissions ({vendorRequests.length})
+          Vendor's Q&A / Suggestion ({suggestions.length})
         </button>
         <button
           onClick={() => setActiveTab('upgrades')}
@@ -1043,42 +1086,69 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       </div>
 
       {activeTab === 'vendors' ? (
-        <div className="card overflow-hidden bg-surface border border-border">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead>
-              <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
-                <th className="px-6 py-4">Vendor Details</th>
-                <th className="px-6 py-4">Submitted By</th>
-                <th className="px-6 py-4">Zone Zip</th>
-                <th className="px-6 py-4">Target Plan</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {vendorRequests.map((v) => (
-                <tr key={v.id} className="hover:bg-surface-2/30 transition-colors">
-                  <td className="px-6 py-4 flex items-center gap-3">
-                    {v.logo_url && <img src={v.logo_url} alt="" className="w-8 h-8 rounded-lg object-cover" />}
-                    <div>
-                      <p className="font-bold text-text">{v.shop_name}</p>
-                      <p className="text-[10px] text-muted">Owner: {v.owner_name}</p>
+        <div className="space-y-4">
+          <div className="card p-6 bg-surface border border-border">
+            <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted flex items-center gap-2">
+              <MessageSquare size={18} className="text-accent" /> Vendor Questions & Platform Suggestions
+            </h3>
+            {suggestions.length === 0 ? (
+              <EmptyState icon={<MessageSquare size={24} />} title="No vendor Q&A or suggestions submitted yet" />
+            ) : (
+              <div className="space-y-4">
+                {suggestions.map((s: any) => (
+                  <div key={s._id || s.id} className="p-5 rounded-2xl bg-surface-2 border border-border space-y-3 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/50 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-text text-sm">{s.shop_name}</span>
+                          <span className="text-xs text-muted">({s.owner_name})</span>
+                        </div>
+                        <p className="text-[11px] text-muted mt-0.5">Phone: {s.phone} | Date: {new Date(s.created_at || Date.now()).toLocaleString()}</p>
+                      </div>
+                      <Badge variant={s.status === 'Responded' || s.status === 'Resolved' ? 'success' : 'warning'}>
+                        {s.status || 'Pending'}
+                      </Badge>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="accent">{v.submitted_by || 'Sub-Admin'}</Badge>
-                  </td>
-                  <td className="px-6 py-4 font-semibold">{v.zip_code}</td>
-                  <td className="px-6 py-4 font-bold text-accent">{v.plan_name}</td>
-                  <td className="px-6 py-4 text-right">
-                    <Button size="sm" onClick={() => setSelectedVendor(v)}>
-                      Review Request
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {vendorRequests.length === 0 && <EmptyState icon={<CheckCircle2 size={24} />} title="No new vendor requests" />}
+
+                    <div className="p-3.5 rounded-xl bg-surface/80 border border-border/50 text-sm text-text">
+                      <p className="font-semibold text-xs text-muted uppercase tracking-wider mb-1">Vendor's Query / Suggestion:</p>
+                      <p className="font-medium leading-relaxed">{s.message}</p>
+                    </div>
+
+                    {s.admin_reply && (
+                      <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-xs text-text">
+                        <p className="font-bold text-accent mb-0.5">Your Response:</p>
+                        <p className="text-xs">{s.admin_reply}</p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2">
+                      <input
+                        type="text"
+                        value={replyInputs[s._id || s.id] || ''}
+                        onChange={(e) => setReplyInputs({ ...replyInputs, [s._id || s.id]: e.target.value })}
+                        placeholder="Type reply to vendor..."
+                        className="flex-1 px-4 py-2 rounded-xl bg-surface border border-border outline-none focus:border-accent text-xs text-text placeholder:text-muted"
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleReplySuggestion(s._id || s.id)} disabled={!replyInputs[s._id || s.id]?.trim()}>
+                          Send Reply
+                        </Button>
+                        {s.status !== 'Resolved' && (
+                          <Button size="sm" variant="outline" onClick={() => handleResolveSuggestion(s._id || s.id)}>
+                            Resolve
+                          </Button>
+                        )}
+                        <button onClick={() => handleDeleteSuggestion(s._id || s.id)} className="p-2 rounded-lg bg-surface-2 hover:bg-red-500/10 text-muted hover:text-red-500 transition-colors">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : activeTab === 'upgrades' ? (
         <div className="card overflow-hidden bg-surface border border-border">
@@ -1780,13 +1850,13 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   };
 
   const handleCreate = async () => {
-    if (!form.name || form.base_price < 0) return;
+    if (!form.name) return;
     await supabase.from('master_inventory').insert({
       name: form.name,
-      category: form.category,
-      base_price: Number(form.base_price),
-      quantity: Number(form.quantity),
-      description: form.description || null,
+      category: form.category || 'Tiffin',
+      base_price: Number(form.base_price) || 0,
+      quantity: Number(form.quantity) || 1,
+      description: form.description || '',
       image_url: form.image_url || null
     });
 
@@ -1800,10 +1870,10 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     if (!editItem) return;
     await supabase.from('master_inventory').update({
       name: editItem.name,
-      category: editItem.category,
-      base_price: Number(editItem.base_price),
-      quantity: Number(editItem.quantity),
-      description: editItem.description,
+      category: editItem.category || 'Tiffin',
+      base_price: Number(editItem.base_price) || 0,
+      quantity: Number(editItem.quantity) || 1,
+      description: editItem.description || '',
       image_url: editItem.image_url
     }).eq('id', editItem.id);
 

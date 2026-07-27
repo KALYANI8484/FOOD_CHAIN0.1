@@ -219,7 +219,21 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 function VendorDashboard({ vendor }: { vendor: VendorType }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [items, setItems] = useState<VendorItem[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestionText, setSuggestionText] = useState('');
+  const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const loadSuggestions = async () => {
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'vendor_suggestions', action: 'select', filters: { vendor_id: vendor.id } })
+      });
+      const d = await res.json();
+      setSuggestions(d.data || []);
+    } catch (e) { console.error(e); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -232,9 +246,41 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
       ]);
       setOrders(o?.data || []);
       setItems(i || []);
+      await loadSuggestions();
       setLoading(false);
     })();
   }, [vendor.id]);
+
+  const handleSendSuggestion = async () => {
+    if (!suggestionText.trim()) return;
+    setSubmittingSuggestion(true);
+    try {
+      await fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'vendor_suggestions',
+          action: 'insert',
+          data: {
+            vendor_id: vendor.id,
+            shop_name: vendor.shop_name,
+            owner_name: vendor.owner_name,
+            phone: vendor.phone,
+            message: suggestionText.trim(),
+            status: 'Pending',
+            admin_reply: '',
+            created_at: new Date().toISOString()
+          }
+        })
+      });
+      setSuggestionText('');
+      await loadSuggestions();
+      alert('Q&A / Suggestion submitted to Super Admin successfully!');
+    } catch (e) {
+      alert('Failed to submit suggestion.');
+    } finally {
+      setSubmittingSuggestion(false);
+    }
+  };
 
   if (loading) return <Spinner />;
 
@@ -335,13 +381,41 @@ function VendorDashboard({ vendor }: { vendor: VendorType }) {
           <p className="text-sm text-muted">Have a question or a feature request? Submit it directly to the Super Admin team.</p>
           <div className="flex flex-col sm:flex-row gap-4">
             <input 
-              className="flex-1 px-4 py-2.5 rounded-xl bg-surface-2 border border-border outline-none focus:border-accent text-sm"
+              value={suggestionText}
+              onChange={(e) => setSuggestionText(e.target.value)}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-surface-2 border border-border outline-none focus:border-accent text-sm text-text placeholder:text-muted"
               placeholder="Type your suggestion or question here..."
             />
-            <Button onClick={() => alert('Suggestion submitted successfully. The Super Admin will review it shortly.')}>
-              Submit to Admin
+            <Button onClick={handleSendSuggestion} disabled={submittingSuggestion || !suggestionText.trim()}>
+              {submittingSuggestion ? <Spinner /> : 'Submit to Admin'}
             </Button>
           </div>
+
+          {/* List of submitted Q&As / Suggestions */}
+          {suggestions.length > 0 && (
+            <div className="space-y-3 pt-4 border-t border-border">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted">Your Submitted Questions & Suggestions ({suggestions.length})</p>
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                {suggestions.map((s: any) => (
+                  <div key={s._id || s.id} className="p-3.5 rounded-xl bg-surface-2/60 border border-border/60 space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="text-xs font-semibold text-text">{s.message}</p>
+                      <Badge variant={s.status === 'Responded' || s.status === 'Resolved' ? 'success' : 'warning'}>
+                        {s.status || 'Pending'}
+                      </Badge>
+                    </div>
+                    {s.admin_reply && (
+                      <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20 text-xs text-text">
+                        <p className="font-bold text-accent mb-0.5">Admin Reply:</p>
+                        <p className="text-xs">{s.admin_reply}</p>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-muted">{new Date(s.created_at || Date.now()).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
