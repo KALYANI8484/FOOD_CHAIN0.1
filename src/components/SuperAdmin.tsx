@@ -2509,13 +2509,38 @@ function PendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' 
     return () => clearInterval(interval);
   }, []);
 
+  const handleResumeOrder = async (order: any) => {
+    try {
+      const targetId = order.id || order._id;
+      await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'update',
+          filters: { id: targetId },
+          data: {
+            status: 'pending',
+            created_at: new Date().toISOString()
+          },
+          admin_override: true
+        })
+      });
+      show(`Order #${targetId.toString().substring(0, 6).toUpperCase()} resumed & re-broadcasted to nearby active vendors!`, 'success');
+      load();
+    } catch (e) {
+      console.error(e);
+      show('Failed to resume order', 'error');
+    }
+  };
+
   if (loading) return <Spinner />;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader 
         title="Pending & Missed Orders" 
-        subtitle="Monitor orders currently broadcasting or missed by vendors (passed 10 min)"
+        subtitle="Monitor orders currently broadcasting or missed by vendors (passed 9 hours)"
       />
 
       {orders.length === 0 ? (
@@ -2524,15 +2549,16 @@ function PendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {orders.map(o => {
             const elapsed = Date.now() - new Date(o.created_at).getTime();
-            const isMissed = elapsed > 10 * 60 * 1000;
+            const isMissed = elapsed > 9 * 60 * 60 * 1000; // 9 hours threshold
+            const targetId = o.id || o._id;
 
             return (
-              <div key={o.id} className={`card p-5 border flex flex-col justify-between ${isMissed ? 'bg-red-50/50 border-red-200' : 'bg-surface border-border'}`}>
+              <div key={targetId} className={`card p-5 border flex flex-col justify-between ${isMissed ? 'bg-red-50/50 border-red-200' : 'bg-surface border-border'}`}>
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-extrabold text-lg text-text">#{o.id.substring(0,6).toUpperCase()}</h3>
+                    <h3 className="font-extrabold text-lg text-text">#{targetId.toString().substring(0, 6).toUpperCase()}</h3>
                     <Badge variant={isMissed ? 'error' : 'warning'}>
-                      {isMissed ? 'Missed by Vendors' : 'Broadcasting...'}
+                      {isMissed ? 'Missed by Vendors' : 'Broadcasting (Active)'}
                     </Badge>
                   </div>
                   <div className="space-y-2 text-sm text-text">
@@ -2546,8 +2572,17 @@ function PendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' 
                   </div>
                 </div>
                 <div className="mt-4 pt-3 border-t border-border/60 flex justify-between items-center text-xs text-muted">
-                  <span>Placed: {new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                  <span className="font-bold text-text">Total: ₹{o.total_price}</span>
+                  <span>Placed: {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-text mr-2">Total: ₹{o.price || o.total_price}</span>
+                    <button
+                      onClick={() => handleResumeOrder(o)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs transition-all shadow-sm flex items-center gap-1"
+                      title="Resume & re-broadcast order to nearby vendors"
+                    >
+                      <RefreshCw size={12} /> Resume Order
+                    </button>
+                  </div>
                 </div>
               </div>
             );

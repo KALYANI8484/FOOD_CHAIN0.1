@@ -461,7 +461,7 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
         const next: Record<string, number> = {};
         radarOrders.forEach((o) => {
           const elapsedMs = Date.now() - new Date(o.created_at).getTime();
-          const remainingSecs = Math.max(0, 600 - Math.floor(elapsedMs / 1000)); // 10 minutes limit
+          const remainingSecs = Math.max(0, 32400 - Math.floor(elapsedMs / 1000)); // 9 hours limit (32400 seconds)
           next[o.id] = remainingSecs;
         });
         return next;
@@ -523,11 +523,14 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
           const isZipMatch = o.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3);
           const isActive = vendor.status === 'approved';
           const isExpired = vendor.status === 'expired';
-          const remaining = timers[o.id] ?? 600;
+          const remaining = timers[o.id] ?? 32400;
           
-          const mins = Math.floor(remaining / 60);
+          const hrs = Math.floor(remaining / 3600);
+          const mins = Math.floor((remaining % 3600) / 60);
           const secs = remaining % 60;
-          const formattedTimer = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          const formattedTimer = hrs > 0 
+            ? `${hrs}h ${mins.toString().padStart(2, '0')}m`
+            : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
           // Button classes evaluation based on specifications
           let btnLabel = 'Confirm Order';

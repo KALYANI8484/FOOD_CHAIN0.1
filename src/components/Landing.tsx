@@ -2,11 +2,143 @@ import { useEffect, useRef, useState } from 'react';
 import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
-  ChevronLeft, Hash, User, CheckCircle
+  ChevronLeft, Hash, User, CheckCircle, Globe
 } from 'lucide-react';
 import { Spinner } from './ui';
 
 type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
+
+export type Language = 'en' | 'hi' | 'mr';
+
+export const translations = {
+  en: {
+    plans: "Plan's",
+    loginRegister: "Login / Register",
+    liveStats: "LIVE PLATFORM STATS",
+    trustedByCommunity: "Trusted by Our Community",
+    totalOrdersPlaced: "Total Orders Placed",
+    vendorsJoined: "Vendors Joined",
+    selectOrder: "Select & Order",
+    noItemsYet: "No items yet",
+    vendorsSettingUp: "Vendors are setting up menus — check back soon!",
+    step1Of2: "Step 1 of 2",
+    step2Of2: "Step 2 of 2",
+    selectWholesaleItems: "Select Wholesale Items",
+    selectMultipleItems: "Select multiple items and customize quantities (Minimum Wholesale MOQ applied)",
+    defaultMin: "Default Min",
+    continueToDetails: "Continue to Details",
+    yourDeliveryDetails: "Your delivery details",
+    fullName: "Full Name",
+    yourName: "Your name",
+    phone: "Phone",
+    mobileNo: "10-digit mobile no.",
+    fullAddress: "Full Address",
+    addressPlaceholder: "Flat, Building, Street, Area...",
+    pinCode: "PIN Code",
+    landmark: "Landmark",
+    landmarkPlaceholder: "Near Metro, Park...",
+    wholesaleOrderSummary: "Wholesale Order Summary",
+    totalOrderAmount: "Total Order Amount",
+    broadcastNotice: "⏳ Your wholesale order will be broadcast to nearby approved vendors immediately.",
+    orderPlaced: "Order Placed!",
+    orderBroadcasted: "Your wholesale order has been broadcast to nearby vendors.",
+    connectingVendors: "Connecting to nearby vendors...",
+    onceVendorAccepts: "Once a vendor accepts your order, they will contact you shortly.",
+    done: "Done",
+    back: "Back",
+    confirmOrder: "Confirm & Place Wholesale Order",
+    contactUs: "Contact Us",
+    footNote: "Connecting verified local kitchen vendors with guests through a seamless, real-time ordering platform.",
+  },
+  hi: {
+    plans: "प्लान्स",
+    loginRegister: "लॉगिन / रजिस्टर",
+    liveStats: "लाइव प्लेटफ़ॉर्म आंकड़े",
+    trustedByCommunity: "हमारे समुदाय का विश्वास",
+    totalOrdersPlaced: "कुल दिए गए ऑर्डर",
+    vendorsJoined: "जुड़े विक्रेता (वेंडर्स)",
+    selectOrder: "चुनें और ऑर्डर करें",
+    noItemsYet: "अभी कोई आइटम नहीं है",
+    vendorsSettingUp: "विक्रेता मेनू सेट कर रहे हैं - जल्द ही वापस देखें!",
+    step1Of2: "चरण 1 / 2",
+    step2Of2: "चरण 2 / 2",
+    selectWholesaleItems: "थोक आइटम चुनें",
+    selectMultipleItems: "कई आइटम चुनें और मात्रा अनुकूलित करें (न्यूनतम थोक MOQ लागू)",
+    defaultMin: "न्यूनतम मात्रा",
+    continueToDetails: "विवरण पर आगे बढ़ें",
+    yourDeliveryDetails: "आपकी डिलीवरी का विवरण",
+    fullName: "पूरा नाम",
+    yourName: "आपका नाम",
+    phone: "फोन नंबर",
+    mobileNo: "10-अंकों का मोबाइल नंबर",
+    fullAddress: "पूरा पता",
+    addressPlaceholder: "मकान नं., इमारत, गली, क्षेत्र...",
+    pinCode: "पिन कोड",
+    landmark: "लैंडमार्क (पहचान का स्थान)",
+    landmarkPlaceholder: "पार्क, मेट्रो के पास...",
+    wholesaleOrderSummary: "थोक ऑर्डर सारांश",
+    totalOrderAmount: "कुल ऑर्डर राशि",
+    broadcastNotice: "⏳ आपका थोक ऑर्डर तुरंत नजदीकी स्वीकृत विक्रेताओं को भेज दिया जाएगा।",
+    orderPlaced: "ऑर्डर सफलतापूर्वक भेजा गया!",
+    orderBroadcasted: "आपका थोक ऑर्डर नजदीकी विक्रेताओं को प्रसारित कर दिया गया है।",
+    connectingVendors: "नजदीकी विक्रेताओं से जुड़ रहे हैं...",
+    onceVendorAccepts: "जैसे ही कोई विक्रेता आपका ऑर्डर स्वीकार करेगा, वह जल्द ही आपसे संपर्क करेगा।",
+    done: "पूर्ण",
+    back: "पीछे",
+    confirmOrder: "पुष्टि करें और थोक ऑर्डर दें",
+    contactUs: "संपर्क करें",
+    footNote: "सत्यापित स्थानीय रसोई विक्रेताओं को एक सहज, वास्तविक समय के ऑर्डरिंग प्लेटफॉर्म के माध्यम से ग्राहकों से जोड़ना।",
+  },
+  mr: {
+    plans: "प्लॅन्स",
+    loginRegister: "लॉगिन / नोंदणी",
+    liveStats: "लाइव्ह प्लॅटफॉर्म आकडेवारी",
+    trustedByCommunity: "आमच्या समुदायाचा विश्वास",
+    totalOrdersPlaced: "एकूण दिलेले ऑर्डर",
+    vendorsJoined: "जोडलेले विक्रेते (व्हेंडर्स)",
+    selectOrder: "निवडा आणि ऑर्डर करा",
+    noItemsYet: "अजून कोणतीही वस्तू उपलब्ध नाही",
+    vendorsSettingUp: "विक्रेते मेनू सेट करत आहेत - लवकरच पुन्हा तपासा!",
+    step1Of2: "टप्पा १ पैकी २",
+    step2Of2: "टप्पा २ पैकी २",
+    selectWholesaleItems: "घाऊक वस्तू निवडा",
+    selectMultipleItems: "अनेक वस्तू निवडा आणि प्रमाण कस्टमाईज करा (किमान घाऊक MOQ लागू)",
+    defaultMin: "किमान प्रमाण",
+    continueToDetails: "तपशीलावर पुढे जा",
+    yourDeliveryDetails: "तुमचा डिलिव्हरी पत्ता व तपशील",
+    fullName: "पूर्ण नाव",
+    yourName: "तुमचे नाव",
+    phone: "फोन नंबर",
+    mobileNo: "१० अंकी मोबाईल नंबर",
+    fullAddress: "पूर्ण पत्ता",
+    addressPlaceholder: "घर क्र., इमारत, रस्ता, परिसर...",
+    pinCode: "पिन कोड",
+    landmark: "लँडमार्क (जवळची खूण)",
+    landmarkPlaceholder: "पार्क जवळ, मेट्रो जवळ...",
+    wholesaleOrderSummary: "घाऊक ऑर्डर सारांश",
+    totalOrderAmount: "एकूण ऑर्डर रक्कम",
+    broadcastNotice: "⏳ तुमची घाऊक ऑर्डर ताबडतोब जवळील मान्यताप्राप्त विक्रेत्यांना पाठवली जाईल.",
+    orderPlaced: "ऑर्डर यशस्वीरित्या दिली!",
+    orderBroadcasted: "तुमची घाऊक ऑर्डर जवळील विक्रेत्यांना प्रसारित करण्यात आली आहे.",
+    connectingVendors: "जवळील विक्रेत्यांशी जोडले जात आहे...",
+    onceVendorAccepts: "विक्रेत्याने तुमची ऑर्डर स्वीकारल्यावर, ते लवकरच तुमच्याशी संपर्क साधतील.",
+    done: "पूर्ण",
+    back: "मागे",
+    confirmOrder: "खात्री करा आणि घाऊक ऑर्डर द्या",
+    contactUs: "संपर्क साधा",
+    footNote: "विश्वासू स्थानिक स्वयंपाकघर विक्रेत्यांना जलद, रिअल-टाइम ऑर्डरिंग प्लॅटफॉर्मद्वारे ग्राहकांशी जोडणे.",
+  }
+};
+
+export const getInitialLanguage = (): Language => {
+  if (typeof window === 'undefined') return 'en';
+  const saved = localStorage.getItem('app_language') as Language;
+  if (saved && (saved === 'en' || saved === 'hi' || saved === 'mr')) return saved;
+  const navLang = (navigator.language || (navigator as any).userLanguage || '').toLowerCase();
+  if (navLang.startsWith('hi')) return 'hi';
+  if (navLang.startsWith('mr')) return 'mr';
+  return 'en';
+};
 
 interface MasterItem  { id: string; name: string; category: string; base_price: number; price: number; image_url: string; description?: string; }
 interface VendorItem  { id: string; item_name: string; price: number; quantity: number; image_url: string; master_item_id: string; vendor_id: string; }
@@ -73,7 +205,7 @@ type ModalStep = 1 | 2 | 3; // 1=select item, 2=buyer details, 3=success
 interface OrderModalProps {
   master: MasterItem;
   onClose: () => void;
-  onOrderPlaced: () => void;
+  onOrderPlaced: (createdOrder: any) => void;
 }
 
 function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
@@ -146,6 +278,10 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
   const totalItemCount = activeSelectedSubItems.reduce((sum, item) => {
     return sum + (selectedQuantities[item.id] || Number(item.quantity) || 1);
   }, 0);
+
+  const summaryItemName = activeSelectedSubItems.length > 0
+    ? activeSelectedSubItems.map(i => `${i.name} (x${selectedQuantities[i.id || i._id] || i.quantity})`).join(', ')
+    : master.name;
 
   const handlePlaceOrder = async () => {
     if (activeSelectedSubItems.length === 0) {
@@ -463,6 +599,9 @@ function FormField({ label, placeholder, icon: Icon, value, onChange, type = 'te
 /* ────────────────────────────────────────────────
    Main Landing Component
 ──────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────
+   Main Landing Component
+──────────────────────────────────────────────── */
 export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
@@ -473,6 +612,17 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedMaster, setSelectedMaster] = useState<MasterItem | null>(null);
 
+  const [activeClientOrder, setActiveClientOrder] = useState<any | null>(null);
+  const [showClaimedModal, setShowClaimedModal] = useState(false);
+
+  const [language, setLanguage] = useState<Language>(getInitialLanguage);
+  const t = translations[language];
+
+  const changeLanguage = (lang: Language) => {
+    setLanguage(lang);
+    localStorage.setItem('app_language', lang);
+  };
+
   useScrollReveal();
 
   useEffect(() => {
@@ -480,6 +630,36 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
     window.addEventListener('scroll', fn, { passive: true });
     return () => window.removeEventListener('scroll', fn);
   }, []);
+
+  // Poll for order status changes if client has an active order
+  useEffect(() => {
+    if (!activeClientOrder || activeClientOrder.status === 'accepted' || activeClientOrder.status === 'delivered') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const orderId = activeClientOrder.id || activeClientOrder._id;
+        const res = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: 'orders',
+            action: 'select',
+            filters: { id: orderId }
+          })
+        });
+        const d = await res.json();
+        if (d.data && d.data[0]) {
+          const updated = d.data[0];
+          if (updated.status === 'accepted') {
+            setActiveClientOrder(updated);
+            setShowClaimedModal(true);
+          }
+        }
+      } catch (e) { console.error(e); }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeClientOrder]);
 
   useEffect(() => {
     (async () => {
@@ -497,7 +677,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         if (gd.data) {
           const plans = gd.data.filter((g: any) => g.allowed_roles?.includes('vendor_plan'));
           if (plans.length > 0) {
-            // Get the most recently uploaded plan
             const latest = plans.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
             setVendorPlanFile(latest.file_data);
           }
@@ -510,8 +689,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const handleVendorPlanClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (vendorPlanFile) {
-      // Create a temporary link to open base64 data in new tab, or just use window.open for pdf/image
-      // Some browsers block huge data URIs in window.open, so we can construct a Blob
       try {
         const arr = vendorPlanFile.split(',');
         const mime = arr[0].match(/:(.*?);/)?.[1];
@@ -536,6 +713,71 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   return (
     <div className="min-h-screen bg-[#F8F8FF] text-[#111118]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
+      {/* ── Active Order Live Tracking Floating Widget ── */}
+      {activeClientOrder && activeClientOrder.status === 'pending' && (
+        <div className="fixed bottom-6 left-6 z-40 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border-2 border-amber-400 text-gray-900 animate-bounce-slow">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold animate-pulse">
+                📡
+              </div>
+              <div>
+                <p className="font-extrabold text-xs text-amber-700 uppercase tracking-wider">Order Active &amp; Broadcasting</p>
+                <p className="font-bold text-sm truncate max-w-[200px]">{activeClientOrder.item_name}</p>
+              </div>
+            </div>
+            <button onClick={() => setActiveClientOrder(null)} className="text-gray-400 hover:text-gray-600 p-1">
+              <X size={14} />
+            </button>
+          </div>
+          <div className="mt-2.5 pt-2 border-t border-amber-100 flex justify-between items-center text-xs">
+            <span className="text-gray-500 font-semibold">OTP Code: <strong className="text-amber-800 text-sm">{activeClientOrder.otp}</strong></span>
+            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-extrabold rounded-md text-[10px]">Broadcasting (9 Hrs)</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Vendor Claimed Order Pop-Up Modal ── */}
+      {showClaimedModal && activeClientOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border-2 border-green-500 text-center space-y-4 animate-scale-in">
+            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle size={44} className="text-green-600 animate-bounce" />
+            </div>
+            <div>
+              <span className="px-3 py-1 bg-green-100 text-green-800 font-extrabold text-xs rounded-full uppercase tracking-wider">
+                Order Claimed by Vendor 🎉
+              </span>
+              <h2 className="text-2xl font-extrabold text-gray-900 mt-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Your Order is Claimed!
+              </h2>
+              <p className="text-gray-600 text-sm mt-1 leading-relaxed">
+                A nearby verified kitchen vendor has accepted your wholesale order for <strong className="text-amber-700">{activeClientOrder.item_name}</strong>.
+              </p>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left space-y-1.5 text-xs text-amber-900">
+              <p className="font-extrabold text-sm text-amber-800">📋 Order Details:</p>
+              <p><strong className="text-gray-700">Item:</strong> {activeClientOrder.item_name} (x{activeClientOrder.quantity})</p>
+              <p><strong className="text-gray-700">Delivery Address:</strong> {activeClientOrder.client_address}</p>
+              <p><strong className="text-gray-700">Client Contact:</strong> {activeClientOrder.client_phone}</p>
+              <p><strong className="text-amber-700 font-extrabold">Delivery OTP Code:</strong> <span className="font-extrabold text-base bg-amber-200/80 px-2 py-0.5 rounded text-amber-900">{activeClientOrder.otp}</span></p>
+            </div>
+
+            <p className="text-xs font-bold text-gray-500">
+              📞 The vendor will contact you at <span className="text-amber-600">{activeClientOrder.client_phone}</span> shortly to coordinate delivery.
+            </p>
+
+            <button
+              onClick={() => setShowClaimedModal(false)}
+              className="w-full py-3.5 rounded-xl bg-green-600 hover:bg-green-700 active:scale-95 text-white font-extrabold text-sm transition-all shadow-lg shadow-green-200"
+            >
+              Great, Thank You!
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Floating WhatsApp ──────────────────── */}
       <a href="https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry." target="_blank" rel="noopener noreferrer" className="wa-float" aria-label="WhatsApp">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -548,7 +790,10 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         <OrderModal
           master={selectedMaster}
           onClose={() => setSelectedMaster(null)}
-          onOrderPlaced={() => setTotalOrders(p => p !== null ? p + 1 : 1)}
+          onOrderPlaced={(createdOrder) => {
+            setTotalOrders(p => p !== null ? p + 1 : 1);
+            setActiveClientOrder(createdOrder);
+          }}
         />
       )}
 
@@ -562,29 +807,58 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             </span>
           </div>
           <nav className="flex items-center gap-3">
+            {/* Multilingual Selector */}
+            <div className="relative flex items-center gap-1.5 bg-gray-100/90 hover:bg-gray-200/90 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold transition-colors">
+              <Globe size={14} className="text-amber-600" />
+              <select
+                value={language}
+                onChange={(e) => changeLanguage(e.target.value as Language)}
+                className="bg-transparent outline-none cursor-pointer text-gray-800 font-extrabold text-xs"
+              >
+                <option value="en">🇬🇧 English</option>
+                <option value="hi">🇮🇳 हिंदी</option>
+                <option value="mr">🇮🇳 मराठी</option>
+              </select>
+            </div>
+
             <button onClick={handleVendorPlanClick} className="text-sm font-semibold text-gray-600 hover:text-amber-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-amber-50">
-              Plan's
+              {t.plans}
             </button>
             <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
-              Login / Register
+              {t.loginRegister}
             </button>
           </nav>
         </div>
       </header>
 
+      {/* ── KPI Section (MOVED TO TOP ABOVE MASTER INVENTORY ITEMS) ────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-6 pt-8 pb-2">
+        <div className="relative bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-8 md:p-10 text-white overflow-hidden shadow-xl shadow-amber-200">
+          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/10 blur-xl" />
+          <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-black/10 blur-xl" />
+          <div className="relative z-10 text-center mb-8 reveal">
+            <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-1.5">{t.liveStats}</p>
+            <h2 className="text-2xl md:text-4xl font-extrabold" style={{ fontFamily: "'Playfair Display', serif" }}>
+              {t.trustedByCommunity}
+            </h2>
+          </div>
+          <div className="relative z-10 grid grid-cols-2 gap-4 md:gap-6 max-w-lg mx-auto">
+            <KpiCard icon={ShoppingBag} label={t.totalOrdersPlaced} value={totalOrders} />
+            <KpiCard icon={Store} label={t.vendorsJoined} value={totalVendors} />
+          </div>
+        </div>
+      </section>
+
       {/* ── Master Inventory Grid ───────────────── */}
-      <main className="max-w-7xl mx-auto px-6 py-14">
-
-
-
+      <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Items */}
         {loadingItems ? (
           <div className="flex justify-center items-center py-40"><Spinner /></div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-32 text-gray-400">
             <UtensilsCrossed size={44} className="mx-auto mb-4 opacity-30" />
-            <p className="font-semibold text-lg">No items yet</p>
-            <p className="text-sm mt-1">Vendors are setting up menus — check back soon!</p>
+            <p className="font-semibold text-lg">{t.noItemsYet}</p>
+            <p className="text-sm mt-1">{t.vendorsSettingUp}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -604,7 +878,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                   </span>
                   <div className="absolute inset-0 bg-amber-500/85 flex flex-col items-center justify-center gap-2 opacity-0 hover:opacity-100 transition-opacity duration-300">
                     <ArrowRight size={28} className="text-white" />
-                    <span className="text-white text-sm font-bold tracking-wide">Select &amp; Order</span>
+                    <span className="text-white text-sm font-bold tracking-wide">{t.selectOrder}</span>
                   </div>
                 </div>
                 <div className="p-4">
@@ -621,24 +895,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         )}
       </main>
 
-      {/* ── KPI Section ────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-6 py-12">
-        <div className="relative bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-12 text-white overflow-hidden shadow-2xl shadow-amber-200">
-          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/10 blur-xl" />
-          <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-black/10 blur-xl" />
-          <div className="relative z-10 text-center mb-10 reveal">
-            <p className="text-sm font-semibold text-white/70 uppercase tracking-widest mb-2">Live Platform Stats</p>
-            <h2 className="text-3xl md:text-4xl font-extrabold" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Trusted by Our Community
-            </h2>
-          </div>
-          <div className="relative z-10 grid grid-cols-2 gap-6 max-w-lg mx-auto">
-            <KpiCard icon={ShoppingBag} label="Total Orders Placed" value={totalOrders} />
-            <KpiCard icon={Store} label="Vendors Joined" value={totalVendors} />
-          </div>
-        </div>
-      </section>
-
       {/* ── Footer ──────────────────────────────── */}
       <footer id="contact" className="border-t border-gray-100 bg-white mt-8">
         <div className="max-w-7xl mx-auto px-6 py-14">
@@ -648,7 +904,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 <img src="/logo.png" alt="Vikrams Ads" className="h-12 w-auto object-contain" />
                 <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>Vikrams Ads</span>
               </div>
-              <p className="text-gray-500 text-sm leading-relaxed">Connecting verified local kitchen vendors with guests through a seamless, real-time ordering platform.</p>
+              <p className="text-gray-500 text-sm leading-relaxed">{t.footNote}</p>
             </div>
 
             <div className="reveal">
