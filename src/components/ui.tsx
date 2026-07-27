@@ -1,4 +1,91 @@
-import { useEffect, useState, type ReactNode, type MouseEvent } from 'react';
+import { useEffect, useState, useRef, type ReactNode, type MouseEvent } from 'react';
+
+export function LanguageSelector({ onChange }: { onChange?: (lang: Language) => void }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: any) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const change = (l: Language) => {
+    setLang(l);
+    localStorage.setItem('app_language', l);
+    window.dispatchEvent(new Event('app_language_change'));
+    if (onChange) onChange(l);
+    setOpen(false);
+  };
+
+  const options: { code: Language; label: string; flag: string }[] = [
+    { code: 'en', label: 'English', flag: '🇬🇧' },
+    { code: 'hi', label: 'हिंदी', flag: '🇮🇳' },
+    { code: 'mr', label: 'मराठी', flag: '🇮🇳' },
+  ];
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      {/* Globe Icon Button ONLY */}
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-9 h-9 rounded-xl bg-gray-100/90 hover:bg-amber-100/80 border border-gray-200/90 flex items-center justify-center text-amber-700 shadow-sm transition-all active:scale-95 group"
+        title="Change Language / भाषा बदलें / भाषा बदला"
+        aria-label="Change Language"
+      >
+        <span className="text-base leading-none group-hover:rotate-12 transition-transform">🌐</span>
+      </button>
+
+      {/* Floating Dropdown Menu */}
+      {open && (
+        <div className="absolute right-0 mt-2 w-36 rounded-2xl bg-white shadow-xl border border-gray-100 py-1.5 z-50 animate-scale-in">
+          <div className="px-3 py-1 border-b border-gray-100 mb-1">
+            <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Select Language</p>
+          </div>
+          {options.map((opt) => (
+            <button
+              key={opt.code}
+              type="button"
+              onClick={() => change(opt.code)}
+              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors ${
+                lang === opt.code
+                  ? 'bg-amber-50 text-amber-700 font-extrabold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span>{opt.flag}</span>
+                <span>{opt.label}</span>
+              </span>
+              {lang === opt.code && <span className="text-amber-600 font-bold">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 import { X } from 'lucide-react';
 
 export function Modal({
@@ -273,43 +360,4 @@ export const getInitialLanguage = (): Language => {
   return 'en';
 };
 
-export function LanguageSelector({ onChange }: { onChange?: (lang: Language) => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
 
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
-
-  const change = (l: Language) => {
-    setLang(l);
-    localStorage.setItem('app_language', l);
-    window.dispatchEvent(new Event('app_language_change'));
-    if (onChange) onChange(l);
-  };
-
-  return (
-    <div className="relative flex items-center gap-1.5 bg-gray-100/90 hover:bg-gray-200/90 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold transition-colors">
-      <span className="text-amber-600 font-extrabold">🌐</span>
-      <select
-        value={lang}
-        onChange={(e) => change(e.target.value as Language)}
-        className="bg-transparent outline-none cursor-pointer text-gray-800 font-extrabold text-xs"
-      >
-        <option value="en">🇬🇧 English</option>
-        <option value="hi">🇮🇳 हिंदी</option>
-        <option value="mr">🇮🇳 मराठी</option>
-      </select>
-    </div>
-  );
-}

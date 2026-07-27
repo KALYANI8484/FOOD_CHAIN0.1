@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase, type Plan } from '../lib/supabase';
-import { Input, Select, Button, Spinner } from './ui';
+import { Input, Select, Button, Spinner, getInitialLanguage, type Language } from './ui';
 
 interface VendorFormProps {
   initialData?: any;
@@ -10,24 +10,90 @@ interface VendorFormProps {
   onCancel?: () => void;
 }
 
+const vfTrans = {
+  en: {
+    ownerName: "Owner Name",
+    phone: "Phone Number",
+    phonePlaceholder: "10-digit mobile number",
+    email: "Email Address",
+    shopName: "Shop / Brand Name",
+    dob: "Birthdate (DDMMYYYY)",
+    dobPlaceholder: "e.g. 19072004",
+    address: "Full Address",
+    zipCode: "ZIP Code",
+    subPlan: "Subscription Plan",
+    validity: "Validity",
+    days: "Days",
+    clients: "Clients",
+    cancel: "Cancel",
+    saving: "Saving...",
+  },
+  hi: {
+    ownerName: "मालिक का नाम",
+    phone: "फोन नंबर",
+    phonePlaceholder: "10-अंकों का मोबाइल नंबर",
+    email: "ईमेल पता",
+    shopName: "दुकान / ब्रांड का नाम",
+    dob: "जन्म तिथि (DDMMYYYY)",
+    dobPlaceholder: "उदा. 19072004",
+    address: "पूरा पता",
+    zipCode: "पिन कोड",
+    subPlan: "सदस्यता योजना (सब्सक्रिप्शन प्लान)",
+    validity: "वैधता",
+    days: "दिन",
+    clients: "ग्राहक",
+    cancel: "रद्द करें",
+    saving: "सहेज रहे हैं...",
+  },
+  mr: {
+    ownerName: "मालकाचे नाव",
+    phone: "फोन नंबर",
+    phonePlaceholder: "१० अंकी मोबाईल नंबर",
+    email: "ईमेल पत्ता",
+    shopName: "दुकान / ब्रँडचे नाव",
+    dob: "जन्मतारीख (DDMMYYYY)",
+    dobPlaceholder: "उदा. 19072004",
+    address: "पूर्ण पत्ता",
+    zipCode: "पिन कोड",
+    subPlan: "सबस्क्रिप्शन प्लॅन",
+    validity: "मुदत",
+    days: "दिवस",
+    clients: "ग्राहक",
+    cancel: "रद्द करा",
+    saving: "जतन करत आहे...",
+  }
+};
+
 export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: VendorFormProps) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
+  const t = vfTrans[lang];
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const formatToDdMmYyyy = (value: string) => {
     if (!value) return '';
-    // Strip all non-digit characters (e.g. -, /, spaces)
     const digitsOnly = value.replace(/\D/g, '');
-    
-    // If it was entered as YYYY-MM-DD (or YYYYMMDD), convert to DDMMYYYY
     if (value.match(/^(\d{4})-(\d{2})-(\d{2})$/)) {
       const [, year, month, day] = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)!;
       return `${day}${month}${year}`;
     }
-    
     return digitsOnly;
   };
 
@@ -70,7 +136,6 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     })();
   }, []);
 
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.owner_name || !form.phone || !form.shop_name || !form.address || !form.zip_code || !form.birthdate) {
@@ -107,56 +172,56 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     <form onSubmit={handleSave} className="space-y-6">
       <div className="grid sm:grid-cols-2 gap-4">
         <Input
-          label="Owner Name"
+          label={t.ownerName}
           value={form.owner_name}
           onChange={(v) => setForm({ ...form, owner_name: v })}
           required
         />
         <Input
-          label="Phone Number"
+          label={t.phone}
           value={form.phone}
           onChange={(v) => setForm({ ...form, phone: v.replace(/\D/g, '').slice(0, 10) })}
           required
           maxLength={10}
-          placeholder="10-digit mobile number"
+          placeholder={t.phonePlaceholder}
         />
         <Input
-          label="Email Address"
+          label={t.email}
           type="email"
           value={form.email}
           onChange={(v) => setForm({ ...form, email: v })}
           placeholder="e.g. owner@shop.com"
         />
         <Input
-          label="Shop / Brand Name"
+          label={t.shopName}
           value={form.shop_name}
           onChange={(v) => setForm({ ...form, shop_name: v })}
           required
         />
         <Input
-          label="Birthdate (DDMMYYYY)"
+          label={t.dob}
           type="text"
           value={form.birthdate}
           onChange={(v) => setForm({ ...form, birthdate: v.replace(/\D/g, '') })}
-          placeholder="e.g. 19072004"
+          placeholder={t.dobPlaceholder}
           required
         />
         <div className="sm:col-span-2">
           <Input
-            label="Full Address"
+            label={t.address}
             value={form.address}
             onChange={(v) => setForm({ ...form, address: v })}
             required
           />
         </div>
         <Input
-          label="ZIP Code"
+          label={t.zipCode}
           value={form.zip_code}
           onChange={(v) => setForm({ ...form, zip_code: v })}
           required
         />
         <Select
-          label="Subscription Plan"
+          label={t.subPlan}
           value={form.plan_id}
           onChange={(v) => setForm({ ...form, plan_id: v })}
           options={plans.map((p) => ({ value: p.id, label: `${p.name} — ₹${p.price}` }))}
@@ -169,9 +234,9 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Plan Limits Summary</p>
               <p className="mt-1 text-sm text-slate-700">
-                Validity: <span className="font-bold text-slate-900">{selectedPlan.validity_days} Days</span> · 
+                {t.validity}: <span className="font-bold text-slate-900">{selectedPlan.validity_days} {t.days}</span> · 
                 Max Items: <span className="font-bold text-slate-900">{selectedPlan.max_items}</span> · 
-                Max Clients: <span className="font-bold text-slate-900">{selectedPlan.max_clients}</span>
+                Max Clients: <span className="font-bold text-slate-900">{selectedPlan.max_clients} {t.clients}</span>
               </p>
             </div>
             <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
@@ -195,11 +260,11 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
       <div className="flex gap-3 justify-end pt-4 border-t border-border">
         {onCancel && (
           <Button variant="outline" onClick={onCancel} disabled={submitting}>
-            Cancel
+            {t.cancel}
           </Button>
         )}
         <Button type="submit" disabled={submitting} className="min-w-[120px]">
-          {submitting ? 'Saving...' : submitLabel}
+          {submitting ? t.saving : submitLabel}
         </Button>
       </div>
     </form>

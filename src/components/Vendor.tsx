@@ -213,13 +213,16 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     <div className="min-h-screen bg-bg flex text-text relative">
       {/* Mobile Header Toggle */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-surface border-b border-border z-30 flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <Store size={18} className="text-accent" />
+        <div className="flex items-center gap-2 min-w-0">
+          <Store size={18} className="text-accent shrink-0" />
           <p className="font-bold text-sm truncate text-text">{vendor.shop_name}</p>
         </div>
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text">
-           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <LanguageSelector />
+          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text" aria-label="Toggle Menu">
+             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar */}

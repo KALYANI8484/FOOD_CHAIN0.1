@@ -4,7 +4,7 @@ import {
   ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
   ChevronLeft, Hash, User, CheckCircle, Globe
 } from 'lucide-react';
-import { Spinner } from './ui';
+import { Spinner, LanguageSelector } from './ui';
 
 type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
@@ -853,33 +853,30 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       )}
 
       {/* ── Header ─────────────────────────────── */}
-      <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100' : 'bg-[#F8F8FF]/80'}`}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Vikrams Ads" className="h-11 w-auto object-contain" />
-            <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+      <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-lg shadow-sm border-b border-gray-100' : 'bg-[#F8F8FF]/90'}`}>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
+          {/* Logo + Brand Name */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
+            <img src="/logo.png" alt="Vikrams Ads" className="h-9 sm:h-11 w-auto object-contain shrink-0" />
+            <span className="font-extrabold text-base sm:text-lg tracking-tight truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
               Vikrams Ads
             </span>
           </div>
-          <nav className="flex items-center gap-3">
-            {/* Multilingual Selector */}
-            <div className="relative flex items-center gap-1.5 bg-gray-100/90 hover:bg-gray-200/90 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold transition-colors">
-              <Globe size={14} className="text-amber-600" />
-              <select
-                value={language}
-                onChange={(e) => changeLanguage(e.target.value as Language)}
-                className="bg-transparent outline-none cursor-pointer text-gray-800 font-extrabold text-xs"
-              >
-                <option value="en">🇬🇧 English</option>
-                <option value="hi">🇮🇳 हिंदी</option>
-                <option value="mr">🇮🇳 मराठी</option>
-              </select>
-            </div>
 
-            <button onClick={handleVendorPlanClick} className="text-sm font-semibold text-gray-600 hover:text-amber-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-amber-50">
+          {/* Navigation & Compact Language Icon Selector */}
+          <nav className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <LanguageSelector onChange={(l) => changeLanguage(l)} />
+
+            <button 
+              onClick={handleVendorPlanClick} 
+              className="text-xs sm:text-sm font-semibold text-gray-600 hover:text-amber-600 transition-colors px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg hover:bg-amber-50"
+            >
               {t.plans}
             </button>
-            <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+            <button 
+              onClick={() => onNavigate('login')} 
+              className="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs sm:text-sm font-bold transition-all shadow-md hover:shadow-lg truncate"
+            >
               {t.loginRegister}
             </button>
           </nav>
