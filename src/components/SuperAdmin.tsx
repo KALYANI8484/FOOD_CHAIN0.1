@@ -2176,15 +2176,21 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       alert('Title and file are required.');
       return;
     }
+    if (visibilityRoles.length === 0) {
+      alert('Please select at least one role under Access Control Visibility.');
+      return;
+    }
     setUploading(true);
+
+    const primaryCategory = visibilityRoles[0] || 'vendor';
 
     await supabase.from('guides').insert({
       title: form.title,
-      category: form.category,
-      keywords: form.keywords,
+      category: primaryCategory,
+      keywords: form.keywords || '',
       allowed_roles: visibilityRoles,
       file_data: pdfData,
-      file_name: pdfFile?.name || 'guide.pdf'
+      file_name: pdfFile?.name || 'document'
     });
 
     setUploading(false);
@@ -2193,6 +2199,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
     setForm({ title: '', category: 'vendor', keywords: '' });
     setPdfFile(null);
     setPdfData('');
+    setVisibilityRoles(['vendor']);
     load();
   };
 
@@ -2211,39 +2218,49 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       <PageHeader 
         title="Operational Documents & Guides" 
         subtitle="Manage Standard Operating Procedures for Sub-Admins, Vendors, and FAQs" 
-        action={<Button onClick={() => setModal(true)}><FileUp size={16} /> Upload PDF</Button>}
+        action={<Button onClick={() => setModal(true)}><FileUp size={16} /> Upload Document</Button>}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger">
-        {guides.map((g) => (
-          <div key={g.id} className="card p-6 bg-surface border border-border flex flex-col justify-between hover-lift group">
-            <div>
-              <div className="flex justify-between items-start">
-                <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center mb-4 text-accent">
-                  <FileText size={18} />
+        {guides.map((g) => {
+          const roles = Array.isArray(g.allowed_roles) && g.allowed_roles.length > 0 ? g.allowed_roles : [g.category || 'vendor'];
+          return (
+            <div key={g.id} className="card p-6 bg-surface border border-border flex flex-col justify-between hover-lift group">
+              <div>
+                <div className="flex justify-between items-start">
+                  <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center mb-4 text-accent">
+                    <FileText size={18} />
+                  </div>
+                  <button onClick={() => handleDelete(g.id)} className="text-muted hover:text-red-500 p-1 rounded hover:bg-surface-2 transition-colors">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <button onClick={() => handleDelete(g.id)} className="text-muted hover:text-red-500 p-1 rounded hover:bg-surface-2 transition-colors">
-                  <Trash2 size={14} />
-                </button>
+                <h3 className="font-extrabold text-base text-text leading-snug">{g.title}</h3>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  {roles.map((role: string) => {
+                    const roleLabel = role === 'sub_admin' ? 'Sub-Admins' : role === 'vendor_plan' ? "Plan's" : role === 'vendor' ? 'Vendors' : role;
+                    return (
+                      <Badge key={role} variant={role === 'sub_admin' ? 'info' : role === 'vendor_plan' ? 'warning' : 'accent'}>
+                        {roleLabel}
+                      </Badge>
+                    );
+                  })}
+                  {g.file_name && <span className="text-[10px] text-muted font-semibold truncate max-w-[110px]">{g.file_name}</span>}
+                </div>
               </div>
-              <h3 className="font-extrabold text-base text-text leading-snug">{g.title}</h3>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant="accent">{g.category}</Badge>
-                {g.file_name && <span className="text-[10px] text-muted font-semibold truncate max-w-[120px]">{g.file_name}</span>}
-              </div>
-            </div>
 
-            {g.file_data && (
-              <a 
-                href={g.file_data} 
-                download={g.file_name || 'guide.pdf'} 
-                className="mt-6 inline-flex items-center justify-center gap-2 py-2 px-3 bg-surface-2 hover:bg-border/30 border border-border rounded-xl text-xs font-bold text-accent transition-colors"
-              >
-                <Upload size={12} className="rotate-180" /> Download PDF
-              </a>
-            )}
-          </div>
-        ))}
+              {g.file_data && (
+                <a 
+                  href={g.file_data} 
+                  download={g.file_name || 'document'} 
+                  className="mt-6 inline-flex items-center justify-center gap-2 py-2 px-3 bg-surface-2 hover:bg-border/30 border border-border rounded-xl text-xs font-bold text-accent transition-colors"
+                >
+                  <Upload size={12} className="rotate-180" /> View / Download Document
+                </a>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Upload Modal */}
