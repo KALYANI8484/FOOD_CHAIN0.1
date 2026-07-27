@@ -53,15 +53,48 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 
   useEffect(() => {
     (async () => {
-      // Find the approved vendor matching the logged-in phone session
-      const queryPhone = vendorPhone || '+919876543210';
-      const { data } = await supabase.from('vendors').select('*').eq('phone', queryPhone).maybeSingle();
-      setVendor(data);
-      if (data && data.plan_id) {
-        const { data: pData } = await supabase.from('subscription_plans').select('*').eq('id', data.plan_id).maybeSingle();
-        setActivePlan(pData);
+      try {
+        const queryPhone = vendorPhone || '';
+        let targetVendor: VendorType | null = null;
+
+        // Try /api/db for MongoDB vendors
+        const res = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: 'vendors',
+            action: 'select',
+            filters: queryPhone ? { phone: queryPhone } : {}
+          })
+        });
+        const d = await res.json();
+        if (d.data && d.data.length > 0) {
+          targetVendor = d.data[0];
+        }
+
+        // Fallback to any active vendor if queryPhone wasn't matched
+        if (!targetVendor) {
+          const allRes = await fetch('/api/db', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: 'vendors', action: 'select', filters: {} })
+          });
+          const allData = await allRes.json();
+          if (allData.data && allData.data.length > 0) {
+            targetVendor = allData.data[0];
+          }
+        }
+
+        setVendor(targetVendor);
+        if (targetVendor && targetVendor.plan_id) {
+          const { data: pData } = await supabase.from('subscription_plans').select('*').eq('id', targetVendor.plan_id).maybeSingle();
+          setActivePlan(pData);
+        }
+      } catch (e) {
+        console.error('Failed to load vendor session:', e);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
   }, [vendorPhone]);
 

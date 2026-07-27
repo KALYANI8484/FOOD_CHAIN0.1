@@ -5,23 +5,46 @@ import {
   Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
 type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins' | 'pending_orders';
 
 export function SuperAdmin({ onExit }: { onExit: () => void }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
+  const navLabels = {
+    en: { approvals: 'Team Approvals', vendors: 'Vendor Database', plans: 'Pricing Plans', inventory: 'Master Inventory', guides: 'Guide Documents', sub_admins: 'Sub-Admins', pending_orders: 'Pending & Missed Orders', exit: 'Exit Dashboard' },
+    hi: { approvals: 'टीम मंजूरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'मूल्य निर्धारण प्लान', inventory: 'मास्टर इन्वेंटरी', guides: 'गाइड दस्तावेज', sub_admins: 'सब-एडमिन', pending_orders: 'लंबित और छूटे हुए ऑर्डर', exit: 'डैशबोर्ड से बाहर निकलें' },
+    mr: { approvals: 'टीम मंजुरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'किंमत प्लॅन्स', inventory: 'मास्टर इन्व्हेंटरी', guides: 'मार्गदर्शक दस्तऐवज', sub_admins: 'सब-ॲडमिन', pending_orders: 'प्रलंबित आणि चुकलेले ऑर्डर', exit: 'डॅशबोर्डवरून बाहेर पडा' },
+  }[lang];
+
   const [tab, setTab] = useState<Tab>('approvals');
   const { toast, show } = useToast();
 
   const navItems: { id: Tab; label: string; icon: any }[] = [
-    { id: 'approvals', label: 'Team Approvals', icon: CheckCircle2 },
-    { id: 'vendors', label: 'Vendor Database', icon: Store },
-    { id: 'plans', label: 'Pricing Plans', icon: CreditCard },
-    { id: 'inventory', label: 'Master Inventory', icon: Package },
-    { id: 'guides', label: 'Guide Documents', icon: FileText },
-    { id: 'sub_admins', label: 'Sub-Admins', icon: Users },
-    { id: 'pending_orders', label: 'Pending & Missed Orders', icon: Clock }
+    { id: 'approvals', label: navLabels.approvals, icon: CheckCircle2 },
+    { id: 'vendors', label: navLabels.vendors, icon: Store },
+    { id: 'plans', label: navLabels.plans, icon: CreditCard },
+    { id: 'inventory', label: navLabels.inventory, icon: Package },
+    { id: 'guides', label: navLabels.guides, icon: FileText },
+    { id: 'sub_admins', label: navLabels.sub_admins, icon: Users },
+    { id: 'pending_orders', label: navLabels.pending_orders, icon: Clock }
   ];
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -69,7 +92,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
             <LanguageSelector />
           </div>
           <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>
-            Exit Dashboard
+            {navLabels.exit}
           </Button>
         </div>
       </aside>

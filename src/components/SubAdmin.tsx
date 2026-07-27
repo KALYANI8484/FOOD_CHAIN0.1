@@ -5,20 +5,43 @@ import {
   ArrowRight, Package, Trash2
 } from 'lucide-react';
 import { supabase, type Vendor, type Activity, type VendorItem } from '../lib/supabase';
-import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer } from './ui';
+import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
 type Tab = 'dashboard' | 'vendors' | 'pending' | 'guides';
 
 export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmail: string }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
+  const navLabels = {
+    en: { dashboard: 'Dashboard', vendors: 'Vendors', pending: 'Correction Inbox', guides: 'SOP Guides', exit: 'Exit', signedInAs: 'Signed In As' },
+    hi: { dashboard: 'डैशबोर्ड', vendors: 'विक्रेता (वेंडर्स)', pending: 'सुधार इनबॉक्स', guides: 'एसओपी गाइड', exit: 'बाहर निकलें', signedInAs: 'साइन इन हैं' },
+    mr: { dashboard: 'डॅशबोर्ड', vendors: 'विक्रेते (व्हेंडर्स)', pending: 'सुधारणा इनबॉक्स', guides: 'एसओपी मार्गदर्शक', exit: 'बाहेर पडा', signedInAs: 'खाते' },
+  }[lang];
+
   const [tab, setTab] = useState<Tab>('dashboard');
   const { toast, show } = useToast();
 
   const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'vendors', label: 'Vendors', icon: Store },
-    { id: 'pending', label: 'Correction Inbox', icon: AlertCircle },
-    { id: 'guides', label: 'SOP Guides', icon: FileText },
+    { id: 'dashboard', label: navLabels.dashboard, icon: LayoutDashboard },
+    { id: 'vendors', label: navLabels.vendors, icon: Store },
+    { id: 'pending', label: navLabels.pending, icon: AlertCircle },
+    { id: 'guides', label: navLabels.guides, icon: FileText },
   ];
 
   return (
@@ -33,7 +56,7 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
         </div>
         
         <div className="p-4 border-b border-border bg-surface-2/40">
-          <p className="text-xs text-muted font-bold uppercase tracking-wider">Signed In As</p>
+          <p className="text-xs text-muted font-bold uppercase tracking-wider">{navLabels.signedInAs}</p>
           <p className="text-xs text-text font-semibold truncate mt-0.5">{adminEmail || 'arjun@mealmesh.io'}</p>
         </div>
 
@@ -52,8 +75,11 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-border">
-          <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>Exit</Button>
+        <div className="p-3 border-t border-border space-y-2">
+          <div className="flex justify-center pb-1">
+            <LanguageSelector />
+          </div>
+          <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>{navLabels.exit}</Button>
         </div>
       </aside>
 

@@ -19,15 +19,26 @@ const loginTranslations = {
     passPlaceholder: "Password or DDMMYYYY (e.g. 19072004)",
     hint: "Vendors: enter your DOB as 8 digits with no spaces, slashes, or dashes.",
     registration: "Registration",
-    signIn: "Sign In",
-    vendorRegTitle: "Vendor Registration Application",
-    vendorRegSub: "Apply for a new kitchen vendor account",
-    fullName: "Full Name / Shop Name",
-    phone: "10-Digit Mobile Phone Number",
-    dob: "Date of Birth (DDMMYYYY)",
-    address: "Complete Shop Address",
-    pincode: "6-Digit Area PIN Code",
-    submitReg: "Submit Vendor Application"
+    signIn: "Sign In to Dashboard",
+    vendorRegTitle: "Vendor Sign-Up",
+    vendorRegSub: "Register your kitchen to start receiving orders instantly.",
+    loginCredTitle: "YOUR LOGIN CREDENTIALS",
+    usernameRule: "🔑 Username = Your Phone Number",
+    passwordRule: "🔑 Password = Your Date of Birth in DDMMYYYY format (e.g., 19072004)",
+    fullNameLabel: "FULL NAME",
+    fullNamePlaceholder: "Owner / Shop Name",
+    phoneLabel: "PHONE NUMBER (WILL BE YOUR USERNAME)",
+    phonePlaceholder: "10-digit mobile number",
+    phoneHint: "Strictly 10 digits — numbers only.",
+    dobLabel: "DATE OF BIRTH (WILL BE YOUR PASSWORD)",
+    dobPlaceholder: "DDMMYYYY  e.g. 19072004",
+    dobHint: "Strictly 8 digits — no slashes, dashes, or spaces. Example: 19072004 for July 19, 2004.",
+    addressLabel: "ADDRESS",
+    addressPlaceholder: "Street, Area...",
+    pincodeLabel: "PIN CODE",
+    pincodePlaceholder: "6-digit area PIN",
+    submitApp: "Submit Application",
+    alreadyRegistered: "Already registered? Sign In →"
   },
   hi: {
     backToHome: "मुख्यपृष्ठ पर वापस जाएं",
@@ -39,15 +50,26 @@ const loginTranslations = {
     passPlaceholder: "पासवर्ड या DDMMYYYY (उदा. 19072004)",
     hint: "विक्रेता: अपनी जन्म तिथि 8 अंकों में बिना किसी स्पेस या डैश के दर्ज करें।",
     registration: "नया पंजीकरण",
-    signIn: "साइन इन करें",
-    vendorRegTitle: "विक्रेता (वेंडर) पंजीकरण आवेदन",
-    vendorRegSub: "नए रसोई विक्रेता खाते के लिए आवेदन करें",
-    fullName: "पूरा नाम / दुकान का नाम",
-    phone: "10-अंकों का मोबाइल नंबर",
-    dob: "जन्म तिथि (DDMMYYYY)",
-    address: "दुकान का पूरा पता",
-    pincode: "6-अंकों का एरिया पिन कोड",
-    submitReg: "आवेदन जमा करें"
+    signIn: "डैशबोर्ड में साइन इन करें",
+    vendorRegTitle: "विक्रेता (वेंडर) साइन-अप",
+    vendorRegSub: "तुरंत ऑर्डर प्राप्त करना शुरू करने के लिए अपनी रसोई पंजीकृत करें।",
+    loginCredTitle: "आपके लॉगिन क्रेडेंशियल",
+    usernameRule: "🔑 यूजरनेम = आपका फोन नंबर",
+    passwordRule: "🔑 पासवर्ड = आपकी जन्म तिथि DDMMYYYY प्रारूप में (उदा. 19072004)",
+    fullNameLabel: "पूरा नाम",
+    fullNamePlaceholder: "मालिक / दुकान का नाम",
+    phoneLabel: "फोन नंबर (यह आपका यूजरनेम होगा)",
+    phonePlaceholder: "10-अंकों का मोबाइल नंबर",
+    phoneHint: "केवल 10 अंक — केवल संख्याएं।",
+    dobLabel: "जन्म तिथि (यह आपका पासवर्ड होगा)",
+    dobPlaceholder: "DDMMYYYY  उदा. 19072004",
+    dobHint: "केवल 8 अंक — कोई स्पेस या डैश नहीं। उदाहरण: 19072004",
+    addressLabel: "पता",
+    addressPlaceholder: "सड़क, क्षेत्र...",
+    pincodeLabel: "पिन कोड",
+    pincodePlaceholder: "6-अंकों का पिन कोड",
+    submitApp: "आवेदन जमा करें",
+    alreadyRegistered: "पहले से पंजीकृत हैं? साइन इन करें →"
   },
   mr: {
     backToHome: "मुख्य पानावर परत जा",
@@ -59,15 +81,26 @@ const loginTranslations = {
     passPlaceholder: "पासवर्ड किंवा DDMMYYYY (उदा. 19072004)",
     hint: "विक्रेते: तुमची जन्मतारीख ८ अंकांत कोणत्याही स्पेसशिवाय प्रविष्ट करा.",
     registration: "नवीन नोंदणी",
-    signIn: "साइन इन करा",
-    vendorRegTitle: "विक्रेता (व्हेंडर) नोंदणी अर्ज",
-    vendorRegSub: "नवीन स्वयंपाकघर विक्रेता खात्यासाठी अर्ज करा",
-    fullName: "पूर्ण नाव / दुकानाचे नाव",
-    phone: "१० अंकी मोबाईल नंबर",
-    dob: "जन्मतारीख (DDMMYYYY)",
-    address: "दुकानाचा पूर्ण पत्ता",
-    pincode: "६ अंकी परिसर पिन कोड",
-    submitReg: "अर्ज सबमिट करा"
+    signIn: "डॅशबोर्डवर साइन इन करा",
+    vendorRegTitle: "विक्रेता (व्हेंडर) सायनिं-अप",
+    vendorRegSub: "झटपट ऑर्डर मिळवणे सुरू करण्यासाठी तुमच्या किचनची नोंदणी करा.",
+    loginCredTitle: "तुमची लॉगिन माहिती (क्रेडेंशियल्स)",
+    usernameRule: "🔑 युझरनेम = तुमचा फोन नंबर",
+    passwordRule: "🔑 पासवर्ड = तुमची जन्मतारीख DDMMYYYY स्वरूपात (उदा. 19072004)",
+    fullNameLabel: "पूर्ण नाव",
+    fullNamePlaceholder: "मालक / दुकानाचे नाव",
+    phoneLabel: "फोन नंबर (हा तुमचा युझरनेम असेल)",
+    phonePlaceholder: "१० अंकी मोबाईल नंबर",
+    phoneHint: "फक्त १० अंक — केवळ संख्या.",
+    dobLabel: "जन्मतारीख (हा तुमचा पासवर्ड असेल)",
+    dobPlaceholder: "DDMMYYYY  उदा. 19072004",
+    dobHint: "फक्त ८ अंक — कोणत्याही स्पेसशिवाय. उदाहरण: 19072004",
+    addressLabel: "पत्ता",
+    addressPlaceholder: "रस्ता, परिसर...",
+    pincodeLabel: "पिन कोड",
+    pincodePlaceholder: "६ अंकी परिसर पिन कोड",
+    submitApp: "अर्ज सबमिट करा",
+    alreadyRegistered: "आधीच नोंदणी केली आहे? साइन इन करा →"
   }
 };
 
@@ -285,7 +318,7 @@ export function Login({
                   disabled={loading || !username || !password}
                   className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-sm transition-all shadow-lg shadow-amber-200 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
                 >
-                  {loading ? <Spinner /> : <><ArrowRight size={16} /> Sign In to Dashboard</>}
+                  {loading ? <Spinner /> : <><ArrowRight size={16} /> {t.signIn}</>}
                 </button>
               </div>
             </div>
@@ -297,32 +330,32 @@ export function Login({
               <div>
                 <img src="/logo.png" alt="Vikrams Ads" className="h-16 w-auto object-contain mb-5" />
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Vendor Sign-Up
+                  {t.vendorRegTitle}
                 </h2>
-                <p className="text-gray-500 text-sm mt-1">Register your kitchen to start receiving orders instantly.</p>
+                <p className="text-gray-500 text-sm mt-1">{t.vendorRegSub}</p>
               </div>
 
               {/* Credential rule callout */}
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm space-y-1">
-                <p className="font-bold text-amber-800 text-xs uppercase tracking-wider">Your Login Credentials</p>
-                <p className="text-amber-700 text-xs">🔑 <strong>Username</strong> = Your Phone Number</p>
-                <p className="text-amber-700 text-xs">🔑 <strong>Password</strong> = Your Date of Birth in <strong>DDMMYYYY</strong> format (e.g., <code className="bg-amber-100 px-1 rounded">19072004</code>)</p>
+                <p className="font-bold text-amber-800 text-xs uppercase tracking-wider">{t.loginCredTitle}</p>
+                <p className="text-amber-700 text-xs">{t.usernameRule}</p>
+                <p className="text-amber-700 text-xs">{t.passwordRule}</p>
               </div>
 
               <div className="space-y-3">
-                <Field label="Full Name" placeholder="Owner / Shop Name" value={sf.name} onChange={patch('name')} icon={UserPlus} />
+                <Field label={t.fullNameLabel} placeholder={t.fullNamePlaceholder} value={sf.name} onChange={patch('name')} icon={UserPlus} />
                 <Field
-                  label="Phone Number (will be your username)"
-                  placeholder="10-digit mobile number"
+                  label={t.phoneLabel}
+                  placeholder={t.phonePlaceholder}
                   value={sf.phone}
                   onChange={(v) => patch('phone')(v.replace(/\D/g, '').slice(0, 10))}
                   icon={Phone}
                   maxLength={10}
-                  hint="Strictly 10 digits — numbers only."
+                  hint={t.phoneHint}
                 />
                 <Field
-                  label="Date of Birth (will be your password)"
-                  placeholder="DDMMYYYY  e.g. 19072004"
+                  label={t.dobLabel}
+                  placeholder={t.dobPlaceholder}
                   value={sf.dob} onChange={patch('dob')}
                   icon={Calendar}
                   maxLength={8}
