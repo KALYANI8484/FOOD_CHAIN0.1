@@ -909,9 +909,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                     ? <img src={item.image_url} alt={item.name} loading="lazy" />
                     : <div className="w-full h-full bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center text-amber-200"><UtensilsCrossed size={40} /></div>
                   }
-                  <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-white/90 backdrop-blur-sm text-[10px] font-bold text-gray-600 border border-gray-100 shadow-sm">
-                    {getItemTranslation(item.category, language)}
-                  </span>
                   <div className="absolute inset-0 bg-amber-500/85 flex flex-col items-center justify-center gap-2 opacity-0 hover:opacity-100 transition-opacity duration-300">
                     <ArrowRight size={28} className="text-white" />
                     <span className="text-white text-sm font-bold tracking-wide">{t.selectOrder}</span>
