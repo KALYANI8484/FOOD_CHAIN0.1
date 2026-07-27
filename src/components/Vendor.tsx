@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import {
   LayoutDashboard, Package, ShoppingBag, CreditCard, Radar, Trash2,
   DollarSign, Clock, CheckCircle2, AlertCircle, Store, Lock as Padlock,
-  Navigation, AlertTriangle, Upload, Menu, X
+  Navigation, AlertTriangle, Upload, Menu, X, Users
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
@@ -175,7 +175,6 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           </div>
           <div className="min-w-0">
             <p className="font-bold text-sm truncate text-text">{vendor.shop_name}</p>
-            <p className="text-xs text-muted">Vendor Dashboard</p>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-14 lg:mt-0">
@@ -288,26 +287,28 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
 
   if (loading) return <Spinner />;
 
-  // Calculate stats
-  const successfulOrders = orders.filter(o => o.status === 'delivered');
-  const revenue = successfulOrders.reduce((s, o) => s + Number(o.price), 0);
-  const pendingFulfillment = orders.filter(o => o.status === 'accepted' || o.status === 'preparing' || o.status === 'out_for_delivery').length;
+  // Calculate exact vendor-specific stats (isolated strictly for this logged-in vendor)
+  const vendorCompletedOrders = orders.filter(o => o.status === 'delivered');
+  const totalVendorEarnings = vendorCompletedOrders.reduce((s, o) => s + (Number(o.price) || 0), 0);
   
-  // Low Stock Alerts (quantity < 5)
-  const lowStockCount = items.filter(item => item.quantity < 5).length;
+  // Unique clients connected by this specific vendor through website orders
+  const uniqueClientsCount = new Set(
+    orders
+      .map(o => (o.client_phone || o.client_name || '').trim())
+      .filter(Boolean)
+  ).size;
 
   const kpis = [
-    { label: 'Today\'s Orders', value: successfulOrders.length, desc: 'Completed deliveries', icon: ShoppingBag, color: 'text-green-600', bg: 'bg-green-500/10' },
-    { label: 'Pending Fulfillment', value: pendingFulfillment, desc: 'Kitchen active prep', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-500/10' },
-    { label: 'Today\'s Earnings', value: `₹${revenue.toLocaleString()}`, desc: 'Delivered revenue', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-500/10' },
-    { label: 'Total Orders Placed', value: orders.length, desc: 'Total orders count', icon: ShoppingBag, color: 'text-purple-600', bg: 'bg-purple-500/10' },
+    { label: 'Total Completed Orders', value: vendorCompletedOrders.length, desc: 'Total overall orders completed', icon: ShoppingBag, color: 'text-green-600', bg: 'bg-green-500/10' },
+    { label: 'Connected Clients', value: uniqueClientsCount, desc: 'Clients connected until now', icon: Users, color: 'text-amber-600', bg: 'bg-amber-500/10' },
+    { label: 'Total Overall Earnings', value: `₹${totalVendorEarnings.toLocaleString()}`, desc: 'Total overall earned from website', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-500/10' },
+    { label: 'Total Orders Received', value: orders.length, desc: 'Lifetime order count', icon: ShoppingBag, color: 'text-purple-600', bg: 'bg-purple-500/10' },
   ];
 
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="animate-fade-in-up">
         <h1 className="text-3xl font-extrabold tracking-tight">Welcome, {vendor.owner_name}</h1>
-        <p className="text-muted mt-1">Here is what is happening at {vendor.shop_name} today</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 stagger">
@@ -327,11 +328,11 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
         {/* Recent orders */}
         <div className="lg:col-span-2 card p-6 bg-surface border border-border">
           <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted">Successful Orders</h3>
-          {successfulOrders.length === 0 ? (
-            <EmptyState icon={<ShoppingBag size={24} />} title="No completed orders today" />
+          {vendorCompletedOrders.length === 0 ? (
+            <EmptyState icon={<ShoppingBag size={24} />} title="No completed orders yet" />
           ) : (
             <div className="space-y-3">
-              {successfulOrders.slice(0, 5).map((o) => (
+              {vendorCompletedOrders.slice(0, 5).map((o) => (
                 <div key={o.id} className="flex items-center justify-between p-3.5 rounded-xl bg-surface-2 border border-border hover:border-accent/25 transition-all">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center text-green-600">
@@ -1015,34 +1016,32 @@ function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; act
           {/* QR Code 1 Card */}
           <div className="p-6 rounded-2xl bg-surface-2 border border-border flex flex-col items-center text-center space-y-4 hover:border-accent/40 transition-colors">
             <Badge variant="accent">Primary Payment QR Code 1</Badge>
-            <div className="w-48 h-48 bg-white p-3 rounded-2xl border-2 border-accent/20 shadow-md flex flex-col items-center justify-center">
+            <div className="w-52 h-64 bg-white p-2 rounded-2xl border-2 border-accent/20 shadow-md flex flex-col items-center justify-center overflow-hidden">
               <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikramsads@upi%26pn=VIKRAMS%20ADS%26cu=INR" 
-                alt="UPI Payment QR Code 1" 
+                src="/qr1.png" 
+                alt="Payment QR Code 1 - Pratibha satere" 
                 className="w-full h-full object-contain"
               />
             </div>
             <div>
-              <p className="font-extrabold text-sm text-text">Scan via GPay / PhonePe / Paytm</p>
-              <p className="text-xs font-semibold text-accent mt-0.5">UPI ID: vikramsads@upi</p>
-              <p className="text-[11px] text-muted mt-1">Merchant: VIKRAMS ADS Official</p>
+              <p className="font-extrabold text-base text-text">Pratibha satere</p>
+              <p className="text-sm font-bold text-accent mt-0.5">9689784930</p>
             </div>
           </div>
 
           {/* QR Code 2 Card */}
           <div className="p-6 rounded-2xl bg-surface-2 border border-border flex flex-col items-center text-center space-y-4 hover:border-accent/40 transition-colors">
             <Badge variant="success">Backup Billing QR Code 2</Badge>
-            <div className="w-48 h-48 bg-white p-3 rounded-2xl border-2 border-green-500/20 shadow-md flex flex-col items-center justify-center">
+            <div className="w-52 h-64 bg-white p-2 rounded-2xl border-2 border-green-500/20 shadow-md flex flex-col items-center justify-center overflow-hidden">
               <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikramadvertising@icici%26pn=VIKRAMS%20ADS%20Billing%26cu=INR" 
-                alt="UPI Payment QR Code 2" 
+                src="/qr2.png" 
+                alt="Payment QR Code 2 - Sonam Hinge" 
                 className="w-full h-full object-contain"
               />
             </div>
             <div>
-              <p className="font-extrabold text-sm text-text">Scan via BHIM / Banking Apps</p>
-              <p className="text-xs font-semibold text-green-600 mt-0.5">UPI ID: vikramadvertising@icici</p>
-              <p className="text-[11px] text-muted mt-1">Bank Account: ICICI Direct Billing</p>
+              <p className="font-extrabold text-base text-text">Sonam Hinge</p>
+              <p className="text-sm font-bold text-green-600 mt-0.5">9309362008</p>
             </div>
           </div>
         </div>
@@ -1050,7 +1049,7 @@ function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; act
         {/* ── Step-by-Step Purchase Guide ── */}
         <div className="p-5 rounded-2xl bg-surface-2/60 border border-border/80 space-y-3">
           <p className="font-bold text-xs uppercase tracking-wider text-muted flex items-center gap-1.5">
-            <AlertCircle size={14} className="text-accent" /> Step-by-Step Plan Purchase & Activation Guide
+            <AlertCircle size={14} className="text-accent" /> Step-by-Step Plan Purchase &amp; Activation Guide
           </p>
           <div className="grid sm:grid-cols-4 gap-4 text-xs">
             <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
@@ -1061,14 +1060,14 @@ function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; act
 
             <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
               <span className="w-6 h-6 rounded-full bg-accent text-white font-extrabold flex items-center justify-center text-xs">2</span>
-              <p className="font-bold text-text pt-1">Scan & Pay</p>
+              <p className="font-bold text-text pt-1">Scan &amp; Pay</p>
               <p className="text-[11px] text-muted">Scan QR Code 1 or QR Code 2 using GPay, PhonePe, Paytm, or BHIM.</p>
             </div>
 
             <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
               <span className="w-6 h-6 rounded-full bg-accent text-white font-extrabold flex items-center justify-center text-xs">3</span>
-              <p className="font-bold text-text pt-1">Copy UTR / Txn Ref</p>
-              <p className="text-[11px] text-muted">Note the 12-digit UTR payment reference number from your UPI app receipt.</p>
+              <p className="font-bold text-text pt-1">Share Payment Screenshot</p>
+              <p className="text-[11px] text-muted">Share your payment screenshot to scanned QR whatsapp no , once cross check we will upgrade your plan</p>
             </div>
 
             <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
