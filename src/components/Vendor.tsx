@@ -850,6 +850,10 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Plan Activation Section ── */}
       <div className="mt-10 pt-8 border-t border-border animate-fade-in-up">
         <PageHeader title="Plan Activation" subtitle="Manage your current plan status, validity, and active subscriptions" />
