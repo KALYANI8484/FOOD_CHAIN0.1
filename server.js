@@ -130,6 +130,7 @@ const subInventorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true },
+  uom: { type: String, default: 'pc' },
   image_url: { type: String, default: null },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);

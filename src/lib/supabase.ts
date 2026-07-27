@@ -30,6 +30,7 @@ export type SubInventory = {
   name: string;
   price: number;
   quantity: number;
+  uom?: string;
   image_url: string | null;
   created_at: string;
 };

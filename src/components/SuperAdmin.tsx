@@ -1666,6 +1666,16 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
 }
 
 // 5.1 Sub Inventory View
+const UOM_OPTIONS = [
+  { label: 'Piece (pc) / Each (ea)', value: 'pc' },
+  { label: 'Plate / Portion / Serving', value: 'plate' },
+  { label: 'Gram (g)', value: 'g' },
+  { label: 'Kilogram (kg)', value: 'kg' },
+  { label: 'Milliliter (ml)', value: 'ml' },
+  { label: 'Liter (L)', value: 'L' },
+  { label: 'Dozen (dz)', value: 'dz' }
+];
+
 function SubInventoryView({ master, show, onClose }: { master: MasterItem, show: (m: string, t?: 'success'|'error'|'info') => void, onClose: () => void }) {
   const [items, setItems] = useState<SubInventory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1675,7 +1685,8 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
   const [form, setForm] = useState({
     name: '',
     price: 0,
-    quantity: 10,
+    quantity: 25,
+    uom: 'pc',
     image_url: ''
   });
 
@@ -1699,12 +1710,13 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
       name: form.name,
       price: Number(form.price),
       quantity: Number(form.quantity),
+      uom: form.uom || 'pc',
       image_url: form.image_url || null
     });
 
     show(`Sub-Item ${form.name} created successfully!`);
     setModal(false);
-    setForm({ name: '', price: 0, quantity: 10, image_url: '' });
+    setForm({ name: '', price: 0, quantity: 25, uom: 'pc', image_url: '' });
     load();
   };
 
@@ -1714,6 +1726,7 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
       name: editItem.name,
       price: Number(editItem.price),
       quantity: Number(editItem.quantity),
+      uom: editItem.uom || 'pc',
       image_url: editItem.image_url
     }).eq('id', editItem.id);
 
@@ -1746,9 +1759,15 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {items.map(item => (
           <div key={item.id} className="card bg-surface border border-border p-4 flex flex-col justify-between">
-            <h3 className="font-bold">{item.name}</h3>
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-accent font-bold">₹{item.price}</span>
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-text">{item.name}</h3>
+                <Badge variant="accent">{item.uom || 'pc'}</Badge>
+              </div>
+              <p className="text-xs text-muted mt-1">Default Qty (MOQ): <strong className="text-text">{item.quantity} {item.uom || 'pc'}</strong></p>
+            </div>
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
+              <span className="text-accent font-extrabold text-base">₹{item.price} / {item.uom || 'pc'}</span>
               <div className="flex gap-2">
                 <button onClick={() => setEditItem(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-text"><Edit2 size={14} /></button>
                 <button onClick={() => handleDelete(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-red-500"><Trash2 size={14} /></button>
@@ -1762,11 +1781,17 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
 
       <Modal open={modal} onClose={() => setModal(false)} title="Create Sub-Item">
         <div className="space-y-4">
-          <Input label="Item Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <Input label="Item Name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Price (₹)" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} required />
-            <Input label="Default Qty" type="number" value={String(form.quantity)} onChange={(v) => setForm({ ...form, quantity: Number(v) })} required />
+            <Input label="Price (₹) *" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} required />
+            <Input label="Default Qty *" type="number" value={String(form.quantity)} onChange={(v) => setForm({ ...form, quantity: Number(v) })} required />
           </div>
+          <Select 
+            label="Unit of Measurement (UOM) *" 
+            value={form.uom} 
+            onChange={(v) => setForm({ ...form, uom: v })} 
+            options={UOM_OPTIONS} 
+          />
           <Button className="w-full mt-4" onClick={handleCreate}>Save Sub-Item</Button>
         </div>
       </Modal>
@@ -1774,11 +1799,17 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
       {editItem && (
         <Modal open={true} onClose={() => setEditItem(null)} title="Edit Sub-Item">
           <div className="space-y-4">
-            <Input label="Item Name" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
+            <Input label="Item Name *" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Price (₹)" type="number" value={String(editItem.price)} onChange={(v) => setEditItem({ ...editItem, price: Number(v) })} required />
-              <Input label="Quantity" type="number" value={String(editItem.quantity)} onChange={(v) => setEditItem({ ...editItem, quantity: Number(v) })} required />
+              <Input label="Price (₹) *" type="number" value={String(editItem.price)} onChange={(v) => setEditItem({ ...editItem, price: Number(v) })} required />
+              <Input label="Default Qty *" type="number" value={String(editItem.quantity)} onChange={(v) => setEditItem({ ...editItem, quantity: Number(v) })} required />
             </div>
+            <Select 
+              label="Unit of Measurement (UOM) *" 
+              value={editItem.uom || 'pc'} 
+              onChange={(v) => setEditItem({ ...editItem, uom: v })} 
+              options={UOM_OPTIONS} 
+            />
             <Button className="w-full mt-4" onClick={handleEditSave}>Update Item</Button>
           </div>
         </Modal>

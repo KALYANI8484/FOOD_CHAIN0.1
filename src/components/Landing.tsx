@@ -80,8 +80,8 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
   const [step, setStep] = useState<ModalStep>(1);
   const [subItems, setSubItems] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
-  const [selectedItem, setSelectedItem] = useState<any | null>(null);
-  const [qty, setQty] = useState(1);
+  const [selectedQuantities, setSelectedQuantities] = useState<{ [id: string]: number }>({});
+  const [selectedItemIds, setSelectedItemIds] = useState<{ [id: string]: boolean }>({});
   const [submitting, setSubmitting] = useState(false);
   const [otp, setOtp] = useState('');
 
@@ -102,20 +102,63 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
           })
         });
         const d = await res.json();
-        setSubItems(d.data || []);
-        if (d.data?.length > 0) setSelectedItem(d.data[0]);
+        const items = d.data || [];
+        setSubItems(items);
+
+        const initialQtys: { [id: string]: number } = {};
+        const initialSelected: { [id: string]: boolean } = {};
+        items.forEach((item: any) => {
+          const defaultMin = Number(item.quantity) || 1;
+          initialQtys[item.id] = defaultMin;
+        });
+        if (items.length > 0) {
+          initialSelected[items[0].id] = true;
+        }
+        setSelectedQuantities(initialQtys);
+        setSelectedItemIds(initialSelected);
       } catch (e) { console.error(e); }
       finally { setLoadingSubs(false); }
     })();
   }, [master.id]);
 
+  const toggleItemSelection = (id: string) => {
+    setSelectedItemIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const updateItemQuantity = (id: string, delta: number, minQty: number) => {
+    setSelectedQuantities(prev => {
+      const current = prev[id] || minQty;
+      const next = Math.max(minQty, current + delta);
+      return { ...prev, [id]: next };
+    });
+  };
+
+  const activeSelectedSubItems = subItems.filter(item => selectedItemIds[item.id]);
+
+  const totalPrice = activeSelectedSubItems.reduce((sum, item) => {
+    const q = selectedQuantities[item.id] || Number(item.quantity) || 1;
+    return sum + (Number(item.price) * q);
+  }, 0);
+
+  const totalItemCount = activeSelectedSubItems.reduce((sum, item) => {
+    return sum + (selectedQuantities[item.id] || Number(item.quantity) || 1);
+  }, 0);
+
   const handlePlaceOrder = async () => {
-    if (!selectedItem) return;
+    if (activeSelectedSubItems.length === 0) {
+      alert('Please select at least one item to order.');
+      return;
+    }
     if (!form.name || !form.phone || !form.address || !form.zip || !form.landmark) {
       alert('All fields are required'); return;
     }
     setSubmitting(true);
     const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    const summaryItemName = activeSelectedSubItems
+      .map(i => `${i.name} (${selectedQuantities[i.id] || i.quantity} ${i.uom || 'pc'})`)
+      .join(', ');
+
     try {
       const res = await fetch('/api/db', {
         method: 'POST',
@@ -129,11 +172,11 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
             client_address: form.address,
             client_zip: form.zip,
             client_landmark: form.landmark,
-            item_name: selectedItem.name,
-            item_id: selectedItem.id,
+            item_name: summaryItemName,
+            item_id: activeSelectedSubItems[0]?.id || master.id,
             master_category_name: master.name,
-            price: selectedItem.price,
-            quantity: qty,
+            price: totalPrice,
+            quantity: totalItemCount,
             status: 'pending',
             otp: generatedOtp
           }
@@ -148,8 +191,6 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
       alert(e.message || 'Failed to place order. Try again.');
     } finally { setSubmitting(false); }
   };
-
-  const price = selectedItem ? selectedItem.price * qty : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md animate-fade-in">
@@ -186,15 +227,15 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-6 py-5">
 
-          {/* ── Step 1: Select Sub-Item ── */}
+          {/* ── Step 1: Select Sub-Items ── */}
           {step === 1 && (
             <div className="space-y-5">
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Step 1 of 2</p>
                 <h3 className="text-lg font-extrabold text-gray-900 mt-0.5" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Choose your item
+                  Select Wholesale Items
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">Select a specific dish from this category</p>
+                <p className="text-xs text-gray-400 mt-0.5">Select multiple items and customize quantities (Minimum Wholesale MOQ applied)</p>
               </div>
 
               {loadingSubs ? (
@@ -202,70 +243,83 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
               ) : subItems.length === 0 ? (
                 <div className="text-center py-8 bg-amber-50 rounded-2xl border border-amber-100">
                   <UtensilsCrossed size={32} className="mx-auto text-amber-300 mb-2" />
-                  <p className="text-sm font-semibold text-gray-600">No specific items listed yet</p>
-                  <p className="text-xs text-gray-400 mt-1">You can still order the master dish below</p>
-                  {/* Fallback: order master item directly */}
+                  <p className="text-sm font-semibold text-gray-600">No specific sub-items listed yet</p>
+                  <p className="text-xs text-gray-400 mt-1">You can still place a custom wholesale order for this category</p>
                   <button
                     onClick={() => {
-                      // Create a synthetic vendor item from master
-                      setSelectedItem({ id: master.id, name: master.name, price: master.price ?? master.base_price, quantity: 99, image_url: master.image_url, master_item_id: master.id, vendor_id: '' });
+                      const synthId = master.id;
+                      setSubItems([{ id: synthId, name: master.name, price: master.price ?? master.base_price, quantity: 1, uom: 'order' }]);
+                      setSelectedItemIds({ [synthId]: true });
+                      setSelectedQuantities({ [synthId]: 1 });
                       setStep(2);
                     }}
                     className="mt-4 px-5 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors"
                   >
-                    Order {master.name} →
+                    Order {master.name} Category →
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {subItems.map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => setSelectedItem(item)}
-                      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl border-2 transition-all text-left ${
-                        selectedItem?.id === item.id
-                          ? 'border-amber-500 bg-amber-50 shadow-md shadow-amber-100'
-                          : 'border-gray-100 hover:border-amber-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
-                        {item.image_url
-                          ? <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
-                          : <div className="w-full h-full flex items-center justify-center text-gray-300"><UtensilsCrossed size={20} /></div>
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900 truncate">{item.name}</p>
-                        <p className="text-amber-600 font-extrabold text-sm">₹{item.price}</p>
-                        {item.quantity < 5 && (
-                          <span className="text-[10px] font-bold text-red-500">Only {item.quantity} left!</span>
+                <div className="space-y-3">
+                  {subItems.map(item => {
+                    const isSelected = !!selectedItemIds[item.id];
+                    const minQty = Number(item.quantity) || 1;
+                    const currentQty = selectedQuantities[item.id] || minQty;
+                    const itemUom = item.uom || 'pc';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'border-amber-500 bg-amber-50/70 shadow-sm'
+                            : 'border-gray-100 hover:border-amber-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => toggleItemSelection(item.id)}>
+                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected ? 'border-amber-500 bg-amber-500' : 'border-gray-300 bg-white'
+                          }`}>
+                            {isSelected && <CheckCircle size={12} className="text-white" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-gray-900 truncate text-sm">{item.name}</p>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-md">
+                                Default Min: {minQty} {itemUom}
+                              </span>
+                            </div>
+                            <p className="text-amber-700 font-extrabold text-xs mt-0.5">
+                              ₹{item.price} / {itemUom}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Sub-Item Quantity Controller (Locked at minQty) */}
+                        {isSelected && (
+                          <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-amber-300 shadow-sm flex-shrink-0">
+                            <button
+                              onClick={() => updateItemQuantity(item.id, -1, minQty)}
+                              disabled={currentQty <= minQty}
+                              className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 font-bold flex items-center justify-center text-sm disabled:opacity-40"
+                              title={`Minimum quantity locked at default MOQ (${minQty})`}
+                            >
+                              −
+                            </button>
+                            <div className="text-center px-1">
+                              <span className="text-xs font-extrabold text-gray-900">{currentQty}</span>
+                              <span className="text-[10px] text-gray-500 font-medium ml-1">{itemUom}</span>
+                            </div>
+                            <button
+                              onClick={() => updateItemQuantity(item.id, 1, minQty)}
+                              className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center justify-center text-sm"
+                            >
+                              +
+                            </button>
+                          </div>
                         )}
                       </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        selectedItem?.id === item.id ? 'border-amber-500 bg-amber-500' : 'border-gray-300'
-                      }`}>
-                        {selectedItem?.id === item.id && <CheckCircle size={12} className="text-white" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Quantity selector */}
-              {subItems.length > 0 && selectedItem && (
-                <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                  <span className="text-sm font-bold text-gray-700">Quantity</span>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setQty(q => Math.max(1, q - 1))}
-                      className="w-8 h-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:border-amber-400 transition-colors font-bold text-lg">
-                      −
-                    </button>
-                    <span className="text-lg font-extrabold text-gray-900 w-6 text-center">{qty}</span>
-                    <button onClick={() => setQty(q => Math.min(20, q + 1))}
-                      className="w-8 h-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:border-amber-400 transition-colors font-bold text-lg">
-                      +
-                    </button>
-                  </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -279,7 +333,6 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                 <h3 className="text-lg font-extrabold text-gray-900 mt-0.5" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Your delivery details
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">Ordering: <strong className="text-gray-700">{selectedItem?.item_name}</strong> × {qty}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -288,18 +341,31 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
               </div>
               <FormField label="Full Address" placeholder="Flat, Building, Street, Area..." icon={MapPin} value={form.address} onChange={patch('address')} />
               <div className="grid grid-cols-2 gap-3">
-                <FormField label="PIN Code" placeholder="110001" icon={Hash} value={form.zip} onChange={patch('zip')} maxLength={6} />
+                <FormField label="PIN Code" placeholder="416009" icon={Hash} value={form.zip} onChange={patch('zip')} maxLength={6} />
                 <FormField label="Landmark" placeholder="Near Metro, Park..." icon={MapPin} value={form.landmark} onChange={patch('landmark')} />
               </div>
 
-              {/* Order Summary */}
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">Order Summary</p>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">{selectedItem?.item_name} × {qty}</span>
-                  <span className="font-extrabold text-amber-700">₹{price}</span>
+              {/* Order Items Breakdown & Summary */}
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Wholesale Order Summary</p>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {activeSelectedSubItems.map(item => {
+                    const q = selectedQuantities[item.id] || Number(item.quantity) || 1;
+                    const itemTotal = Number(item.price) * q;
+                    return (
+                      <div key={item.id} className="flex justify-between text-xs text-gray-700 font-medium">
+                        <span>• {item.name} ({q} {item.uom || 'pc'})</span>
+                        <span className="font-bold text-gray-900">₹{itemTotal}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <p className="text-[10px] text-amber-600 mt-2">⏳ We will connect you to nearby vendors. Once a vendor claims your order, they will contact you.</p>
+
+                <div className="pt-2 border-t border-amber-200/60 flex justify-between items-center text-sm">
+                  <span className="font-extrabold text-gray-900">Total Order Amount:</span>
+                  <span className="font-extrabold text-amber-700 text-base">₹{totalPrice}</span>
+                </div>
+                <p className="text-[10px] text-amber-600">⏳ Your wholesale order will be broadcast to nearby approved vendors immediately.</p>
               </div>
             </div>
           )}
@@ -314,7 +380,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                 <h3 className="text-2xl font-extrabold text-gray-900" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Order Placed!
                 </h3>
-                <p className="text-gray-500 text-sm mt-1">Your order has been broadcast to nearby vendors.</p>
+                <p className="text-gray-500 text-sm mt-1">Your wholesale order has been broadcast to nearby vendors.</p>
               </div>
               <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white animate-pulse">
                 <p className="text-sm font-bold uppercase tracking-widest opacity-90 mb-2">Connecting to nearby vendors...</p>
@@ -329,11 +395,11 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
         <div className="px-6 pb-6 pt-3 flex-shrink-0 border-t border-gray-100">
           {step === 1 && subItems.length > 0 && (
             <button
-              disabled={!selectedItem}
+              disabled={activeSelectedSubItems.length === 0}
               onClick={() => setStep(2)}
               className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
             >
-              Continue to Details <ChevronRight size={18} />
+              Continue to Details ({activeSelectedSubItems.length} items • ₹{totalPrice}) <ChevronRight size={18} />
             </button>
           )}
           {step === 2 && (
@@ -345,7 +411,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                 <ChevronLeft size={16} /> Back
               </button>
               <button
-                disabled={submitting || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
+                disabled={submitting || activeSelectedSubItems.length === 0 || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
                 onClick={handlePlaceOrder}
                 className="flex-1 h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
               >
