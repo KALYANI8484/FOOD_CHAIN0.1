@@ -1,12 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff,
   UserPlus, ChevronLeft, Phone, MapPin, Calendar,
   Hash, Store, Users, Shield
 } from 'lucide-react';
-import { Spinner } from './ui';
+import { Spinner, LanguageSelector, getInitialLanguage, type Language } from './ui';
 
 type AuthMode = 'login' | 'signup' | 'reset';
+
+const loginTranslations = {
+  en: {
+    backToHome: "Back to Home",
+    title: "Login / Register",
+    subtitle: "Access your workspace below",
+    userLabel: "Email / Phone Number",
+    userPlaceholder: "admin@email.com or +91 99999...",
+    passLabel: "Password / Date of Birth",
+    passPlaceholder: "Password or DDMMYYYY (e.g. 19072004)",
+    hint: "Vendors: enter your DOB as 8 digits with no spaces, slashes, or dashes.",
+    registration: "Registration",
+    signIn: "Sign In",
+    vendorRegTitle: "Vendor Registration Application",
+    vendorRegSub: "Apply for a new kitchen vendor account",
+    fullName: "Full Name / Shop Name",
+    phone: "10-Digit Mobile Phone Number",
+    dob: "Date of Birth (DDMMYYYY)",
+    address: "Complete Shop Address",
+    pincode: "6-Digit Area PIN Code",
+    submitReg: "Submit Vendor Application"
+  },
+  hi: {
+    backToHome: "मुख्यपृष्ठ पर वापस जाएं",
+    title: "लॉगिन / रजिस्टर",
+    subtitle: "नीचे अपने कार्यक्षेत्र तक पहुंचें",
+    userLabel: "ईमेल / फोन नंबर",
+    userPlaceholder: "admin@email.com या +91 99999...",
+    passLabel: "पासवर्ड / जन्म तिथि (DOB)",
+    passPlaceholder: "पासवर्ड या DDMMYYYY (उदा. 19072004)",
+    hint: "विक्रेता: अपनी जन्म तिथि 8 अंकों में बिना किसी स्पेस या डैश के दर्ज करें।",
+    registration: "नया पंजीकरण",
+    signIn: "साइन इन करें",
+    vendorRegTitle: "विक्रेता (वेंडर) पंजीकरण आवेदन",
+    vendorRegSub: "नए रसोई विक्रेता खाते के लिए आवेदन करें",
+    fullName: "पूरा नाम / दुकान का नाम",
+    phone: "10-अंकों का मोबाइल नंबर",
+    dob: "जन्म तिथि (DDMMYYYY)",
+    address: "दुकान का पूरा पता",
+    pincode: "6-अंकों का एरिया पिन कोड",
+    submitReg: "आवेदन जमा करें"
+  },
+  mr: {
+    backToHome: "मुख्य पानावर परत जा",
+    title: "लॉगिन / नोंदणी",
+    subtitle: "खाली तुमच्या खात्यात प्रवेश करा",
+    userLabel: "ईमेल / फोन नंबर",
+    userPlaceholder: "admin@email.com किंवा +91 99999...",
+    passLabel: "पासवर्ड / जन्मतारीख (DOB)",
+    passPlaceholder: "पासवर्ड किंवा DDMMYYYY (उदा. 19072004)",
+    hint: "विक्रेते: तुमची जन्मतारीख ८ अंकांत कोणत्याही स्पेसशिवाय प्रविष्ट करा.",
+    registration: "नवीन नोंदणी",
+    signIn: "साइन इन करा",
+    vendorRegTitle: "विक्रेता (व्हेंडर) नोंदणी अर्ज",
+    vendorRegSub: "नवीन स्वयंपाकघर विक्रेता खात्यासाठी अर्ज करा",
+    fullName: "पूर्ण नाव / दुकानाचे नाव",
+    phone: "१० अंकी मोबाईल नंबर",
+    dob: "जन्मतारीख (DDMMYYYY)",
+    address: "दुकानाचा पूर्ण पत्ता",
+    pincode: "६ अंकी परिसर पिन कोड",
+    submitReg: "अर्ज सबमिट करा"
+  }
+};
 
 /* ── Reusable input ────────────────────────────── */
 function Field({
@@ -46,7 +109,6 @@ function Field({
   );
 }
 
-
 /* ── Main Component ────────────────────────────── */
 export function Login({
   onLogin, onBack
@@ -54,6 +116,24 @@ export function Login({
   onLogin: (r: 'super_admin' | 'sub_admin' | 'vendor', cred?: string) => void;
   onBack: () => void;
 }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const t = loginTranslations[lang];
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
   const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -90,7 +170,7 @@ export function Login({
       setError('All fields are required'); return;
     }
     if (!/^\d{8}$/.test(sf.dob)) {
-      setError('Date of Birth must be exactly 8 digits in DDMMYYYY format — no slashes or dashes.'); return;
+      setError('Date of Birth must be exactly 8 digits in DDMMYYYY format'); return;
     }
     if (!/^\d{6}$/.test(sf.pincode)) {
       setError('PIN Code must be exactly 6 digits.'); return;
@@ -100,13 +180,20 @@ export function Login({
       const res = await fetch('/api/vendors/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ owner_name: sf.name, phone: sf.phone, birthdate: sf.dob, address: sf.address, zip_code: sf.pincode })
+        body: JSON.stringify({
+          owner_name: sf.name,
+          shop_name: sf.name,
+          phone: sf.phone,
+          dob: sf.dob,
+          address: sf.address,
+          zip_code: sf.pincode
+        })
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Registration failed');
       else {
-        setSuccess('Account created successfully! Redirecting to login...');
-        setTimeout(() => switchMode('login'), 2000);
+        setSuccess('Application submitted! Your vendor account is pending verification by Super Admin.');
+        setSf({ name: '', phone: '', dob: '', address: '', pincode: '' });
       }
     } catch { setError('Network error — please try again'); }
     finally { setLoading(false); }
@@ -114,9 +201,11 @@ export function Login({
 
   /* Reset Password */
   const handleReset = async () => {
-    setError(''); setSuccess(''); setLoading(true);
+    setError(''); setSuccess('');
+    if (!username) { setError('Enter your registered email address first'); return; }
+    setLoading(true);
     try {
-      const res = await fetch('/api/super-admin/reset-password', {
+      const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: username })
@@ -129,7 +218,7 @@ export function Login({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8F8FF] px-6 py-12" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F8FF] px-6 py-12 relative" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
         {/* Back button */}
         <button
@@ -137,8 +226,13 @@ export function Login({
           className="absolute top-6 left-6 flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-semibold transition-colors group"
         >
           <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Back to Home
+          {t.backToHome}
         </button>
+
+        {/* Language Selector Top Right */}
+        <div className="absolute top-6 right-6">
+          <LanguageSelector />
+        </div>
 
         <div className="w-full max-w-md animate-scale-in">
 
@@ -148,26 +242,26 @@ export function Login({
               <div>
                 <img src="/logo.png" alt="Vikrams Ads" className="h-16 w-auto object-contain mb-5" />
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Login / Register
+                  {t.title}
                 </h2>
-                <p className="text-gray-500 text-sm mt-1">Access your workspace below</p>
+                <p className="text-gray-500 text-sm mt-1">{t.subtitle}</p>
               </div>
 
               <div className="space-y-4">
                 <Field
-                  label="Email / Phone Number"
-                  placeholder="admin@email.com or +91 99999..."
+                  label={t.userLabel}
+                  placeholder={t.userPlaceholder}
                   value={username} onChange={setUsername}
                   icon={Phone}
                 />
                 <div>
                   <Field
-                    label="Password / Date of Birth"
-                    placeholder="Password or DDMMYYYY (e.g. 19072004)"
+                    label={t.passLabel}
+                    placeholder={t.passPlaceholder}
                     type="password"
                     value={password} onChange={setPassword}
                     icon={Lock}
-                    hint="Vendors: enter your DOB as 8 digits with no spaces, slashes, or dashes."
+                    hint={t.hint}
                   />
                   <div className="flex justify-between items-center mt-2 px-1">
                     <button
@@ -175,7 +269,7 @@ export function Login({
                       onClick={() => switchMode('signup')}
                       className="text-xs text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1 hover:underline"
                     >
-                      <UserPlus size={13} /> Registration
+                      <UserPlus size={13} /> {t.registration}
                     </button>
                   </div>
                 </div>

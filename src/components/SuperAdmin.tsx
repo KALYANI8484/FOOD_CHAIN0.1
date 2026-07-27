@@ -5,7 +5,7 @@ import {
   Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector } from './ui';
 import { VendorForm } from './VendorForm';
 
 type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins' | 'pending_orders';
@@ -21,30 +21,29 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
     { id: 'inventory', label: 'Master Inventory', icon: Package },
     { id: 'guides', label: 'Guide Documents', icon: FileText },
     { id: 'sub_admins', label: 'Sub-Admins', icon: Users },
-    { id: 'pending_orders', label: 'Pending Orders', icon: Clock },
+    { id: 'pending_orders', label: 'Pending & Missed Orders', icon: Clock }
   ];
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-bg flex text-text relative">
-      {/* Mobile Header Toggle */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-surface border-b border-border z-30 flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
-          <p className="font-bold text-sm truncate text-text">VIKRAMS ADS</p>
-        </div>
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text">
-           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
+    <div className="flex h-screen bg-bg text-text overflow-hidden relative">
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl bg-surface border border-border shadow-md"
+      >
+        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
 
       {/* Sidebar */}
       <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="px-5 py-4 border-b border-border hidden lg:flex items-center gap-3 cursor-pointer group" onClick={onExit}>
-          <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain shrink-0" />
+        <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center group-hover:rotate-12 transition-transform">
+            <Store size={18} className="text-white" />
+          </div>
           <div className="min-w-0">
-            <p className="font-bold text-sm truncate">VIKRAMS ADS</p>
+            <p className="font-bold text-sm truncate text-text">VIKRAMS ADS</p>
             <p className="text-xs text-muted">Super Admin Portal</p>
           </div>
         </div>
@@ -65,7 +64,10 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border space-y-2">
+          <div className="flex justify-center pb-1">
+            <LanguageSelector />
+          </div>
           <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>
             Exit Dashboard
           </Button>

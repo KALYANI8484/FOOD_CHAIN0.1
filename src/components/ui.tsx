@@ -260,3 +260,56 @@ export function SpotlightCard({ children, className = '' }: { children: ReactNod
     </div>
   );
 }
+
+export type Language = 'en' | 'hi' | 'mr';
+
+export const getInitialLanguage = (): Language => {
+  if (typeof window === 'undefined') return 'en';
+  const saved = localStorage.getItem('app_language') as Language;
+  if (saved && (saved === 'en' || saved === 'hi' || saved === 'mr')) return saved;
+  const navLang = (navigator.language || (navigator as any).userLanguage || '').toLowerCase();
+  if (navLang.startsWith('hi')) return 'hi';
+  if (navLang.startsWith('mr')) return 'mr';
+  return 'en';
+};
+
+export function LanguageSelector({ onChange }: { onChange?: (lang: Language) => void }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
+  const change = (l: Language) => {
+    setLang(l);
+    localStorage.setItem('app_language', l);
+    window.dispatchEvent(new Event('app_language_change'));
+    if (onChange) onChange(l);
+  };
+
+  return (
+    <div className="relative flex items-center gap-1.5 bg-gray-100/90 hover:bg-gray-200/90 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold transition-colors">
+      <span className="text-amber-600 font-extrabold">🌐</span>
+      <select
+        value={lang}
+        onChange={(e) => change(e.target.value as Language)}
+        className="bg-transparent outline-none cursor-pointer text-gray-800 font-extrabold text-xs"
+      >
+        <option value="en">🇬🇧 English</option>
+        <option value="hi">🇮🇳 हिंदी</option>
+        <option value="mr">🇮🇳 मराठी</option>
+      </select>
+    </div>
+  );
+}

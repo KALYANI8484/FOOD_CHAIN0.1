@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector } from './ui';
 
 function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
@@ -195,7 +195,10 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border space-y-2">
+          <div className="flex justify-center pb-1">
+            <LanguageSelector />
+          </div>
           <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>Exit</Button>
         </div>
       </aside>

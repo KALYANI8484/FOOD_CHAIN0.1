@@ -47,8 +47,13 @@ export const translations = {
     done: "Done",
     back: "Back",
     confirmOrder: "Confirm & Place Wholesale Order",
+    getInTouch: "Get in Touch",
+    whatsAppUs: "WhatsApp Us",
+    quickLinks: "Quick Links",
+    becomeVendor: "Become a Vendor",
     contactUs: "Contact Us",
     footNote: "Connecting verified local kitchen vendors with guests through a seamless, real-time ordering platform.",
+    allRightsReserved: "© 2026 Vikrams Ads. All rights reserved."
   },
   hi: {
     plans: "प्लान्स",
@@ -86,8 +91,13 @@ export const translations = {
     done: "पूर्ण",
     back: "पीछे",
     confirmOrder: "पुष्टि करें और थोक ऑर्डर दें",
+    getInTouch: "संपर्क करें",
+    whatsAppUs: "व्हाट्सएप करें",
+    quickLinks: "त्वरित लिंक",
+    becomeVendor: "विक्रेता (वेंडर) बनें",
     contactUs: "संपर्क करें",
     footNote: "सत्यापित स्थानीय रसोई विक्रेताओं को एक सहज, वास्तविक समय के ऑर्डरिंग प्लेटफॉर्म के माध्यम से ग्राहकों से जोड़ना।",
+    allRightsReserved: "© 2026 विक्रम्स एड्स। सर्वाधिकार सुरक्षित।"
   },
   mr: {
     plans: "प्लॅन्स",
@@ -125,9 +135,36 @@ export const translations = {
     done: "पूर्ण",
     back: "मागे",
     confirmOrder: "खात्री करा आणि घाऊक ऑर्डर द्या",
+    getInTouch: "संपर्क साधा",
+    whatsAppUs: "व्हाट्सॲप करा",
+    quickLinks: "जलद लिंक्स",
+    becomeVendor: "विक्रेते (व्हेंडर) बना",
     contactUs: "संपर्क साधा",
     footNote: "विश्वासू स्थानिक स्वयंपाकघर विक्रेत्यांना जलद, रिअल-टाइम ऑर्डरिंग प्लॅटफॉर्मद्वारे ग्राहकांशी जोडणे.",
+    allRightsReserved: "© २०२६ विक्रम्स ॲड्स. सर्व हक्क राखीव."
   }
+};
+
+const itemTranslations: Record<string, Record<Language, string>> = {
+  'breakfast': { en: 'Breakfast', hi: 'नाश्ता', mr: 'न्याहारी' },
+  'breakfasst': { en: 'Breakfast', hi: 'नाश्ता', mr: 'न्याहारी' },
+  'lunch': { en: 'Lunch', hi: 'दोपहर का भोजन (लंच)', mr: 'दुपारचे जेवण (लंच)' },
+  'dinner': { en: 'Dinner', hi: 'रात का खाना (डिनर)', mr: 'रात्रीचे जेवण (डिनर)' },
+  'full tiffin': { en: 'Full Tiffin', hi: 'फुल टिफिन', mr: 'फुल डबा (टिफिन)' },
+  'poli bhaji (with delivery)': { en: 'Poli Bhaji (With Delivery)', hi: 'पोळी भाजी (डिलीवरी के साथ)', mr: 'पोळी भाजी (डिलिव्हरीसह)' },
+  'tiffin': { en: 'Tiffin', hi: 'टिफिन', mr: 'टिफिन' },
+  'thali': { en: 'Thali', hi: 'थाली', mr: 'थाळी' },
+  'vegetables': { en: 'Vegetables', hi: 'सब्जियां', mr: 'भाजीपाला' },
+  'lunch/dinner': { en: 'Lunch / Dinner', hi: 'लंच / डिनर', mr: 'जेवण (दुपार/रात्री)' },
+};
+
+export const getItemTranslation = (name: string, lang: Language): string => {
+  if (!name) return '';
+  const lower = name.toLowerCase().trim();
+  if (itemTranslations[lower] && itemTranslations[lower][lang]) {
+    return itemTranslations[lower][lang];
+  }
+  return name;
 };
 
 export const getInitialLanguage = (): Language => {
@@ -874,7 +911,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                     : <div className="w-full h-full bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center text-amber-200"><UtensilsCrossed size={40} /></div>
                   }
                   <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-white/90 backdrop-blur-sm text-[10px] font-bold text-gray-600 border border-gray-100 shadow-sm">
-                    {item.category}
+                    {getItemTranslation(item.category, language)}
                   </span>
                   <div className="absolute inset-0 bg-amber-500/85 flex flex-col items-center justify-center gap-2 opacity-0 hover:opacity-100 transition-opacity duration-300">
                     <ArrowRight size={28} className="text-white" />
@@ -883,7 +920,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 </div>
                 <div className="p-4">
                   <h3 className="font-bold text-gray-900 truncate text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {item.name}
+                    {getItemTranslation(item.name, language)}
                   </h3>
                   {item.description && (
                     <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
@@ -908,11 +945,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             </div>
 
             <div className="reveal">
-              <h3 className="font-bold text-[#111118] text-sm mb-5 uppercase tracking-widest">Get in Touch</h3>
+              <h3 className="font-bold text-[#111118] text-sm mb-5 uppercase tracking-widest">{t.getInTouch}</h3>
               <ul className="space-y-3">
                 {[
                   { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373', color: 'amber' },
-                  { href: 'https://wa.me/919175537373?text=Hello%20Vikrams%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: 'WhatsApp Us', color: 'green' },
+                  { href: 'https://wa.me/919175537373?text=Hello%20Vikrams%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs, color: 'green' },
                   { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com', color: 'amber' },
                   { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com', color: 'amber' },
                 ].map(({ href, icon: Icon, label, color }) => (
@@ -930,16 +967,16 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             </div>
 
             <div className="reveal reveal-right">
-              <h3 className="font-bold text-[#111118] text-sm mb-5 uppercase tracking-widest">Quick Links</h3>
+              <h3 className="font-bold text-[#111118] text-sm mb-5 uppercase tracking-widest">{t.quickLinks}</h3>
               <ul className="space-y-3">
                 <li>
                   <button onClick={() => onNavigate('login')} className="flex items-center gap-2 text-sm text-gray-600 hover:text-amber-600 transition-colors">
-                    <Lock size={14} /> Login / Register
+                    <Lock size={14} /> {t.loginRegister}
                   </button>
                 </li>
                 <li>
                   <a href="https://wa.me/919175537373?text=Hi%2C%20I%20want%20to%20join%20as%20a%20vendor." target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-600 hover:text-green-600 transition-colors">
-                    <Store size={14} /> Become a Vendor
+                    <Store size={14} /> {t.becomeVendor}
                   </a>
                 </li>
               </ul>
@@ -947,7 +984,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
           </div>
 
           <div className="border-t border-gray-100 mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-gray-400">© 2026 Vikrams Ads. All rights reserved.</p>
+            <p className="text-xs text-gray-400">{t.allRightsReserved}</p>
             <div className="flex items-center gap-3">
               {[
                 { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', Icon: MessageCircle, bg: 'bg-green-100 hover:bg-green-200', color: 'text-green-600' },
