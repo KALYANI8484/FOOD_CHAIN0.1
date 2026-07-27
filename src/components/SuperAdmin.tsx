@@ -1765,7 +1765,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         body: formData
       });
       const data = await res.json();
-      if (!res.ok) throw new Error('Upload failed');
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
 
       if (isEdit && editItem) {
         setEditItem({ ...editItem, image_url: data.url });
@@ -1890,23 +1890,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       <Modal open={modal} onClose={() => setModal(false)} title="Create Master Item">
         <div className="space-y-4">
           <Input label="Item Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-          <Select label="Category" value={form.category} onChange={(v) => setForm({ ...form, category: v })} options={categories.map(c => ({ value: c, label: c }))} />
-          
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Base Price (₹)" type="number" value={String(form.base_price)} onChange={(v) => setForm({ ...form, base_price: Number(v) })} required />
-            <Input label="Default Qty" type="number" value={String(form.quantity)} onChange={(v) => setForm({ ...form, quantity: Number(v) })} required />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Description</label>
-            <textarea
-              rows={2}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="List inclusions (e.g. Rice, Roti, Dal)"
-              className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
-            />
-          </div>
+          <Input label="Starting Price (₹)" type="number" value={String(form.base_price)} onChange={(v) => setForm({ ...form, base_price: Number(v) })} required />
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>
@@ -1949,23 +1933,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         {editItem && (
           <div className="space-y-4">
             <Input label="Item Name" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
-            <Select label="Category" value={editItem.category} onChange={(v) => setEditItem({ ...editItem, category: v })} options={categories.map(c => ({ value: c, label: c }))} />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Base Price (₹)" type="number" value={String(editItem.base_price)} onChange={(v) => setEditItem({ ...editItem, base_price: Number(v) })} required />
-              <Input label="Default Qty" type="number" value={String(editItem.quantity)} onChange={(v) => setEditItem({ ...editItem, quantity: Number(v) })} required />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Description</label>
-              <textarea
-                rows={2}
-                value={editItem.description || ''}
-                onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
-                placeholder="Inclusions list"
-                className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
-              />
-            </div>
+            <Input label="Starting Price (₹)" type="number" value={String(editItem.base_price)} onChange={(v) => setEditItem({ ...editItem, base_price: Number(v) })} required />
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>
@@ -2180,17 +2148,6 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       <Modal open={modal} onClose={() => setModal(false)} title="Upload Document">
         <div className="space-y-4">
           <Input label="Title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} required />
-          <Select 
-            label="Categorized audience" 
-            value={form.category} 
-            onChange={(v) => setForm({ ...form, category: v })} 
-            options={[
-              { value: 'Vendor Guides', label: 'Vendor Guides' },
-              { value: 'Sub-Admin SOPs', label: 'Sub-Admin SOPs' },
-              { value: 'Client FAQs', label: 'Client FAQs' }
-            ]} 
-          />
-          <Input label="Keywords" value={form.keywords} onChange={(v) => setForm({ ...form, keywords: v })} placeholder="comma, separated, tags" />
           
           {/* Visibility checkboxes */}
           <div className="space-y-2">
@@ -2219,18 +2176,6 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
                   className="accent-accent"
                 />
                 Show to Vendors
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={visibilityRoles.includes('client')}
-                  onChange={(e) => {
-                    if (e.target.checked) setVisibilityRoles([...visibilityRoles, 'client']);
-                    else setVisibilityRoles(visibilityRoles.filter(r => r !== 'client'));
-                  }}
-                  className="accent-accent"
-                />
-                Show to Clients
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input 
