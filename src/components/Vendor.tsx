@@ -20,7 +20,7 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
   );
 }
 
-type Tab = 'dashboard' | 'radar' | 'kanban' | 'upgrade';
+type Tab = 'dashboard' | 'radar' | 'kanban' | 'activation' | 'upgrade';
 
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -133,8 +133,8 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'radar', label: 'Order Radar', icon: Radar },
     { id: 'kanban', label: 'Active Orders', icon: Navigation },
-
-    { id: 'upgrade', label: 'Upgrade Plan', icon: CreditCard },
+    { id: 'activation', label: 'Plan Activation', icon: CheckCircle2 },
+    { id: 'upgrade', label: "Plan's", icon: CreditCard },
   ];
 
   if (loading) return <div className="min-h-screen bg-bg flex items-center justify-center"><Spinner /></div>;
@@ -206,7 +206,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           {tab === 'dashboard' && <VendorDashboard vendor={vendor} onTab={setTab} />}
           {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
-
+          {tab === 'activation' && <PlanActivation vendor={vendor} activePlan={activePlan} onTab={setTab} />}
           {tab === 'upgrade' && <UpgradePlan vendor={vendor} show={show} />}
         </div>
       </main>
@@ -947,43 +947,140 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
         </div>
       )}
 
-      {/* ── Plan Activation Section ── */}
-      <div className="mt-10 pt-8 border-t border-border animate-fade-in-up">
-        <PageHeader title="Plan Activation" subtitle="Manage your current plan status, validity, and active subscriptions" />
-        <div className="card p-6 bg-surface border border-border mt-4 shadow-sm">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <h3 className="text-xl font-bold text-text">{vendor.plan_name || 'Free Tier'}</h3>
-                <Badge variant={vendor.status === 'approved' ? 'success' : vendor.status === 'expired' ? 'error' : 'warning'}>
-                  {vendor.status === 'approved' ? 'Active' : vendor.status === 'expired' ? 'Expired' : 'Pending Verification'}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted mt-1">Shop: <strong className="text-text">{vendor.shop_name}</strong> | Owner: <strong className="text-text">{vendor.owner_name}</strong></p>
+      </div>
+    </div>
+  );
+}
+
+// 5. Plan Activation Module Tab (Placed in between Active Orders and Plan's)
+function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; activePlan: Plan | null; onTab: (t: Tab) => void }) {
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <PageHeader 
+        title="Plan Activation & Payment Guide" 
+        subtitle="Manage your active plan status, scan QR codes to purchase new plans, and follow the activation guide." 
+      />
+
+      {/* ── Active Subscription Status Card ── */}
+      <div className="card p-6 bg-surface border border-border shadow-sm">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-extrabold text-text">{vendor.plan_name || 'Free Tier'}</h3>
+              <Badge variant={vendor.status === 'approved' ? 'success' : vendor.status === 'expired' ? 'error' : 'warning'}>
+                {vendor.status === 'approved' ? 'Active Subscription' : vendor.status === 'expired' ? 'Plan Expired' : 'Pending Verification'}
+              </Badge>
             </div>
-            {vendor.subscription_end && (
-              <div className="text-left md:text-right">
-                <p className="text-xs text-muted font-medium">Subscription Validity</p>
-                <p className="text-sm font-bold text-text mt-0.5">
-                  {new Date(vendor.subscription_start || Date.now()).toLocaleDateString()} — {new Date(vendor.subscription_end).toLocaleDateString()}
-                </p>
-              </div>
-            )}
+            <p className="text-xs text-muted mt-1">Shop: <strong className="text-text">{vendor.shop_name}</strong> | Owner: <strong className="text-text">{vendor.owner_name}</strong></p>
           </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-border/60">
-            <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
-              <p className="text-xs text-muted font-medium">Activation Status</p>
-              <p className="text-lg font-bold text-accent capitalize mt-1">{vendor.status || 'Active'}</p>
+          {vendor.subscription_end && (
+            <div className="text-left md:text-right">
+              <p className="text-xs text-muted font-medium">Subscription Validity Period</p>
+              <p className="text-sm font-bold text-accent mt-0.5">
+                {vendor.subscription_start || 'N/A'} — {vendor.subscription_end}
+              </p>
             </div>
-            <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
-              <p className="text-xs text-muted font-medium">Max Clients Allowed</p>
-              <p className="text-lg font-bold text-text mt-1">{vendor.total_clients || 0} Clients</p>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-border/60">
+          <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
+            <p className="text-xs text-muted font-medium">Activation Status</p>
+            <p className="text-lg font-bold text-accent capitalize mt-1">{vendor.status || 'Active'}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
+            <p className="text-xs text-muted font-medium">Max Clients Allowed</p>
+            <p className="text-lg font-bold text-text mt-1">{vendor.total_clients || 0} Registered Clients</p>
+          </div>
+          <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
+            <p className="text-xs text-muted font-medium">Registered Zone Zip</p>
+            <p className="text-lg font-bold text-text mt-1">Zone {vendor.zip_code}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── QR Code Payment Section ── */}
+      <div className="card p-6 bg-surface border border-border space-y-6">
+        <div>
+          <h3 className="text-lg font-extrabold text-text flex items-center gap-2">
+            <CreditCard size={20} className="text-accent" /> Scan QR Codes to Purchase / Upgrade Plan
+          </h3>
+          <p className="text-xs text-muted mt-1">
+            New vendors registered on Free Tier can scan either QR code below using any UPI App (GPay, PhonePe, Paytm, BHIM) to purchase a Starter (₹499) or Premium (₹1,499) plan.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* QR Code 1 Card */}
+          <div className="p-6 rounded-2xl bg-surface-2 border border-border flex flex-col items-center text-center space-y-4 hover:border-accent/40 transition-colors">
+            <Badge variant="accent">Primary Payment QR Code 1</Badge>
+            <div className="w-48 h-48 bg-white p-3 rounded-2xl border-2 border-accent/20 shadow-md flex flex-col items-center justify-center">
+              <img 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikramsads@upi%26pn=VIKRAMS%20ADS%26cu=INR" 
+                alt="UPI Payment QR Code 1" 
+                className="w-full h-full object-contain"
+              />
             </div>
-            <div className="p-4 rounded-xl bg-surface-2 border border-border/50">
-              <p className="text-xs text-muted font-medium">Registered Zip Code</p>
-              <p className="text-lg font-bold text-text mt-1">Zone {vendor.zip_code}</p>
+            <div>
+              <p className="font-extrabold text-sm text-text">Scan via GPay / PhonePe / Paytm</p>
+              <p className="text-xs font-semibold text-accent mt-0.5">UPI ID: vikramsads@upi</p>
+              <p className="text-[11px] text-muted mt-1">Merchant: VIKRAMS ADS Official</p>
             </div>
+          </div>
+
+          {/* QR Code 2 Card */}
+          <div className="p-6 rounded-2xl bg-surface-2 border border-border flex flex-col items-center text-center space-y-4 hover:border-accent/40 transition-colors">
+            <Badge variant="success">Backup Billing QR Code 2</Badge>
+            <div className="w-48 h-48 bg-white p-3 rounded-2xl border-2 border-green-500/20 shadow-md flex flex-col items-center justify-center">
+              <img 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikramadvertising@icici%26pn=VIKRAMS%20ADS%20Billing%26cu=INR" 
+                alt="UPI Payment QR Code 2" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div>
+              <p className="font-extrabold text-sm text-text">Scan via BHIM / Banking Apps</p>
+              <p className="text-xs font-semibold text-green-600 mt-0.5">UPI ID: vikramadvertising@icici</p>
+              <p className="text-[11px] text-muted mt-1">Bank Account: ICICI Direct Billing</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Step-by-Step Purchase Guide ── */}
+        <div className="p-5 rounded-2xl bg-surface-2/60 border border-border/80 space-y-3">
+          <p className="font-bold text-xs uppercase tracking-wider text-muted flex items-center gap-1.5">
+            <AlertCircle size={14} className="text-accent" /> Step-by-Step Plan Purchase & Activation Guide
+          </p>
+          <div className="grid sm:grid-cols-4 gap-4 text-xs">
+            <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
+              <span className="w-6 h-6 rounded-full bg-accent text-white font-extrabold flex items-center justify-center text-xs">1</span>
+              <p className="font-bold text-text pt-1">Select Your Plan</p>
+              <p className="text-[11px] text-muted">Choose Starter (₹499) or Premium (₹1,499) in the Plan's tab.</p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
+              <span className="w-6 h-6 rounded-full bg-accent text-white font-extrabold flex items-center justify-center text-xs">2</span>
+              <p className="font-bold text-text pt-1">Scan & Pay</p>
+              <p className="text-[11px] text-muted">Scan QR Code 1 or QR Code 2 using GPay, PhonePe, Paytm, or BHIM.</p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
+              <span className="w-6 h-6 rounded-full bg-accent text-white font-extrabold flex items-center justify-center text-xs">3</span>
+              <p className="font-bold text-text pt-1">Copy UTR / Txn Ref</p>
+              <p className="text-[11px] text-muted">Note the 12-digit UTR payment reference number from your UPI app receipt.</p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface border border-border/50 space-y-1">
+              <span className="w-6 h-6 rounded-full bg-accent text-white font-extrabold flex items-center justify-center text-xs">4</span>
+              <p className="font-bold text-text pt-1">Instant Activation</p>
+              <p className="text-[11px] text-muted">Submit request in Plan's tab. Super Admin verifies and activates your plan!</p>
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <Button onClick={() => onTab('upgrade')}>
+              Browse Plans & Submit Upgrade Request
+            </Button>
           </div>
         </div>
       </div>
