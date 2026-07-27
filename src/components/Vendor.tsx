@@ -23,6 +23,23 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
 type Tab = 'dashboard' | 'radar' | 'kanban' | 'activation' | 'upgrade';
 
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
   const [tab, setTab] = useState<Tab>('dashboard');
   const [vendor, setVendor] = useState<VendorType | null>(null);
   const [activePlan, setActivePlan] = useState<Plan | null>(null);
@@ -127,14 +144,18 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     if (vendor.plan_name === 'Basic') return 10;
     return 5;
   };
-  const formatLimitLabel = (limit: number) => (limit === Infinity ? 'Unlimited' : String(limit));
+  const navLabels = {
+    en: { dashboard: 'Dashboard', radar: 'Order Radar', kanban: 'Active Orders', activation: 'Plan Activation', upgrade: "Plan's", exit: 'Exit' },
+    hi: { dashboard: 'डैशबोर्ड', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लान एक्टिवेशन', upgrade: 'प्लान्स', exit: 'बाहर निकलें' },
+    mr: { dashboard: 'डॅशबोर्ड', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लॅन ॲक्टिव्हेशन', upgrade: 'प्लॅन्स', exit: 'बाहेर पडा' },
+  }[lang];
 
   const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'radar', label: 'Order Radar', icon: Radar },
-    { id: 'kanban', label: 'Active Orders', icon: Navigation },
-    { id: 'activation', label: 'Plan Activation', icon: CheckCircle2 },
-    { id: 'upgrade', label: "Plan's", icon: CreditCard },
+    { id: 'dashboard', label: navLabels.dashboard, icon: LayoutDashboard },
+    { id: 'radar', label: navLabels.radar, icon: Radar },
+    { id: 'kanban', label: navLabels.kanban, icon: Navigation },
+    { id: 'activation', label: navLabels.activation, icon: CheckCircle2 },
+    { id: 'upgrade', label: navLabels.upgrade, icon: CreditCard },
   ];
 
   if (loading) return <div className="min-h-screen bg-bg flex items-center justify-center"><Spinner /></div>;

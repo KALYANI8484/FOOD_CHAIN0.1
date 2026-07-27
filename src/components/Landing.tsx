@@ -52,7 +52,7 @@ export const translations = {
     quickLinks: "Quick Links",
     becomeVendor: "Become a Vendor",
     contactUs: "Contact Us",
-    footNote: "Connecting verified local kitchen vendors with guests through a seamless, real-time ordering platform.",
+    footNote: "Bringing authentic local flavors to every guest by connecting verified kitchen partners through a fast, seamless ordering platform",
     allRightsReserved: "© 2026 Vikrams Ads. All rights reserved."
   },
   hi: {
@@ -96,7 +96,7 @@ export const translations = {
     quickLinks: "त्वरित लिंक",
     becomeVendor: "विक्रेता (वेंडर) बनें",
     contactUs: "संपर्क करें",
-    footNote: "सत्यापित स्थानीय रसोई विक्रेताओं को एक सहज, वास्तविक समय के ऑर्डरिंग प्लेटफॉर्म के माध्यम से ग्राहकों से जोड़ना।",
+    footNote: "एक त्वरित, सहज ऑर्डरिंग प्लेटफ़ॉर्म के माध्यम से सत्यापित रसोई भागीदारों को जोड़कर हर ग्राहक तक प्रामाणिक स्थानीय स्वाद पहुंचाना।",
     allRightsReserved: "© 2026 विक्रम्स एड्स। सर्वाधिकार सुरक्षित।"
   },
   mr: {
@@ -140,30 +140,29 @@ export const translations = {
     quickLinks: "जलद लिंक्स",
     becomeVendor: "विक्रेते (व्हेंडर) बना",
     contactUs: "संपर्क साधा",
-    footNote: "विश्वासू स्थानिक स्वयंपाकघर विक्रेत्यांना जलद, रिअल-टाइम ऑर्डरिंग प्लॅटफॉर्मद्वारे ग्राहकांशी जोडणे.",
+    footNote: "जलद, सुलभ ऑर्डरिंग प्लॅटफॉर्मद्वारे पडताळणी केलेल्या किचन पार्टनर्सना जोडून प्रत्येक ग्राहकापर्यंत अस्सल स्थानिक चव पोहोचवणे.",
     allRightsReserved: "© २०२६ विक्रम्स ॲड्स. सर्व हक्क राखीव."
   }
 };
 
-const itemTranslations: Record<string, Record<Language, string>> = {
-  'breakfast': { en: 'Breakfast', hi: 'नाश्ता', mr: 'न्याहारी' },
-  'breakfasst': { en: 'Breakfast', hi: 'नाश्ता', mr: 'न्याहारी' },
-  'lunch': { en: 'Lunch', hi: 'दोपहर का भोजन (लंच)', mr: 'दुपारचे जेवण (लंच)' },
-  'dinner': { en: 'Dinner', hi: 'रात का खाना (डिनर)', mr: 'रात्रीचे जेवण (डिनर)' },
-  'full tiffin': { en: 'Full Tiffin', hi: 'फुल टिफिन', mr: 'फुल डबा (टिफिन)' },
-  'poli bhaji (with delivery)': { en: 'Poli Bhaji (With Delivery)', hi: 'पोळी भाजी (डिलीवरी के साथ)', mr: 'पोळी भाजी (डिलिव्हरीसह)' },
-  'tiffin': { en: 'Tiffin', hi: 'टिफिन', mr: 'टिफिन' },
-  'thali': { en: 'Thali', hi: 'थाली', mr: 'थाळी' },
-  'vegetables': { en: 'Vegetables', hi: 'सब्जियां', mr: 'भाजीपाला' },
-  'lunch/dinner': { en: 'Lunch / Dinner', hi: 'लंच / डिनर', mr: 'जेवण (दुपार/रात्री)' },
-};
-
 export const getItemTranslation = (name: string, lang: Language): string => {
-  if (!name) return '';
-  const lower = name.toLowerCase().trim();
-  if (itemTranslations[lower] && itemTranslations[lower][lang]) {
-    return itemTranslations[lower][lang];
-  }
+  if (!name || lang === 'en') return name;
+  const clean = name.toLowerCase().replace(/[^a-z0-9]/gi, ' ').trim();
+  
+  if (clean.includes('full tiffin')) return lang === 'hi' ? 'फुल टिफिन' : 'फुल डबा (टिफिन)';
+  if (clean.includes('poli bhaji')) return lang === 'hi' ? 'पोळी भाजी (डिलीवरी के साथ)' : 'पोळी भाजी (डिलिव्हरीसह)';
+  if (clean.includes('breakfast') || clean.includes('breakfasst')) return lang === 'hi' ? 'नाश्ता' : 'न्याहारी';
+  if (clean.includes('lunch') && clean.includes('dinner')) return lang === 'hi' ? 'लंच / डिनर' : 'जेवण (दुपार/रात्री)';
+  if (clean.includes('lunch')) return lang === 'hi' ? 'दोपहर का भोजन (लंच)' : 'दुपारचे जेवण (लंच)';
+  if (clean.includes('dinner')) return lang === 'hi' ? 'रात का खाना (डिनर)' : 'रात्रीचे जेवण (डिनर)';
+  if (clean.includes('general')) return lang === 'hi' ? 'सामान्य' : 'सामान्य';
+  if (clean.includes('thali')) return lang === 'hi' ? 'थाली' : 'थाळी';
+  if (clean.includes('tiffin')) return lang === 'hi' ? 'टिफिन' : 'टिफिन';
+  if (clean.includes('vegetable')) return lang === 'hi' ? 'सब्जियां' : 'भाजीपाला';
+  if (clean.includes('dosa')) return lang === 'hi' ? 'मसाला डोसा' : 'मसाला डोसा';
+  if (clean.includes('idli')) return lang === 'hi' ? 'इडली सांभर' : 'इडली सांबार';
+  if (clean.includes('khichdi')) return lang === 'hi' ? 'दाल खिचड़ी' : 'डाळ खिचडी';
+  
   return name;
 };
 
