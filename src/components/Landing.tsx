@@ -103,17 +103,19 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
         });
         const d = await res.json();
         const items = d.data || [];
-        setSubItems(items);
-
+        
         const initialQtys: { [id: string]: number } = {};
         const initialSelected: { [id: string]: boolean } = {};
         items.forEach((item: any) => {
+          const key = item.id || item._id;
           const defaultMin = Number(item.quantity) || 1;
-          initialQtys[item.id] = defaultMin;
+          initialQtys[key] = defaultMin;
         });
         if (items.length > 0) {
-          initialSelected[items[0].id] = true;
+          const firstKey = items[0].id || items[0]._id;
+          initialSelected[firstKey] = true;
         }
+        setSubItems(items);
         setSelectedQuantities(initialQtys);
         setSelectedItemIds(initialSelected);
       } catch (e) { console.error(e); }
@@ -133,10 +135,11 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
     });
   };
 
-  const activeSelectedSubItems = subItems.filter(item => selectedItemIds[item.id]);
+  const activeSelectedSubItems = subItems.filter(item => selectedItemIds[item.id || item._id]);
 
   const totalPrice = activeSelectedSubItems.reduce((sum, item) => {
-    const q = selectedQuantities[item.id] || Number(item.quantity) || 1;
+    const key = item.id || item._id;
+    const q = selectedQuantities[key] || Number(item.quantity) || 1;
     return sum + (Number(item.price) * q);
   }, 0);
 
@@ -261,21 +264,22 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
               ) : (
                 <div className="space-y-3">
                   {subItems.map(item => {
-                    const isSelected = !!selectedItemIds[item.id];
+                    const itemId = item.id || item._id;
+                    const isSelected = !!selectedItemIds[itemId];
                     const minQty = Number(item.quantity) || 1;
-                    const currentQty = selectedQuantities[item.id] || minQty;
+                    const currentQty = selectedQuantities[itemId] || minQty;
                     const itemUom = item.uom || 'pc';
 
                     return (
                       <div
-                        key={item.id}
+                        key={itemId}
                         className={`p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 ${
                           isSelected
                             ? 'border-amber-500 bg-amber-50/70 shadow-sm'
                             : 'border-gray-100 hover:border-amber-200 bg-white'
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => toggleItemSelection(item.id)}>
+                        <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => toggleItemSelection(itemId)}>
                           <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                             isSelected ? 'border-amber-500 bg-amber-500' : 'border-gray-300 bg-white'
                           }`}>
@@ -298,7 +302,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                         {isSelected && (
                           <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-amber-300 shadow-sm flex-shrink-0">
                             <button
-                              onClick={() => updateItemQuantity(item.id, -1, minQty)}
+                              onClick={() => updateItemQuantity(itemId, -1, minQty)}
                               disabled={currentQty <= minQty}
                               className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 font-bold flex items-center justify-center text-sm disabled:opacity-40"
                               title={`Minimum quantity locked at default MOQ (${minQty})`}
@@ -310,7 +314,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                               <span className="text-[10px] text-gray-500 font-medium ml-1">{itemUom}</span>
                             </div>
                             <button
-                              onClick={() => updateItemQuantity(item.id, 1, minQty)}
+                              onClick={() => updateItemQuantity(itemId, 1, minQty)}
                               className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center justify-center text-sm"
                             >
                               +
@@ -607,9 +611,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                   <h3 className="font-bold text-gray-900 truncate text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
                     {item.name}
                   </h3>
-                  <p className="text-amber-600 font-extrabold text-xl mt-1">
-                    ₹{item.base_price ?? item.price}
-                  </p>
                   {item.description && (
                     <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
                   )}

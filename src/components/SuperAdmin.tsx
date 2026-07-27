@@ -1722,13 +1722,14 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
 
   const handleEditSave = async () => {
     if (!editItem) return;
+    const targetId = editItem.id || (editItem as any)._id;
     await supabase.from('sub_inventory').update({
       name: editItem.name,
       price: Number(editItem.price),
       quantity: Number(editItem.quantity),
       uom: editItem.uom || 'pc',
       image_url: editItem.image_url
-    }).eq('id', editItem.id);
+    }).eq('id', targetId);
 
     show('Sub-Item updated');
     setEditItem(null);
@@ -1737,7 +1738,8 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
 
   const handleDelete = async (item: SubInventory) => {
     if (confirm(`Warning: Are you sure you want to delete ${item.name}?`)) {
-      await supabase.from('sub_inventory').delete().eq('id', item.id);
+      const targetId = item.id || (item as any)._id;
+      await supabase.from('sub_inventory').delete().eq('id', targetId);
       show(`Sub-Item ${item.name} removed`, 'info');
       load();
     }
@@ -1975,8 +1977,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
                 <p className="text-xs text-muted mt-1 line-clamp-2">{item.description || 'No description available.'}</p>
               </div>
 
-              <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
-                <span className="text-lg font-extrabold text-accent">₹{item.base_price}</span>
+              <div className="flex items-center justify-end mt-4 pt-3 border-t border-border/50">
                 <div className="flex gap-2">
                   <button onClick={(e) => { e.stopPropagation(); setEditItem(item); }} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-text" title="Edit"><Edit2 size={12} /></button>
                   <button onClick={(e) => { e.stopPropagation(); handleDelete(item); }} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500" title="Delete"><Trash2 size={12} /></button>
@@ -1992,8 +1993,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       {/* Add Master Item Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="Create Master Item">
         <div className="space-y-4">
-          <Input label="Item Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-          <Input label="Starting Price (₹)" type="number" value={String(form.base_price)} onChange={(v) => setForm({ ...form, base_price: Number(v) })} required />
+          <Input label="Item Name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>
@@ -2035,8 +2035,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Modify Master Item">
         {editItem && (
           <div className="space-y-4">
-            <Input label="Item Name" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
-            <Input label="Starting Price (₹)" type="number" value={String(editItem.base_price)} onChange={(v) => setEditItem({ ...editItem, base_price: Number(v) })} required />
+            <Input label="Item Name *" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>
