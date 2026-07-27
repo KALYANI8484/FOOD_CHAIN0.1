@@ -303,36 +303,51 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
     });
   };
 
-  const activeSelectedSubItems = subItems.filter(item => selectedItemIds[item.id || item._id]);
+  const activeSelectedSubItems = subItems.filter(item => {
+    const key = item.id || (item as any)._id;
+    return !!selectedItemIds[key];
+  });
 
-  const totalPrice = activeSelectedSubItems.reduce((sum, item) => {
-    const key = item.id || item._id;
+  const effectiveItems = activeSelectedSubItems.length > 0
+    ? activeSelectedSubItems
+    : [{
+        id: master.id || (master as any)._id || 'master_item',
+        name: master.name,
+        price: master.price ?? master.base_price ?? 99,
+        quantity: 1,
+        uom: 'order'
+      }];
+
+  const totalPrice = effectiveItems.reduce((sum, item) => {
+    const key = item.id || (item as any)._id;
     const q = selectedQuantities[key] || Number(item.quantity) || 1;
-    return sum + (Number(item.price) * q);
+    return sum + (Number(item.price ?? master.base_price ?? 99) * q);
   }, 0);
 
-  const totalItemCount = activeSelectedSubItems.reduce((sum, item) => {
-    return sum + (selectedQuantities[item.id] || Number(item.quantity) || 1);
+  const totalItemCount = effectiveItems.reduce((sum, item) => {
+    const key = item.id || (item as any)._id;
+    return sum + (selectedQuantities[key] || Number(item.quantity) || 1);
   }, 0);
 
-  const summaryItemName = activeSelectedSubItems.length > 0
-    ? activeSelectedSubItems.map(i => `${i.name} (x${selectedQuantities[i.id || i._id] || i.quantity})`).join(', ')
-    : master.name;
+  const summaryItemName = effectiveItems
+    .map(i => {
+      const key = i.id || (i as any)._id;
+      const q = selectedQuantities[key] || i.quantity || 1;
+      const uom = (i as any).uom || 'pc';
+      return `${i.name} (${q} ${uom})`;
+    })
+    .join(', ');
 
   const handlePlaceOrder = async () => {
-    if (activeSelectedSubItems.length === 0) {
-      alert('Please select at least one item to order.');
-      return;
-    }
     if (!form.name || !form.phone || !form.address || !form.zip || !form.landmark) {
-      alert('All fields are required'); return;
+      alert('All fields are required');
+      return;
     }
     setSubmitting(true);
     const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
-    const summaryItemName = activeSelectedSubItems
-      .map(i => `${i.name} (${selectedQuantities[i.id] || i.quantity} ${i.uom || 'pc'})`)
-      .join(', ');
+    const masterId = master.id || (master as any)._id || '';
+    const firstItemId = effectiveItems[0]?.id || (effectiveItems[0] as any)?._id || masterId;
 
     try {
       const res = await fetch('/api/db', {
@@ -348,12 +363,13 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
             client_zip: form.zip,
             client_landmark: form.landmark,
             item_name: summaryItemName,
-            item_id: activeSelectedSubItems[0]?.id || master.id,
+            item_id: firstItemId,
             master_category_name: master.name,
             price: totalPrice,
             quantity: totalItemCount,
             status: 'pending',
-            otp: generatedOtp
+            otp: generatedOtp,
+            created_at: new Date().toISOString()
           }
         })
       });
@@ -363,8 +379,11 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
       setStep(3);
       onOrderPlaced();
     } catch (e: any) {
+      console.error('Order error:', e);
       alert(e.message || 'Failed to place order. Try again.');
-    } finally { setSubmitting(false); }
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (
@@ -569,13 +588,13 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
 
         {/* Footer CTA */}
         <div className="px-6 pb-6 pt-3 flex-shrink-0 border-t border-gray-100">
-          {step === 1 && subItems.length > 0 && (
+          {step === 1 && (
             <button
-              disabled={activeSelectedSubItems.length === 0}
+              disabled={effectiveItems.length === 0}
               onClick={() => setStep(2)}
               className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
             >
-              Continue to Details ({activeSelectedSubItems.length} items • ₹{totalPrice}) <ChevronRight size={18} />
+              Continue to Details ({effectiveItems.length} items • ₹{totalPrice}) <ChevronRight size={18} />
             </button>
           )}
           {step === 2 && (
@@ -587,11 +606,11 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                 <ChevronLeft size={16} /> Back
               </button>
               <button
-                disabled={submitting || activeSelectedSubItems.length === 0 || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
+                disabled={submitting || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
                 onClick={handlePlaceOrder}
                 className="flex-1 h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
               >
-                {submitting ? <Spinner /> : <><ArrowRight size={16} /> Place Order — ₹{price}</>}
+                {submitting ? <Spinner /> : <><ArrowRight size={16} /> Place Order — ₹{totalPrice}</>}
               </button>
             </div>
           )}
