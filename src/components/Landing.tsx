@@ -486,17 +486,17 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100' : 'bg-[#F8F8FF]/80'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Vikram Advertising" className="h-11 w-auto object-contain" />
+            <img src="/logo.png" alt="Vikrams Ads" className="h-11 w-auto object-contain" />
             <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              Vikram Advertising
+              Vikrams Ads
             </span>
           </div>
           <nav className="flex items-center gap-3">
             <button onClick={handleVendorPlanClick} className="text-sm font-semibold text-gray-600 hover:text-amber-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-amber-50">
-              Vendor's Plan
+              Plan's
             </button>
             <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
-              Login / Sign-In
+              Login / Register
             </button>
           </nav>
         </div>
@@ -578,8 +578,8 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
           <div className="grid md:grid-cols-3 gap-12 items-start">
             <div className="reveal reveal-left">
               <div className="flex items-center gap-3 mb-4">
-                <img src="/logo.png" alt="Vikram Advertising" className="h-12 w-auto object-contain" />
-                <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>Vikram Advertising</span>
+                <img src="/logo.png" alt="Vikrams Ads" className="h-12 w-auto object-contain" />
+                <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>Vikrams Ads</span>
               </div>
               <p className="text-gray-500 text-sm leading-relaxed">Connecting verified local kitchen vendors with guests through a seamless, real-time ordering platform.</p>
             </div>
@@ -589,7 +589,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <ul className="space-y-3">
                 {[
                   { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373', color: 'amber' },
-                  { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: 'WhatsApp Us', color: 'green' },
+                  { href: 'https://wa.me/919175537373?text=Hello%20Vikrams%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: 'WhatsApp Us', color: 'green' },
                   { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com', color: 'amber' },
                   { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com', color: 'amber' },
                 ].map(({ href, icon: Icon, label, color }) => (
@@ -611,7 +611,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <ul className="space-y-3">
                 <li>
                   <button onClick={() => onNavigate('login')} className="flex items-center gap-2 text-sm text-gray-600 hover:text-amber-600 transition-colors">
-                    <Lock size={14} /> Login / Sign-In
+                    <Lock size={14} /> Login / Register
                   </button>
                 </li>
                 <li>
@@ -624,7 +624,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
           </div>
 
           <div className="border-t border-gray-100 mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-gray-400">© 2026 Vikram Advertising. All rights reserved.</p>
+            <p className="text-xs text-gray-400">© 2026 Vikrams Ads. All rights reserved.</p>
             <div className="flex items-center gap-3">
               {[
                 { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', Icon: MessageCircle, bg: 'bg-green-100 hover:bg-green-200', color: 'text-green-600' },

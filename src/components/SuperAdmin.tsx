@@ -32,7 +32,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
       <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-surface border-b border-border z-30 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
-          <p className="font-bold text-sm truncate text-text">VIKRAM ADVERTISING</p>
+          <p className="font-bold text-sm truncate text-text">VIKRAMS ADS</p>
         </div>
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text">
            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -44,7 +44,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
         <div className="px-5 py-4 border-b border-border hidden lg:flex items-center gap-3 cursor-pointer group" onClick={onExit}>
           <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain shrink-0" />
           <div className="min-w-0">
-            <p className="font-bold text-sm truncate">VIKRAM ADVERTISING</p>
+            <p className="font-bold text-sm truncate">VIKRAMS ADS</p>
             <p className="text-xs text-muted">Super Admin Portal</p>
           </div>
         </div>
@@ -177,7 +177,7 @@ function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <PageHeader title="Overview Dashboard" subtitle="Real-time operations status of VIKRAM ADVERTISING" />
+      <PageHeader title="Overview Dashboard" subtitle="Real-time operations status of VIKRAMS ADS" />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 stagger">
@@ -2242,7 +2242,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
                   }}
                   className="accent-accent"
                 />
-                Show to Vendor's Plan
+                Show to Plan's
               </label>
             </div>
           </div>

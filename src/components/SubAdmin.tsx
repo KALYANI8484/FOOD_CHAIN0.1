@@ -27,7 +27,7 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
         <div className="px-5 py-4 border-b border-border flex items-center gap-3 cursor-pointer group" onClick={onExit}>
           <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain shrink-0" />
           <div>
-            <p className="font-bold text-sm">VIKRAM ADVERTISING</p>
+            <p className="font-bold text-sm">VIKRAMS ADS</p>
             <p className="text-xs text-muted">Sub-Admin Portal</p>
           </div>
         </div>

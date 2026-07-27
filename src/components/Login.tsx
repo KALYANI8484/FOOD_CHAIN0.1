@@ -146,9 +146,9 @@ export function Login({
           {mode === 'login' && (
             <div className="space-y-6">
               <div>
-                <img src="/logo.png" alt="Vikram Advertising" className="h-16 w-auto object-contain mb-5" />
+                <img src="/logo.png" alt="Vikrams Ads" className="h-16 w-auto object-contain mb-5" />
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Login / Sign-In
+                  Login / Register
                 </h2>
                 <p className="text-gray-500 text-sm mt-1">Access your workspace below</p>
               </div>
@@ -208,7 +208,7 @@ export function Login({
           {mode === 'signup' && (
             <div className="space-y-5">
               <div>
-                <img src="/logo.png" alt="Vikram Advertising" className="h-16 w-auto object-contain mb-5" />
+                <img src="/logo.png" alt="Vikrams Ads" className="h-16 w-auto object-contain mb-5" />
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Vendor Sign-Up
                 </h2>
