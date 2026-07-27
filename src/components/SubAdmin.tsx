@@ -97,7 +97,58 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
   );
 }
 
+const subTrans = {
+  en: {
+    dashboardTitle: 'Dashboard Overview',
+    dashboardSubtitle: 'Review your vendor modification requests',
+    approvedRequests: 'Approved Requests',
+    pendingApprovals: 'Pending Approvals',
+    rejectedRequests: 'Rejected Requests',
+    quickActions: 'Quick Actions',
+    manageVendors: 'Manage Vendors',
+    correctionInbox: 'Correction Inbox',
+  },
+  hi: {
+    dashboardTitle: 'डैशबोर्ड अवलोकन',
+    dashboardSubtitle: 'अपने विक्रेता संशोधन अनुरोधों की समीक्षा करें',
+    approvedRequests: 'स्वीकृत अनुरोध',
+    pendingApprovals: 'लंबित अनुमोदन',
+    rejectedRequests: 'अस्वीकृत अनुरोध',
+    quickActions: 'त्वरित कार्रवाइयां',
+    manageVendors: 'विक्रेता प्रबंधित करें',
+    correctionInbox: 'सुधार इनबॉक्स',
+  },
+  mr: {
+    dashboardTitle: 'डॅशबोर्ड विहंगावलोकन',
+    dashboardSubtitle: 'तुमच्या विक्रेता बदल विनंत्यांचे पुनरावलोकन करा',
+    approvedRequests: 'मंजूर विनंत्या',
+    pendingApprovals: 'प्रलंबित मंजुरी',
+    rejectedRequests: 'नाकारलेल्या विनंत्या',
+    quickActions: 'जलद कृती',
+    manageVendors: 'विक्रेते व्यवस्थापित करा',
+    correctionInbox: 'सुधारणा इनबॉक्स',
+  }
+};
+
 function SubDashboard({ onTab, adminEmail }: { onTab: (t: Tab) => void; adminEmail: string }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
+  const t = subTrans[lang];
   const [kpis, setKpis] = useState({ approved: 0, pending: 0, rejected: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -117,16 +168,16 @@ function SubDashboard({ onTab, adminEmail }: { onTab: (t: Tab) => void; adminEma
   if (loading) return <Spinner />;
 
   const kpiCards = [
-    { label: 'Approved Requests', value: kpis.approved, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { label: 'Pending Approvals', value: kpis.pending, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { label: 'Rejected Requests', value: kpis.rejected, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { label: t.approvedRequests, value: kpis.approved, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { label: t.pendingApprovals, value: kpis.pending, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { label: t.rejectedRequests, value: kpis.rejected, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
   ];
 
   return (
     <div className="space-y-8">
       <div className="animate-fade-in-up">
-        <h1 className="text-3xl font-extrabold tracking-tight">Dashboard Overview</h1>
-        <p className="text-muted mt-1">Review your vendor modification requests</p>
+        <h1 className="text-3xl font-extrabold tracking-tight">{t.dashboardTitle}</h1>
+        <p className="text-muted mt-1">{t.dashboardSubtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger">
@@ -144,7 +195,7 @@ function SubDashboard({ onTab, adminEmail }: { onTab: (t: Tab) => void; adminEma
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Quick Actions */}
         <div className="card p-6 bg-surface border border-border animate-fade-in-up delay-200">
-          <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted">Quick Actions</h3>
+          <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-muted">{t.quickActions}</h3>
           <div className="space-y-3">
             <button 
               onClick={() => onTab('vendors')}
@@ -152,7 +203,7 @@ function SubDashboard({ onTab, adminEmail }: { onTab: (t: Tab) => void; adminEma
             >
               <div className="flex items-center gap-3">
                 <Store size={16} className="text-accent" />
-                <span className="text-sm font-bold">Manage Vendors</span>
+                <span className="text-sm font-bold">{t.manageVendors}</span>
               </div>
               <ArrowRight size={14} className="text-muted" />
             </button>
@@ -162,7 +213,7 @@ function SubDashboard({ onTab, adminEmail }: { onTab: (t: Tab) => void; adminEma
             >
               <div className="flex items-center gap-3">
                 <AlertCircle size={16} className="text-red-500" />
-                <span className="text-sm font-bold">Correction Inbox</span>
+                <span className="text-sm font-bold">{t.correctionInbox}</span>
               </div>
               <ArrowRight size={14} className="text-muted" />
             </button>

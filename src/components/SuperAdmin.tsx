@@ -127,8 +127,65 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
   );
 }
 
+const saTrans = {
+  en: {
+    dashboardTitle: 'Overview Dashboard',
+    dashboardSubtitle: 'Real-time operations status of VIKRAMS ADS',
+    totalActiveVendors: 'Total & Active Vendors',
+    registeredVsOperating: 'Registered vs Operating',
+    activeSubscriptions: 'Active Subscriptions',
+    vendorsOnPremium: 'Vendors on Premium plans',
+    monthlySubRev: 'Monthly Subscription Rev',
+    estMonthlyRev: 'Est monthly subscription revenue',
+    liveOrdersToday: 'Live Orders Today',
+    ordersPendingReview: 'orders pending review',
+  },
+  hi: {
+    dashboardTitle: 'अवलोकन डैशबोर्ड',
+    dashboardSubtitle: 'VIKRAMS ADS की वास्तविक समय संचालन स्थिति',
+    totalActiveVendors: 'कुल और सक्रिय विक्रेता',
+    registeredVsOperating: 'पंजीकृत बनाम कार्यरत',
+    activeSubscriptions: 'सक्रिय सदस्यताएँ',
+    vendorsOnPremium: 'प्रीमियम प्लान पर विक्रेता',
+    monthlySubRev: 'मासिक सदस्यता राजस्व',
+    estMonthlyRev: 'अनुमानित मासिक सदस्यता आय',
+    liveOrdersToday: 'आज के लाइव ऑर्डर',
+    ordersPendingReview: 'समीक्षा हेतु लंबित ऑर्डर',
+  },
+  mr: {
+    dashboardTitle: 'विहंगावलोकन डॅशबोर्ड',
+    dashboardSubtitle: 'VIKRAMS ADS ची रिअल-टाइम ऑपरेशन स्थिती',
+    totalActiveVendors: 'एकूण आणि सक्रिय विक्रेते',
+    registeredVsOperating: 'नोंदणीकृत विरुद्ध कार्यरत',
+    activeSubscriptions: 'सक्रिय सबस्क्रिप्शन्स',
+    vendorsOnPremium: 'प्रीमियम प्लॅनवरील विक्रेते',
+    monthlySubRev: 'मासिक सबस्क्रिप्शन महसूल',
+    estMonthlyRev: 'अंदाजित मासिक सबस्क्रिप्शन उत्पन्न',
+    liveOrdersToday: 'आजचे लाइव्ह ऑर्डर्स',
+    ordersPendingReview: 'पडताळणीसाठी प्रलंबित ऑर्डर्स',
+  }
+};
+
 // 1. Dashboard Module Tab
 function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('app_language_change', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('app_language_change', handleStorage);
+    };
+  }, []);
+
+  const t = saTrans[lang];
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [logs, setLogs] = useState<Activity[]>([]);
@@ -194,15 +251,15 @@ function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   const pendingReviewOrders = orders.filter(o => o.status === 'System Denied' || o.status === 'pending');
 
   const kpis = [
-    { label: 'Total & Active Vendors', value: `${totalVendors} / ${activeVendors}`, desc: 'Registered vs Operating', icon: Store, color: 'text-green-600', bg: 'bg-green-500/10' },
-    { label: 'Active Subscriptions', value: premiumVendors, desc: 'Vendors on Premium plans', icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-500/10' },
-    { label: 'Monthly Subscription Rev', value: `₹${totalRevenue.toLocaleString()}`, desc: 'Est monthly subscription revenue', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-500/10' },
-    { label: 'Live Orders Today', value: liveOrdersToday, desc: `${pendingReviewOrders.length} orders pending review`, icon: ShoppingBag, color: 'text-accent', bg: 'bg-accent/10' },
+    { label: t.totalActiveVendors, value: `${totalVendors} / ${activeVendors}`, desc: t.registeredVsOperating, icon: Store, color: 'text-green-600', bg: 'bg-green-500/10' },
+    { label: t.activeSubscriptions, value: premiumVendors, desc: t.vendorsOnPremium, icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-500/10' },
+    { label: t.monthlySubRev, value: `₹${totalRevenue.toLocaleString()}`, desc: t.estMonthlyRev, icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-500/10' },
+    { label: t.liveOrdersToday, value: liveOrdersToday, desc: `${pendingReviewOrders.length} ${t.ordersPendingReview}`, icon: ShoppingBag, color: 'text-accent', bg: 'bg-accent/10' },
   ];
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <PageHeader title="Overview Dashboard" subtitle="Real-time operations status of VIKRAMS ADS" />
+      <PageHeader title={t.dashboardTitle} subtitle={t.dashboardSubtitle} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 stagger">
