@@ -1868,6 +1868,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
   const handleEditSave = async () => {
     if (!editItem) return;
+    const targetId = editItem.id || (editItem as any)._id;
     await supabase.from('master_inventory').update({
       name: editItem.name,
       category: editItem.category || 'Tiffin',
@@ -1875,7 +1876,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       quantity: Number(editItem.quantity) || 1,
       description: editItem.description || '',
       image_url: editItem.image_url
-    }).eq('id', editItem.id);
+    }).eq('id', targetId);
 
     show('Master Item updated');
     setEditItem(null);
@@ -1883,8 +1884,9 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   };
 
   const handleDelete = async (item: MasterItem) => {
+    const targetId = item.id || (item as any)._id;
     if (confirm(`Warning: Are you sure you want to delete ${item.name}? This will remove it from global client browsing.`)) {
-      await supabase.from('master_inventory').delete().eq('id', item.id);
+      await supabase.from('master_inventory').delete().eq('id', targetId);
       show(`Master Item ${item.name} removed`, 'info');
       load();
     }

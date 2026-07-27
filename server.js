@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 
@@ -386,11 +386,28 @@ app.post('/api/upload', (req, res, next) => {
       })
     );
 
-    const url = `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
+    const url = `/api/uploads/${fileKey}`;
     res.json({ url });
   } catch (err) {
     console.error('S3 Upload error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Image Proxy Endpoint to stream S3 objects securely
+app.get('/api/uploads/:key', async (req, res) => {
+  try {
+    const fileKey = req.params.key;
+    const bucketName = process.env.AWS_BUCKET_NAME;
+    const command = new GetObjectCommand({ Bucket: bucketName, Key: fileKey });
+    const s3Res = await s3.send(command);
+    if (s3Res.ContentType) {
+      res.setHeader('Content-Type', s3Res.ContentType);
+    }
+    s3Res.Body.pipe(res);
+  } catch (err) {
+    console.error('Image proxy fetch error:', err);
+    res.status(404).send('Image not found');
   }
 });
 
@@ -511,9 +528,17 @@ app.post('/api/db', async (req, res) => {
           query = query.limit(limit);
         }
         let docs = await query.exec();
+        const convertImageUrl = (obj) => {
+          if (obj && obj.image_url && typeof obj.image_url === 'string' && obj.image_url.includes('.amazonaws.com/')) {
+            const key = obj.image_url.split('.amazonaws.com/').pop();
+            obj.image_url = `/api/uploads/${key}`;
+          }
+          return obj;
+        };
+
         if (table === 'orders') {
           docs = docs.map(d => {
-            const obj = d.toJSON();
+            const obj = convertImageUrl(d.toJSON());
             if (obj.status === 'pending' && !req.body.admin_override) {
               obj.client_name = 'Hidden (Provide OTP)';
               obj.client_phone = 'Hidden (Provide OTP)';
@@ -528,9 +553,9 @@ app.post('/api/db', async (req, res) => {
           }
         } else {
           if (single) {
-            responseData = docs.length > 0 ? docs[0].toJSON() : null;
+            responseData = docs.length > 0 ? convertImageUrl(docs[0].toJSON()) : null;
           } else {
-            responseData = docs.map(d => d.toJSON());
+            responseData = docs.map(d => convertImageUrl(d.toJSON()));
           }
         }
         break;
