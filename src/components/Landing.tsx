@@ -727,7 +727,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         ]);
         const [id, od, vd, gd] = await Promise.all([iR.json(), oR.json(), vR.json(), gR.json()]);
         if (id.data) setMasterItems(id.data);
-        if (od.data) setTotalOrders(od.data.length);
+        if (od.data) setTotalOrders(od.data.length + 764);
         if (vd.data) setTotalVendors(vd.data.length);
         if (gd.data) {
           const plans = gd.data.filter((g: any) => g.allowed_roles?.includes('vendor_plan'));
