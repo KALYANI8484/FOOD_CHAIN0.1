@@ -8,8 +8,47 @@ import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, t
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
-type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins' | 'pending_orders';
+type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins';
 
+// Helper to compress images client-side before upload to bypass Nginx payload limits
+const compressImageFile = (file: File, maxWidth = 1024, quality = 0.8): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) return resolve(file); // Don't compress non-images (like PDFs)
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = event => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => {
+          if (!blob) return resolve(file);
+          const compressedFile = new File([blob], file.name, {
+            type: file.type,
+            lastModified: Date.now()
+          });
+          resolve(compressedFile);
+        }, file.type, quality);
+      };
+      img.onerror = error => reject(error);
+    };
+    reader.onerror = error => reject(error);
+  });
+};
 export function SuperAdmin({ onExit }: { onExit: () => void }) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
 
@@ -29,9 +68,9 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
   }, []);
 
   const navLabels = {
-    en: { approvals: 'Team Approvals', vendors: 'Vendor Database', plans: 'Pricing Plans', inventory: 'Master Inventory', guides: 'Guide Documents', sub_admins: 'Sub-Admins', pending_orders: 'Pending & Missed Orders', exit: 'Exit Dashboard' },
-    hi: { approvals: 'टीम मंजूरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'मूल्य निर्धारण प्लान', inventory: 'मास्टर इन्वेंटरी', guides: 'गाइड दस्तावेज', sub_admins: 'सब-एडमिन', pending_orders: 'लंबित और छूटे हुए ऑर्डर', exit: 'डैशबोर्ड से बाहर निकलें' },
-    mr: { approvals: 'टीम मंजुरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'किंमत प्लॅन्स', inventory: 'मास्टर इन्व्हेंटरी', guides: 'मार्गदर्शक दस्तऐवज', sub_admins: 'सब-ॲडमिन', pending_orders: 'प्रलंबित आणि चुकलेले ऑर्डर', exit: 'डॅशबोर्डवरून बाहेर पडा' },
+    en: { approvals: 'Team Approvals', vendors: 'Vendor Database', plans: 'Pricing Plans', inventory: 'Master Inventory', guides: 'Guide Documents', sub_admins: 'Sub-Admins', exit: 'Exit Dashboard' },
+    hi: { approvals: 'टीम मंजूरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'मूल्य निर्धारण प्लान', inventory: 'मास्टर इन्वेंटरी', guides: 'गाइड दस्तावेज', sub_admins: 'सब-एडमिन', exit: 'डैशबोर्ड से बाहर निकलें' },
+    mr: { approvals: 'टीम मंजुरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'किंमत प्लॅन्स', inventory: 'मास्टर इन्व्हेंटरी', guides: 'मार्गदर्शक दस्तऐवज', sub_admins: 'सब-ॲडमिन', exit: 'डॅशबोर्डवरून बाहेर पडा' },
   }[lang];
 
   const [tab, setTab] = useState<Tab>('approvals');
@@ -43,8 +82,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
     { id: 'plans', label: navLabels.plans, icon: CreditCard },
     { id: 'inventory', label: navLabels.inventory, icon: Package },
     { id: 'guides', label: navLabels.guides, icon: FileText },
-    { id: 'sub_admins', label: navLabels.sub_admins, icon: Users },
-    { id: 'pending_orders', label: navLabels.pending_orders, icon: Clock }
+    { id: 'sub_admins', label: navLabels.sub_admins, icon: Users }
   ];
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -62,12 +100,10 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
       {/* Sidebar */}
       <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center group-hover:rotate-12 transition-transform">
-            <Store size={18} className="text-white" />
-          </div>
+          <img src="/logo.png" alt="Logo" className="h-9 w-auto object-contain shrink-0" />
           <div className="min-w-0">
-            <p className="font-bold text-sm truncate text-text">VIKRAMS ADS</p>
-            <p className="text-xs text-muted">Super Admin Portal</p>
+            <p className="font-extrabold text-base tracking-tight text-black">VIKRAM ADS</p>
+            <p className="text-[10px] text-muted uppercase tracking-wider font-semibold">Super Admin Portal</p>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-14 lg:mt-0">
@@ -106,7 +142,6 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
           {tab === 'inventory' && <InventoryTab show={show} />}
           {tab === 'guides' && <GuidesTab show={show} />}
           {tab === 'sub_admins' && <SubAdminsTab show={show} />}
-          {tab === 'pending_orders' && <PendingOrdersTab show={show} />}
         </div>
       </main>
 
@@ -130,7 +165,7 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
 const saTrans = {
   en: {
     dashboardTitle: 'Overview Dashboard',
-    dashboardSubtitle: 'Real-time operations status of VIKRAMS ADS',
+    dashboardSubtitle: 'Real-time operations status of VIKRAM ADS',
     totalActiveVendors: 'Total & Active Vendors',
     registeredVsOperating: 'Registered vs Operating',
     activeSubscriptions: 'Active Subscriptions',
@@ -142,7 +177,7 @@ const saTrans = {
   },
   hi: {
     dashboardTitle: 'अवलोकन डैशबोर्ड',
-    dashboardSubtitle: 'VIKRAMS ADS की वास्तविक समय संचालन स्थिति',
+    dashboardSubtitle: 'VIKRAM ADS की वास्तविक समय संचालन स्थिति',
     totalActiveVendors: 'कुल और सक्रिय विक्रेता',
     registeredVsOperating: 'पंजीकृत बनाम कार्यरत',
     activeSubscriptions: 'सक्रिय सदस्यताएँ',
@@ -154,7 +189,7 @@ const saTrans = {
   },
   mr: {
     dashboardTitle: 'विहंगावलोकन डॅशबोर्ड',
-    dashboardSubtitle: 'VIKRAMS ADS ची रिअल-टाइम ऑपरेशन स्थिती',
+    dashboardSubtitle: 'VIKRAM ADS ची रिअल-टाइम ऑपरेशन स्थिती',
     totalActiveVendors: 'एकूण आणि सक्रिय विक्रेते',
     registeredVsOperating: 'नोंदणीकृत विरुद्ध कार्यरत',
     activeSubscriptions: 'सक्रिय सबस्क्रिप्शन्स',
@@ -613,15 +648,26 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
     setImgUploadingId(rowId);
     try {
+      const compressedFile = await compressImageFile(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressedFile);
 
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData
       });
-      const resData = await res.json();
-      if (!res.ok) throw new Error('Image upload failed');
+      
+      let resData;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        resData = await res.json();
+      } else {
+        const text = await res.text();
+        if (res.status === 413 || text.includes('413')) throw new Error('Image too large. Please upload a smaller image.');
+        throw new Error(`Server returned HTML error (${res.status}) instead of JSON`);
+      }
+      
+      if (!res.ok) throw new Error(resData?.error || 'Image upload failed');
 
       setEditingInventory(prev => prev.map(item => {
         if (item.id === rowId) {
@@ -1942,15 +1988,26 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
     setUploading(true);
     try {
+      const compressedFile = await compressImageFile(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressedFile);
 
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (res.status === 413 || text.includes('413')) throw new Error('Image too large for the server configuration. Compression failed or image is still too large.');
+        throw new Error(`Server returned HTML error (${res.status}) instead of JSON`);
+      }
+      
+      if (!res.ok) throw new Error(data?.error || 'Upload failed');
 
       if (isEdit && editItem) {
         setEditItem({ ...editItem, image_url: data.url });
@@ -2095,14 +2152,31 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               {uploading && <div className="absolute inset-0 bg-surface/90 flex items-center justify-center rounded-xl"><Spinner /></div>}
             </div>
 
-            <div className="text-xs bg-surface-2/60 border border-border/80 rounded-xl p-3 text-muted space-y-1">
+            <Input 
+              label="Image URL (Optional / ChatGPT / Web / Photo URL)" 
+              placeholder="https://... or upload photo below" 
+              value={form.image_url || ''} 
+              onChange={(v) => setForm({ ...form, image_url: v })} 
+            />
+
+            <div className="text-xs bg-surface-2/60 border border-border/80 rounded-xl p-3 text-muted space-y-1.5">
               <p className="font-bold text-text text-[11px] uppercase tracking-wider">Photo Upload Specifications:</p>
-              <ul className="list-disc list-inside space-y-0.5 text-[11px]">
-                <li><strong className="text-text">JPEG Size Range:</strong> 2 MB – 5 MB (Compressed)</li>
-                <li><strong className="text-text">PNG Size Range:</strong> 5 MB – 15 MB (Uncompressed)</li>
-                <li><strong className="text-text">Target Resolution:</strong> 1920×1080 (Full HD) or 2048×1536</li>
-                <li><strong className="text-text">Max Application Limit:</strong> 10 MB maximum</li>
-              </ul>
+              <div className="space-y-1 text-[11px]">
+                <p className="font-semibold text-text">JPG / JPEG:</p>
+                <ul className="list-disc list-inside pl-2 space-y-0.5 text-muted">
+                  <li>Max Size: 15 MB</li>
+                  <li>Min Resolution: 600 × 600 px</li>
+                  <li>Recommended: 1920 × 1080 px</li>
+                  <li>Max Resolution: 10000 × 10000 px</li>
+                </ul>
+                <p className="font-semibold text-text pt-1">PNG:</p>
+                <ul className="list-disc list-inside pl-2 space-y-0.5 text-muted">
+                  <li>Max Size: 15 MB</li>
+                  <li>Min Resolution: 600 × 600 px</li>
+                  <li>Recommended: 1920 × 1080 px</li>
+                  <li>Max Resolution: 10000 × 10000 px</li>
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -2555,122 +2629,6 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           </div>
         </div>
       </Modal>
-    </div>
-  );
-}
-
-// 9. Pending Orders Tab
-function PendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    try {
-      const res = await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: 'orders',
-          action: 'select',
-          filters: { status: 'pending' },
-          admin_override: true
-        })
-      });
-      const d = await res.json();
-      setOrders((d.data || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  // Update timer every minute to calculate expiration
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleResumeOrder = async (order: any) => {
-    try {
-      const targetId = order.id || order._id;
-      await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: 'orders',
-          action: 'update',
-          filters: { id: targetId },
-          data: {
-            status: 'pending',
-            created_at: new Date().toISOString()
-          },
-          admin_override: true
-        })
-      });
-      show(`Order #${targetId.toString().substring(0, 6).toUpperCase()} resumed & re-broadcasted to nearby active vendors!`, 'success');
-      load();
-    } catch (e) {
-      console.error(e);
-      show('Failed to resume order', 'error');
-    }
-  };
-
-  if (loading) return <Spinner />;
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader 
-        title="Pending & Missed Orders" 
-        subtitle="Monitor orders currently broadcasting or missed by vendors (passed 9 hours)"
-      />
-
-      {orders.length === 0 ? (
-        <EmptyState icon={<Clock size={28} />} title="No pending orders" subtitle="All incoming orders have been accepted or fulfilled." />
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {orders.map(o => {
-            const elapsed = Date.now() - new Date(o.created_at).getTime();
-            const isMissed = elapsed > 9 * 60 * 60 * 1000; // 9 hours threshold
-            const targetId = o.id || o._id;
-
-            return (
-              <div key={targetId} className={`card p-5 border flex flex-col justify-between ${isMissed ? 'bg-red-50/50 border-red-200' : 'bg-surface border-border'}`}>
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-extrabold text-lg text-text">#{targetId.toString().substring(0, 6).toUpperCase()}</h3>
-                    <Badge variant={isMissed ? 'error' : 'warning'}>
-                      {isMissed ? 'Missed by Vendors' : 'Broadcasting (Active)'}
-                    </Badge>
-                  </div>
-                  <div className="space-y-2 text-sm text-text">
-                    <p><span className="text-muted text-xs">Item:</span> <span className="font-bold text-accent">{o.item_name}</span> (x{o.quantity})</p>
-                    <p><span className="text-muted text-xs">Category:</span> {o.master_category_name}</p>
-                    <div className="p-3 bg-surface-2 rounded-xl mt-3 space-y-1">
-                      <p className="font-bold text-text">{o.client_name} - {o.client_phone}</p>
-                      <p className="text-xs text-muted">{o.client_address}</p>
-                      <p className="text-xs font-semibold mt-1">PIN: {o.client_zip} | Landmark: {o.client_landmark}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 pt-3 border-t border-border/60 flex justify-between items-center text-xs text-muted">
-                  <span>Placed: {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-text mr-2">Total: ₹{o.price || o.total_price}</span>
-                    <button
-                      onClick={() => handleResumeOrder(o)}
-                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs transition-all shadow-sm flex items-center gap-1"
-                      title="Resume & re-broadcast order to nearby vendors"
-                    >
-                      <RefreshCw size={12} /> Resume Order
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

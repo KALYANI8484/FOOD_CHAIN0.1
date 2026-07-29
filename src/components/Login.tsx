@@ -5,6 +5,7 @@ import {
   Hash, Store, Users, Shield
 } from 'lucide-react';
 import { Spinner, LanguageSelector, getInitialLanguage, type Language } from './ui';
+import { AntigravitySuccessModal, CelebratorySubmitButton } from './AntigravitySuccessModal';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
@@ -171,6 +172,7 @@ export function Login({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showAntigravityModal, setShowAntigravityModal] = useState(false);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -218,6 +220,7 @@ export function Login({
           shop_name: sf.name,
           phone: sf.phone,
           dob: sf.dob,
+          birthdate: sf.dob,
           address: sf.address,
           zip_code: sf.pincode
         })
@@ -225,7 +228,8 @@ export function Login({
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Registration failed');
       else {
-        setSuccess('Application submitted! Your vendor account is pending verification by Super Admin.');
+        setShowAntigravityModal(true);
+        setSuccess('Application submitted! Your vendor account is active with Free Tier.');
         setSf({ name: '', phone: '', dob: '', address: '', pincode: '' });
       }
     } catch { setError('Network error — please try again'); }
@@ -253,6 +257,15 @@ export function Login({
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F8FF] px-6 py-12 relative" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
+        <AntigravitySuccessModal
+          open={showAntigravityModal}
+          onClose={() => setShowAntigravityModal(false)}
+          title="Application Submitted!"
+          subtitle="Your vendor application has been executed in a zero-gravity isolated workspace. All systems operational — Free Tier Plan Auto-Assigned!"
+          primaryActionText="Submit"
+          onPrimaryAction={() => switchMode('login')}
+        />
+
         {/* Back button */}
         <button
           onClick={onBack}
@@ -273,7 +286,10 @@ export function Login({
           {mode === 'login' && (
             <div className="space-y-6">
               <div>
-                <img src="/logo.png" alt="Vikrams Ads" className="h-16 w-auto object-contain mb-5" />
+                <div className="inline-flex items-center gap-3 p-2.5 rounded-2xl bg-slate-100 border border-slate-300 shadow-sm mb-5">
+                  <img src="/logo.png" alt="Vikram Ads" className="h-14 w-auto object-contain filter drop-shadow-sm" />
+                  <span className="font-black text-xl tracking-tight text-black pr-2" style={{ fontFamily: "'Playfair Display', serif" }}>Vikram Ads</span>
+                </div>
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
                   {t.title}
                 </h2>
@@ -328,7 +344,10 @@ export function Login({
           {mode === 'signup' && (
             <div className="space-y-5">
               <div>
-                <img src="/logo.png" alt="Vikrams Ads" className="h-16 w-auto object-contain mb-5" />
+                <div className="inline-flex items-center gap-3 p-2.5 rounded-2xl bg-slate-100 border border-slate-300 shadow-sm mb-5">
+                  <img src="/logo.png" alt="Vikram Ads" className="h-14 w-auto object-contain filter drop-shadow-sm" />
+                  <span className="font-black text-xl tracking-tight text-black pr-2" style={{ fontFamily: "'Playfair Display', serif" }}>Vikram Ads</span>
+                </div>
                 <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
                   {t.vendorRegTitle}
                 </h2>
@@ -361,14 +380,8 @@ export function Login({
                   maxLength={8}
                   hint="Strictly 8 digits — no slashes, dashes, or spaces. Example: 19072004 for July 19, 2004."
                 />
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
-                    <Field label="Address" placeholder="Street, Area..." value={sf.address} onChange={patch('address')} icon={MapPin} />
-                  </div>
-                  <div className="col-span-1">
-                    <Field label="PIN Code" placeholder="110001" value={sf.pincode} onChange={patch('pincode')} icon={Hash} maxLength={6} />
-                  </div>
-                </div>
+                <Field label={t.addressLabel || "ADDRESS"} placeholder={t.addressPlaceholder || "Street, Area..."} value={sf.address} onChange={patch('address')} icon={MapPin} />
+                <Field label={t.pincodeLabel || "PIN CODE"} placeholder={t.pincodePlaceholder || "110001"} value={sf.pincode} onChange={patch('pincode')} icon={Hash} maxLength={6} />
               </div>
 
               {error && (
@@ -382,14 +395,13 @@ export function Login({
                 </div>
               )}
 
-              <div className="flex flex-col gap-3 pt-1">
-                <button
+              <div className="flex flex-col gap-4 pt-2 items-center">
+                <CelebratorySubmitButton
+                  text="Submit Application"
                   onClick={handleSignup}
                   disabled={loading}
-                  className="w-full h-12 rounded-xl bg-green-600 hover:bg-green-700 active:scale-95 text-white font-bold text-sm transition-all shadow-lg shadow-green-200 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loading ? <Spinner /> : <><ArrowRight size={16} /> Submit Application</>}
-                </button>
+                  className="w-full"
+                />
                 <button
                   onClick={() => switchMode('login')}
                   className="text-sm text-gray-500 hover:text-gray-800 font-semibold text-center transition-colors"

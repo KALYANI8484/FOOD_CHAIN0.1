@@ -320,8 +320,8 @@ const vTrans = {
     paidPlanRequired: 'Paid Plan Required',
     awaitingActivation: 'Awaiting Activation',
     confirmOrder: 'Confirm Order',
-    radarSilentTitle: 'Radar search is silent',
-    radarSilentDesc: 'No active client orders are currently broadcasting for your subscription plan.',
+    radarSilentTitle: 'Radar Search is Silent',
+    radarSilentDesc: 'Upgrade your plan to connect with clients and unlock exclusive premium features.',
     // Kanban Active Orders
     kanbanTitle: 'Active Orders Board',
     kanbanSubtitle: 'Progress board for kitchen preparation and dispatch',
@@ -936,14 +936,11 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
           const isZipMatch = o.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3);
           const isActive = vendor.status === 'approved';
           const isExpired = vendor.status === 'expired';
-          const remaining = timers[orderId] ?? 32400;
+          const remaining = timers[orderId] ?? 60;
           
-          const hrs = Math.floor(remaining / 3600);
-          const mins = Math.floor((remaining % 3600) / 60);
+          const mins = Math.floor(remaining / 60);
           const secs = remaining % 60;
-          const formattedTimer = hrs > 0 
-            ? `${hrs}h ${mins.toString().padStart(2, '0')}m`
-            : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          const formattedTimer = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
           // Button classes evaluation based on specifications
           let btnLabel = t.confirmOrder;
@@ -1066,11 +1063,26 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
 
         {radarOrders.filter(o => o.master_category_name === (activePlan?.master_category_name || vendor.plan_name)).length === 0 && (
           <div className="col-span-full">
-            <EmptyState 
-              icon={<Radar size={32} className="text-muted" />} 
-              title="Radar search is silent" 
-              subtitle="No active client orders are currently broadcasting for your subscription plan." 
-            />
+            <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-amber-500/15 via-orange-500/15 to-amber-500/15 border-2 border-amber-500/40 text-center shadow-xl animate-fade-in my-4 relative overflow-hidden">
+              <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-400/20 blur-2xl pointer-events-none" />
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white mx-auto flex items-center justify-center mb-4 shadow-lg shadow-amber-500/30 animate-pulse">
+                  <Sparkles size={32} />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight max-w-2xl mx-auto leading-snug">
+                  Upgrade your plan to connect with clients and unlock exclusive premium features.
+                </h3>
+                <p className="text-sm font-bold text-amber-800 mt-3 max-w-lg mx-auto">
+                  Start receiving live order broadcasts directly from nearby clients on your vendor radar.
+                </p>
+                <button
+                  onClick={() => onTab('subscription')}
+                  className="mt-6 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-black text-sm transition-all shadow-xl shadow-amber-500/30 inline-flex items-center gap-2.5 cursor-pointer"
+                >
+                  <Sparkles size={18} /> Upgrade Subscription Plan
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

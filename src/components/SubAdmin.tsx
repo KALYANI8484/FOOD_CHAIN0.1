@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Store, Plus, Users, Clock, CheckCircle2,
   Activity as ActivityIcon, AlertCircle, FileText, Eye, Pencil, Search,
-  ArrowRight, Package, Trash2
+  ArrowRight, Package, Trash2, Menu, X, RefreshCw
 } from 'lucide-react';
 import { supabase, type Vendor, type Activity, type VendorItem } from '../lib/supabase';
 import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
-type Tab = 'dashboard' | 'vendors' | 'pending' | 'guides';
+type Tab = 'dashboard' | 'vendors' | 'pending' | 'guides' | 'live_tracker' | 'pending_orders';
 
 export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmail: string }) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
@@ -29,12 +29,13 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
   }, []);
 
   const navLabels = {
-    en: { dashboard: 'Dashboard', vendors: 'Vendors', pending: 'Correction Inbox', guides: 'SOP Guides', exit: 'Exit', signedInAs: 'Signed In As' },
-    hi: { dashboard: 'डैशबोर्ड', vendors: 'विक्रेता (वेंडर्स)', pending: 'सुधार इनबॉक्स', guides: 'एसओपी गाइड', exit: 'बाहर निकलें', signedInAs: 'साइन इन हैं' },
-    mr: { dashboard: 'डॅशबोर्ड', vendors: 'विक्रेते (व्हेंडर्स)', pending: 'सुधारणा इनबॉक्स', guides: 'एसओपी मार्गदर्शक', exit: 'बाहेर पडा', signedInAs: 'खाते' },
+    en: { dashboard: 'Dashboard', vendors: 'Vendors', pending: 'Correction Inbox', guides: 'SOP Guides', live_tracker: 'Live Order Tracker', pending_orders: 'Pending & Missed Orders', exit: 'Exit', signedInAs: 'Signed In As' },
+    hi: { dashboard: 'डैशबोर्ड', vendors: 'विक्रेता (वेंडर्स)', pending: 'सुधार इनबॉक्स', guides: 'एसओपी गाइड', live_tracker: 'लाइव ऑर्डर ट्रैकर', pending_orders: 'लंबित और छूटे हुए ऑर्डर', exit: 'बाहर निकलें', signedInAs: 'साइन इन हैं' },
+    mr: { dashboard: 'डॅशबोर्ड', vendors: 'विक्रेते (व्हेंडर्स)', pending: 'सुधारणा इनबॉक्स', guides: 'एसओपी मार्गदर्शक', live_tracker: 'लाइव्ह ऑर्डर ट्रॅकर', pending_orders: 'प्रलंबित आणि चुकलेले ऑर्डर', exit: 'बाहेर पडा', signedInAs: 'खाते' },
   }[lang];
 
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast, show } = useToast();
 
   const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
@@ -42,20 +43,45 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
     { id: 'vendors', label: navLabels.vendors, icon: Store },
     { id: 'pending', label: navLabels.pending, icon: AlertCircle },
     { id: 'guides', label: navLabels.guides, icon: FileText },
+    { id: 'live_tracker', label: navLabels.live_tracker, icon: ActivityIcon },
+    { id: 'pending_orders', label: navLabels.pending_orders, icon: Clock },
   ];
 
   return (
-    <div className="min-h-screen bg-bg flex text-text">
-      <aside className="w-64 border-r border-border bg-surface flex flex-col h-screen sticky top-0 z-20">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-3 cursor-pointer group" onClick={onExit}>
+    <div className="flex h-screen bg-bg text-text overflow-hidden relative">
+      {/* Mobile Top Navbar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={onExit}>
+          <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain shrink-0" />
+          <span className="font-extrabold text-sm tracking-tight text-black">VIKRAM ADS</span>
+        </div>
+        <button 
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 rounded-xl bg-surface-2 border border-border text-text focus:outline-none"
+        >
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
+      {/* Backdrop for Mobile Menu */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-xs"
+        />
+      )}
+
+      {/* Responsive Drawer Sidebar */}
+      <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="px-5 py-4 border-b border-border hidden lg:flex items-center gap-3 cursor-pointer group" onClick={onExit}>
           <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain shrink-0" />
           <div>
-            <p className="font-bold text-sm">VIKRAMS ADS</p>
-            <p className="text-xs text-muted">Sub-Admin Portal</p>
+            <p className="font-extrabold text-base tracking-tight text-black">VIKRAM ADS</p>
+            <p className="text-[10px] text-muted uppercase tracking-wider font-semibold">Sub-Admin Portal</p>
           </div>
         </div>
         
-        <div className="p-4 border-b border-border bg-surface-2/40">
+        <div className="p-4 border-b border-border bg-surface-2/40 mt-14 lg:mt-0">
           <p className="text-xs text-muted font-bold uppercase tracking-wider">{navLabels.signedInAs}</p>
           <p className="text-xs text-text font-semibold truncate mt-0.5">{adminEmail || 'arjun@mealmesh.io'}</p>
         </div>
@@ -64,7 +90,7 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
                 tab === item.id ? 'bg-accent/10 text-accent font-semibold' : 'text-muted hover:text-text hover:bg-surface-2'
               }`}
@@ -83,12 +109,14 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto h-screen bg-bg relative z-10">
-        <div className="p-8 max-w-7xl mx-auto">
+      <main className="flex-1 overflow-y-auto h-screen bg-bg relative z-10 pt-16 lg:pt-0">
+        <div className="p-4 sm:p-8 max-w-7xl mx-auto">
           {tab === 'dashboard' && <SubDashboard onTab={setTab} adminEmail={adminEmail} />}
           {tab === 'vendors' && <MyVendors show={show} adminEmail={adminEmail} />}
           {tab === 'pending' && <CorrectionInbox show={show} />}
           {tab === 'guides' && <SubGuides />}
+          {tab === 'live_tracker' && <SubAdminLiveOrderTrackerTab show={show} />}
+          {tab === 'pending_orders' && <SubAdminPendingOrdersTab show={show} />}
         </div>
       </main>
 
@@ -760,6 +788,422 @@ function SubGuides() {
           </div>
         )}
       </Drawer>
+    </div>
+  );
+}
+
+// 5. Live Order Tracker Tab Component for Sub-Admin
+function SubAdminLiveOrderTrackerTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'awaiting' | 'approved'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'select',
+          admin_override: true
+        })
+      });
+      const d = await res.json();
+      setOrders((d.data || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleApproveOrder = async (order: any) => {
+    try {
+      const targetId = order.id || order._id;
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'update',
+          filters: { id: targetId },
+          data: {
+            status: 'pending',
+            created_at: new Date().toISOString()
+          },
+          admin_override: true
+        })
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      show(`✅ Order #${targetId.toString().substring(0, 6).toUpperCase()} Approved! Now visible to nearby kitchen vendors.`, 'success');
+      fetchOrders();
+    } catch (e: any) {
+      console.error(e);
+      show(e.message || 'Failed to approve order', 'error');
+    }
+  };
+
+  const handleDiscardOrder = async (order: any) => {
+    try {
+      const targetId = order.id || order._id;
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'delete',
+          filters: { id: targetId },
+          admin_override: true
+        })
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      show(`❌ Order #${targetId.toString().substring(0, 6).toUpperCase()} discarded & permanently deleted from database!`, 'info');
+      fetchOrders();
+    } catch (e: any) {
+      console.error(e);
+      show(e.message || 'Failed to discard order', 'error');
+    }
+  };
+
+  const filteredOrders = orders.filter(o => {
+    if (filter === 'awaiting') {
+      if (o.vendor_id || (o.status !== 'awaiting_subadmin_approval' && o.status !== 'pending')) return false;
+    } else if (filter === 'approved') {
+      if (!o.vendor_id && o.status !== 'accepted' && o.status !== 'preparing' && o.status !== 'out_for_delivery') return false;
+    }
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const nameMatch = (o.client_name || '').toLowerCase().includes(term);
+      const phoneMatch = (o.client_phone || '').includes(term);
+      const itemMatch = (o.item_name || '').toLowerCase().includes(term);
+      const codeMatch = (o.id || o._id || '').toString().toLowerCase().includes(term);
+      return nameMatch || phoneMatch || itemMatch || codeMatch;
+    }
+    return true;
+  });
+
+  const awaitingCount = orders.filter(o => !o.vendor_id && (o.status === 'awaiting_subadmin_approval' || o.status === 'pending')).length;
+  const approvedCount = orders.filter(o => o.vendor_id || ['accepted', 'preparing', 'out_for_delivery'].includes(o.status)).length;
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Live Order Tracker</h1>
+            {awaitingCount > 0 && (
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-500 text-white font-black text-xs animate-pulse">
+                {awaitingCount} Awaiting
+              </span>
+            )}
+          </div>
+          <p className="text-muted text-sm mt-1">Review all incoming client orders in real time. Approve ✅ to broadcast to nearby vendors or Discard ❌.</p>
+        </div>
+
+        <button
+          onClick={fetchOrders}
+          className="px-4 py-2 rounded-xl bg-surface-2 border border-border text-xs font-bold hover:bg-surface-3 transition-colors flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
+        >
+          <RefreshCw size={14} /> Refresh Live Stream
+        </button>
+      </div>
+
+      {/* Structured Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-2.5 rounded-2xl border border-border">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              filter === 'all' ? 'bg-amber-500 text-white shadow-xs' : 'text-muted hover:text-text hover:bg-surface-2'
+            }`}
+          >
+            All Orders ({orders.length})
+          </button>
+          <button
+            onClick={() => setFilter('awaiting')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              filter === 'awaiting' ? 'bg-blue-600 text-white shadow-xs' : 'text-blue-600 bg-blue-50/60 hover:bg-blue-100/60'
+            }`}
+          >
+            ⏳ Awaiting Approval ({awaitingCount})
+          </button>
+          <button
+            onClick={() => setFilter('approved')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              filter === 'approved' ? 'bg-green-600 text-white shadow-xs' : 'text-muted hover:text-text hover:bg-surface-2'
+            }`}
+          >
+            ✅ Approved &amp; Live ({approvedCount})
+          </button>
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            type="text"
+            placeholder="Search order, client, phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-surface-2 border border-border text-xs focus:outline-none focus:border-accent"
+          />
+        </div>
+      </div>
+
+      {/* Structured Table */}
+      <div className="card overflow-hidden border border-border shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse min-w-[700px]">
+            <thead>
+              <tr className="bg-surface-2/70 border-b border-border text-[11px] font-bold text-muted uppercase tracking-wider">
+                <th className="p-4">ORDER ID &amp; TIME</th>
+                <th className="p-4">CLIENT &amp; CONTACT DETAILS</th>
+                <th className="p-4">ORDERED ITEMS &amp; QTY</th>
+                <th className="p-4">TOTAL PRICE</th>
+                <th className="p-4">STATUS</th>
+                <th className="p-4 text-center">SUB-ADMIN ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60 font-medium">
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-muted">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Clock size={28} className="text-muted/60" />
+                      <p className="font-bold text-sm">No orders found in this view</p>
+                      <p className="text-xs text-muted">New orders placed by clients on the website will appear here in real time.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredOrders.map((o) => {
+                  const targetId = o.id || o._id;
+                  const formattedCode = `#${targetId.toString().substring(0, 6).toUpperCase()}`;
+                  const isAwaiting = o.status === 'awaiting_subadmin_approval';
+                  const isApproved = o.status === 'pending' || o.status === 'accepted' || o.status === 'delivered';
+                  const isDiscarded = o.status === 'discarded' || o.status === 'rejected';
+
+                  return (
+                    <tr key={targetId} className={`hover:bg-surface-2/40 transition-colors ${isAwaiting ? 'bg-blue-50/30' : ''}`}>
+                      {/* Order ID & Time */}
+                      <td className="p-4 align-top">
+                        <span className="font-black text-base text-text block">{formattedCode}</span>
+                        <span className="text-[11px] text-muted block mt-0.5">
+                          {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-[10px] text-muted/80 block">
+                          {new Date(o.created_at).toLocaleDateString()}
+                        </span>
+                      </td>
+
+                      {/* Client Details */}
+                      <td className="p-4 align-top">
+                        <p className="font-bold text-text text-sm">{o.client_name}</p>
+                        <p className="text-xs text-amber-600 font-bold mt-0.5">📞 {o.client_phone}</p>
+                        <p className="text-xs text-muted mt-1 max-w-xs line-clamp-2">{o.client_address}</p>
+                        <p className="text-[11px] font-semibold text-muted mt-0.5">
+                          PIN: <strong className="text-text">{o.client_zip}</strong> | Landmark: <strong className="text-text">{o.client_landmark}</strong>
+                        </p>
+                      </td>
+
+                      {/* Ordered Items */}
+                      <td className="p-4 align-top">
+                        <p className="font-bold text-accent text-sm">{o.item_name}</p>
+                        <p className="text-xs text-muted mt-0.5">Quantity: <strong className="text-text">{o.quantity} pc</strong></p>
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-surface-2 text-muted text-[10px] font-bold rounded-md">
+                          Category: {o.master_category_name || 'General'}
+                        </span>
+                      </td>
+
+                      {/* Total Price */}
+                      <td className="p-4 align-top">
+                        <span className="font-extrabold text-base text-text">₹{o.price || o.total_price}</span>
+                      </td>
+
+                      {/* Status Badge */}
+                      <td className="p-4 align-top">
+                        {isAwaiting && (
+                          <Badge variant="info" className="animate-pulse">
+                            ⏳ Awaiting Approval
+                          </Badge>
+                        )}
+                        {!isAwaiting && (o.vendor_id || o.status === 'accepted' || o.status === 'preparing' || o.status === 'out_for_delivery') && (
+                          <Badge variant="success">
+                            ✅ Approved &amp; Live
+                          </Badge>
+                        )}
+                        {!isAwaiting && (!o.vendor_id && o.status === 'pending') && (
+                          <Badge variant="warning">
+                            📡 Broadcasting to Vendors
+                          </Badge>
+                        )}
+                      </td>
+
+                      {/* Action Column: Reject (Red Pill) & Approve (Green Pill) */}
+                      <td className="p-4 align-top text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {/* Reject Red Pill Button */}
+                          <button
+                            onClick={() => handleDiscardOrder(o)}
+                            className="h-8 px-4 rounded-full bg-[#E53935] hover:bg-red-700 active:scale-95 text-white font-black text-xs transition-all shadow-sm border-2 border-slate-900 flex items-center justify-center cursor-pointer tracking-wider"
+                            title="Reject & Delete Order Permanently from database"
+                          >
+                            reject
+                          </button>
+
+                          {/* Approve Green Pill Button */}
+                          <button
+                            onClick={() => handleApproveOrder(o)}
+                            className="h-8 px-4 rounded-full bg-[#43A047] hover:bg-green-700 active:scale-95 text-white font-black text-xs transition-all shadow-sm border-2 border-slate-900 flex items-center justify-center cursor-pointer tracking-wider"
+                            title="Approve order — Shift to Awaiting Approval for vendors"
+                          >
+                            approve
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 6. Pending & Missed Orders Tab for Sub-Admin
+function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'select',
+          filters: { status: 'pending' },
+          admin_override: true
+        })
+      });
+      const d = await res.json();
+      setOrders((d.data || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // Update timer every minute to calculate expiration
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleResumeOrder = async (order: any) => {
+    try {
+      const targetId = order.id || order._id;
+      await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'update',
+          filters: { id: targetId },
+          data: {
+            status: 'pending',
+            created_at: new Date().toISOString()
+          },
+          admin_override: true
+        })
+      });
+      show(`Order #${targetId.toString().substring(0, 6).toUpperCase()} resumed & re-broadcasted to nearby active vendors!`, 'success');
+      load();
+    } catch (e) {
+      console.error(e);
+      show('Failed to resume order', 'error');
+    }
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Pending &amp; Missed Orders</h1>
+          <p className="text-muted mt-1 text-sm">Monitor live broadcasting orders and resume missed client orders for vendors</p>
+        </div>
+        <button
+          onClick={load}
+          className="px-4 py-2 rounded-xl bg-surface-2 border border-border text-xs font-bold hover:bg-surface-3 transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+        >
+          <RefreshCw size={14} /> Refresh List
+        </button>
+      </div>
+
+      {orders.length === 0 ? (
+        <EmptyState icon={<Clock size={28} />} title="No pending orders" subtitle="All incoming orders have been accepted or fulfilled." />
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {orders.map(o => {
+            const elapsed = Date.now() - new Date(o.created_at).getTime();
+            const isMissed = elapsed > 60 * 1000; // 1 minute threshold
+            const targetId = o.id || o._id;
+
+            return (
+              <div key={targetId} className={`card p-5 border flex flex-col justify-between ${isMissed ? 'bg-red-50/50 border-red-200' : 'bg-surface border-border'}`}>
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-extrabold text-lg text-text">#{targetId.toString().substring(0, 6).toUpperCase()}</h3>
+                    <Badge variant={isMissed ? 'error' : 'warning'}>
+                      {isMissed ? 'Missed by Vendors' : 'Broadcasting (Active)'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2 text-sm text-text">
+                    <p><span className="text-muted text-xs">Item:</span> <span className="font-bold text-amber-600">{o.item_name}</span> (x{o.quantity})</p>
+                    <p><span className="text-muted text-xs">Category:</span> {o.master_category_name || 'General'}</p>
+                    <div className="p-3 bg-surface-2/60 rounded-xl mt-3 space-y-1 border border-border/40">
+                      <p className="font-bold text-text">{o.client_name} - {o.client_phone}</p>
+                      <p className="text-xs text-muted">{o.client_address}</p>
+                      <p className="text-xs font-semibold mt-1 text-amber-700">PIN: {o.client_zip} | Landmark: {o.client_landmark}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-border/60 flex justify-between items-center text-xs text-muted">
+                  <span>Placed: {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-text mr-1">Total: ₹{o.price || o.total_price}</span>
+                    <button
+                      onClick={() => handleResumeOrder(o)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                      title="Resume & re-broadcast order to nearby vendors"
+                    >
+                      <RefreshCw size={12} /> Resume
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

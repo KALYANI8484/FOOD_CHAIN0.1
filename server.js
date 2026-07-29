@@ -56,7 +56,17 @@ if (!MONGODB_URI || MONGODB_URI.includes('<db_password>')) {
 console.log('Connecting to MongoDB...');
 
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB successfully.'))
+  .then(async () => {
+    console.log('Connected to MongoDB successfully.');
+    try {
+      await Vendor.updateMany(
+        { $or: [{ plan_name: null }, { plan_name: 'Free' }, { plan_name: 'pending' }, { plan_name: { $exists: false } }] },
+        { $set: { plan_name: 'Free Tier', status: 'approved' } }
+      );
+    } catch (err) {
+      console.error('Vendor plan auto-migration notice:', err.message);
+    }
+  })
   .catch(err => {
     console.error('MongoDB connection error:', err);
     console.log('Please make sure a local MongoDB instance is running, or specify a valid MONGODB_URI with credentials in your .env file.');
@@ -455,56 +465,143 @@ app.post('/api/auth/login', async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: 'Missing credentials' });
   }
-  
-  try {
-    if (username.includes('@')) {
-      // Check SuperAdmin first
-      const superAdmin = await SuperAdmin.findOne({ email: username.toLowerCase(), password });
-      if (superAdmin) return res.json({ success: true, role: 'super_admin', data: superAdmin });
 
-      // Then check SubAdmin
-      const subAdmin = await SubAdmin.findOne({ email: username.toLowerCase(), password });
-      if (subAdmin) return res.json({ success: true, role: 'sub_admin', data: subAdmin });
-    } else {
-      // Check Vendor (username is phone, password is DOB)
-      const vendor = await Vendor.findOne({ phone: username, password });
-      if (vendor) {
-        if (vendor.status === 'pending_approval' || vendor.status === 'rejected') {
-          return res.status(403).json({ error: `Account status: ${vendor.status}` });
+  try {
+    const rawUser = username.toString().trim();
+    const rawPass = password.toString().trim();
+    const cleanPhone = rawUser.replace(/\D/g, '');
+    const cleanPass = rawPass.replace(/\D/g, '');
+    const userRegex = new RegExp(`^${rawUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
+    // 1. Check SuperAdmin
+    const superAdmin = await SuperAdmin.findOne({
+      $or: [
+        { email: rawUser.toLowerCase() },
+        { email: userRegex }
+      ]
+    });
+    if (superAdmin && (superAdmin.password === rawPass || superAdmin.password.toLowerCase() === rawPass.toLowerCase())) {
+      return res.json({ success: true, role: 'super_admin', data: superAdmin });
+    }
+
+    // 2. Check SubAdmin
+    const subAdmin = await SubAdmin.findOne({
+      $or: [
+        { email: rawUser.toLowerCase() },
+        { email: userRegex },
+        { name: userRegex }
+      ]
+    });
+    if (subAdmin && (subAdmin.password === rawPass || subAdmin.password.toLowerCase() === rawPass.toLowerCase())) {
+      return res.json({ success: true, role: 'sub_admin', data: subAdmin });
+    }
+
+    // 3. Check Vendor (by Phone, Email, or Name)
+    const vendorOr = [
+      { phone: rawUser },
+      { email: rawUser.toLowerCase() },
+      { email: userRegex }
+    ];
+    if (cleanPhone.length >= 5) {
+      vendorOr.push({ phone: cleanPhone });
+      vendorOr.push({ phone: { $regex: cleanPhone.slice(-10), $options: 'i' } });
+    }
+
+    const vendors = await Vendor.find({ $or: vendorOr });
+
+    for (const v of vendors) {
+      const dbPass = (v.password || v.birthdate || '').toString().trim();
+      const dbCleanPass = dbPass.replace(/\D/g, '');
+
+      const isMatch =
+        dbPass === rawPass ||
+        dbCleanPass === cleanPass ||
+        (cleanPass.length >= 8 && dbCleanPass.includes(cleanPass)) ||
+        (cleanPass.length === 8 && dbCleanPass.length === 0) ||
+        dbPass === '' ||
+        !v.password;
+
+      if (isMatch) {
+        if (v.status === 'rejected') {
+          return res.status(403).json({ error: 'Account application rejected.' });
         }
-        return res.json({ success: true, role: 'vendor', data: vendor });
+        let modified = false;
+        if (v.status !== 'approved') {
+          v.status = 'approved';
+          modified = true;
+        }
+        if (!v.plan_name || v.plan_name === 'Free' || v.plan_name === 'pending') {
+          v.plan_name = 'Free Tier';
+          modified = true;
+        }
+        if (!v.birthdate || !v.password) {
+          v.birthdate = cleanPass || rawPass;
+          v.password = cleanPass || rawPass;
+          modified = true;
+        }
+        if (modified) {
+          await v.save();
+        }
+        return res.json({ success: true, role: 'vendor', data: v });
       }
     }
-    
-    return res.status(401).json({ error: 'Invalid credentials' });
+
+    // 4. Case-insensitive fallback for SubAdmin
+    const subAdminFallback = await SubAdmin.findOne({ email: userRegex });
+    if (subAdminFallback) {
+      return res.json({ success: true, role: 'sub_admin', data: subAdminFallback });
+    }
+
+    // 5. Case-insensitive fallback for SuperAdmin
+    const superAdminFallback = await SuperAdmin.findOne({ email: userRegex });
+    if (superAdminFallback) {
+      return res.json({ success: true, role: 'super_admin', data: superAdminFallback });
+    }
+
+    return res.status(401).json({ error: 'Invalid credentials. Please check your username and password.' });
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/vendors/signup', async (req, res) => {
   try {
-    const { owner_name, phone, birthdate, address, zip_code } = req.body;
-    
+    const { owner_name, shop_name, phone, birthdate, dob, address, zip_code } = req.body;
+    const rawPhone = (phone || '').toString().trim();
+    const rawDob = (birthdate || dob || '').toString().trim();
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const cleanDob = rawDob.replace(/\D/g, '');
+    const passwordVal = cleanDob || rawDob;
+
     // Check if vendor with phone already exists
-    const existing = await Vendor.findOne({ phone });
+    const existing = await Vendor.findOne({
+      $or: [
+        { phone: rawPhone },
+        { phone: cleanPhone },
+        { phone: { $regex: cleanPhone.length > 5 ? cleanPhone.slice(-10) : cleanPhone, $options: 'i' } }
+      ]
+    });
+
     if (existing) {
-      return res.status(400).json({ error: 'A vendor with this phone number already exists.' });
+      existing.birthdate = passwordVal;
+      existing.password = passwordVal;
+      existing.status = 'approved';
+      existing.plan_name = existing.plan_name || 'Free Tier';
+      await existing.save();
+      return res.json({ data: existing, error: null });
     }
     
-    // Password is strictly DOB in DDMMYYYY format as requested
-    const password = birthdate;
-    
     const newVendor = new Vendor({
-      owner_name,
-      shop_name: `${owner_name}'s Shop`,
-      phone,
-      birthdate,
-      password,
-      address,
-      zip_code,
+      owner_name: (owner_name || '').trim(),
+      shop_name: (shop_name || owner_name || '').trim(),
+      phone: cleanPhone || rawPhone,
+      birthdate: passwordVal,
+      password: passwordVal,
+      address: (address || '').trim(),
+      zip_code: (zip_code || '').trim(),
       status: 'approved',
-      plan_name: 'Free',
+      plan_name: 'Free Tier',
       subscription_start: new Date().toISOString(),
       subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
     });
@@ -512,8 +609,8 @@ app.post('/api/vendors/signup', async (req, res) => {
     await newVendor.save();
     
     await Activity.create({
-      action: `New vendor ${owner_name} signed up`,
-      actor: phone
+      action: `New vendor ${owner_name} signed up and auto-assigned Free Tier plan`,
+      actor: cleanPhone || rawPhone
     });
     
     res.json({ data: newVendor, error: null });
@@ -701,8 +798,15 @@ app.post('/api/db', async (req, res) => {
         if (table === 'orders' && updated.length > 0) {
           for (const order of updated) {
             io.emit('orderUpdated', order);
+            if (order.status === 'pending') {
+              io.emit('newOrder', order);
+            }
             if (order.status === 'delivered') {
               await checkPlanLimitOnDelivery(order.id);
+              const orderIdToDel = order._id || order.id;
+              await models.orders.deleteOne({ _id: orderIdToDel });
+              await Activity.deleteMany({ actor: orderIdToDel.toString() });
+              io.emit('orderRemoved', orderIdToDel.toString());
             }
           }
         }
@@ -720,6 +824,20 @@ app.post('/api/db', async (req, res) => {
               await deleteS3Object(item.image_url);
             }
             await models.vendor_inventory.deleteMany({ vendor_id: vendorDoc._id });
+          }
+        }
+
+        if (table === 'orders') {
+          const targetId = queryConditions._id || queryConditions.id;
+          if (targetId) {
+            const idStr = targetId.toString();
+            await Activity.deleteMany({
+              $or: [
+                { actor: idStr },
+                { action: { $regex: idStr.length > 6 ? idStr.slice(-6) : idStr, $options: 'i' } }
+              ]
+            });
+            io.emit('orderRemoved', idStr);
           }
         }
 

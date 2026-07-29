@@ -53,7 +53,7 @@ export const translations = {
     becomeVendor: "Become a Vendor",
     contactUs: "Contact Us",
     footNote: "Bringing authentic local flavors to every guest by connecting verified kitchen partners through a fast, seamless ordering platform",
-    allRightsReserved: "© 2026 Vikrams Ads. All rights reserved."
+    allRightsReserved: "© 2026 Vikram Ads. All rights reserved. | Made by KS-STUDIO (sangaonkar8484@gmail.com)"
   },
   hi: {
     plans: "प्लान्स",
@@ -367,7 +367,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
             master_category_name: master.name,
             price: totalPrice,
             quantity: totalItemCount,
-            status: 'pending',
+            status: 'awaiting_subadmin_approval',
             otp: generatedOtp,
             created_at: new Date().toISOString()
           }
@@ -427,9 +427,9 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Step 1 of 2</p>
                 <h3 className="text-lg font-extrabold text-gray-900 mt-0.5" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Select Wholesale Items
+                  Select items
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">Select multiple items and customize quantities (Minimum Wholesale MOQ applied)</p>
+                <p className="text-xs text-gray-400 mt-0.5">Select items and customize quantities</p>
               </div>
 
               {loadingSubs ? (
@@ -477,41 +477,41 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                             {isSelected && <CheckCircle size={12} className="text-white" />}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-gray-900 truncate text-sm">{item.name}</p>
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-md">
-                                Default Min: {minQty} {itemUom}
-                              </span>
-                            </div>
+                            <p className="font-bold text-gray-900 truncate text-sm">{getItemTranslation(item.name, language)}</p>
                             <p className="text-amber-700 font-extrabold text-xs mt-0.5">
                               ₹{item.price} / {itemUom}
                             </p>
                           </div>
                         </div>
 
-                        {/* Sub-Item Quantity Controller (Locked at minQty) */}
-                        {isSelected && (
-                          <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-amber-300 shadow-sm flex-shrink-0">
-                            <button
-                              onClick={() => updateItemQuantity(itemId, -1, minQty)}
-                              disabled={currentQty <= minQty}
-                              className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 font-bold flex items-center justify-center text-sm disabled:opacity-40"
-                              title={`Minimum quantity locked at default MOQ (${minQty})`}
-                            >
-                              −
-                            </button>
-                            <div className="text-center px-1">
-                              <span className="text-xs font-extrabold text-gray-900">{currentQty}</span>
-                              <span className="text-[10px] text-gray-500 font-medium ml-1">{itemUom}</span>
+                        {/* Right Section: Quantity Controller + minimum order badge underneath */}
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          {isSelected && (
+                            <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-amber-300 shadow-sm">
+                              <button
+                                onClick={() => updateItemQuantity(itemId, -1, minQty)}
+                                disabled={currentQty <= minQty}
+                                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 font-bold flex items-center justify-center text-sm disabled:opacity-40"
+                                title={`minimum order: ${minQty} ${itemUom}`}
+                              >
+                                −
+                              </button>
+                              <div className="text-center px-1">
+                                <span className="text-xs font-extrabold text-gray-900">{currentQty}</span>
+                                <span className="text-[10px] text-gray-500 font-medium ml-1">{itemUom}</span>
+                              </div>
+                              <button
+                                onClick={() => updateItemQuantity(itemId, 1, minQty)}
+                                className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center justify-center text-sm"
+                              >
+                                +
+                              </button>
                             </div>
-                            <button
-                              onClick={() => updateItemQuantity(itemId, 1, minQty)}
-                              className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center justify-center text-sm"
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
+                          )}
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 bg-amber-100/90 text-amber-900 rounded-md shadow-xs">
+                            minimum order: {minQty} {itemUom}
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
@@ -727,7 +727,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         ]);
         const [id, od, vd, gd] = await Promise.all([iR.json(), oR.json(), vR.json(), gR.json()]);
         if (id.data) setMasterItems(id.data);
-        if (od.data) setTotalOrders(od.data.length + 764);
+        if (od.data) setTotalOrders(od.data.length + 734);
         if (vd.data) setTotalVendors(vd.data.length);
         if (gd.data) {
           const plans = gd.data.filter((g: any) => g.allowed_roles?.includes('vendor_plan'));
@@ -769,25 +769,49 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
     <div className="min-h-screen bg-[#F8F8FF] text-[#111118]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
       {/* ── Active Order Live Tracking Floating Widget ── */}
-      {activeClientOrder && activeClientOrder.status === 'pending' && (
-        <div className="fixed bottom-6 left-6 z-40 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border-2 border-amber-400 text-gray-900 animate-bounce-slow">
+      {activeClientOrder && (activeClientOrder.status === 'pending' || activeClientOrder.status === 'awaiting_subadmin_approval' || activeClientOrder.status === 'discarded') && (
+        <div className={`fixed bottom-6 left-6 z-40 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border-2 text-gray-900 animate-bounce-slow ${
+          activeClientOrder.status === 'discarded' ? 'border-red-400' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'border-blue-400' : 'border-amber-400'
+        }`}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold animate-pulse">
-                📡
+              <div className={`w-8 h-8 rounded-xl text-white flex items-center justify-center font-bold animate-pulse ${
+                activeClientOrder.status === 'discarded' ? 'bg-red-500' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'bg-blue-500' : 'bg-amber-500'
+              }`}>
+                {activeClientOrder.status === 'discarded' ? '❌' : activeClientOrder.status === 'awaiting_subadmin_approval' ? '⏳' : '📡'}
               </div>
               <div>
-                <p className="font-extrabold text-xs text-amber-700 uppercase tracking-wider">Order Active &amp; Broadcasting</p>
+                <p className={`font-extrabold text-xs uppercase tracking-wider ${
+                  activeClientOrder.status === 'discarded' ? 'text-red-700' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'text-blue-700' : 'text-amber-700'
+                }`}>
+                  {activeClientOrder.status === 'discarded' 
+                    ? 'Order Discarded by Admin' 
+                    : activeClientOrder.status === 'awaiting_subadmin_approval' 
+                    ? 'Awaiting Sub-Admin Approval' 
+                    : 'Order Active & Broadcasting'}
+                </p>
                 <p className="font-bold text-sm truncate max-w-[200px]">{activeClientOrder.item_name}</p>
               </div>
             </div>
-            <button onClick={() => setActiveClientOrder(null)} className="text-gray-400 hover:text-gray-600 p-1">
+            <button onClick={() => setActiveClientOrder(null)} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
               <X size={14} />
             </button>
           </div>
-          <div className="mt-2.5 pt-2 border-t border-amber-100 flex justify-between items-center text-xs">
-            <span className="text-gray-500 font-semibold">OTP Code: <strong className="text-amber-800 text-sm">{activeClientOrder.otp}</strong></span>
-            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-extrabold rounded-md text-[10px]">Broadcasting (9 Hrs)</span>
+          <div className="mt-2.5 pt-2 border-t border-gray-100 flex justify-between items-center text-xs">
+            <span className="text-gray-500 font-semibold">OTP Code: <strong className="text-gray-800 text-sm">{activeClientOrder.otp}</strong></span>
+            <span className={`px-2 py-0.5 font-extrabold rounded-md text-[10px] ${
+              activeClientOrder.status === 'discarded' 
+                ? 'bg-red-100 text-red-800' 
+                : activeClientOrder.status === 'awaiting_subadmin_approval' 
+                ? 'bg-blue-100 text-blue-800 animate-pulse' 
+                : 'bg-amber-100 text-amber-800'
+            }`}>
+              {activeClientOrder.status === 'discarded' 
+                ? 'Discarded' 
+                : activeClientOrder.status === 'awaiting_subadmin_approval' 
+                ? 'Sub-Admin Verification' 
+                : 'Broadcasting (1 Min)'}
+            </span>
           </div>
         </div>
       )}
@@ -855,11 +879,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       {/* ── Header ─────────────────────────────── */}
       <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-lg shadow-sm border-b border-gray-100' : 'bg-[#F8F8FF]/90'}`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
-          {/* Logo + Brand Name */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-            <img src="/logo.png" alt="Vikrams Ads" className="h-9 sm:h-11 w-auto object-contain shrink-0" />
-            <span className="font-extrabold text-base sm:text-lg tracking-tight truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              Vikrams Ads
+          {/* Spotlighted Brand Badge */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0 px-3 py-1.5 rounded-2xl bg-slate-100 border border-slate-300 shadow-sm transition-all">
+            <img src="/logo.png" alt="Vikram Ads" className="h-9 sm:h-11 w-auto object-contain shrink-0 filter drop-shadow-sm" />
+            <span className="font-black text-lg sm:text-xl tracking-tight text-black drop-shadow-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              Vikram Ads
             </span>
           </div>
 
@@ -949,9 +973,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         <div className="max-w-7xl mx-auto px-6 py-14">
           <div className="grid md:grid-cols-3 gap-12 items-start">
             <div className="reveal reveal-left">
-              <div className="flex items-center gap-3 mb-4">
-                <img src="/logo.png" alt="Vikrams Ads" className="h-12 w-auto object-contain" />
-                <span className="font-extrabold text-lg tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>Vikrams Ads</span>
+              <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 rounded-2xl bg-slate-100 border border-slate-300 shadow-sm">
+                <img src="/logo.png" alt="Vikram Ads" className="h-12 w-auto object-contain filter drop-shadow-sm" />
+                <span className="font-black text-xl tracking-tight text-black" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  Vikram Ads
+                </span>
               </div>
               <p className="text-gray-500 text-sm leading-relaxed">{t.footNote}</p>
             </div>
@@ -961,7 +987,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <ul className="space-y-3">
                 {[
                   { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373', color: 'amber' },
-                  { href: 'https://wa.me/919175537373?text=Hello%20Vikrams%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs, color: 'green' },
+                  { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs, color: 'green' },
                   { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com', color: 'amber' },
                   { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com', color: 'amber' },
                 ].map(({ href, icon: Icon, label, color }) => (
