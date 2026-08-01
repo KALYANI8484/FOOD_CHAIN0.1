@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import {
   LayoutDashboard, Package, ShoppingBag, CreditCard, Radar, Trash2,
   DollarSign, Clock, CheckCircle2, AlertCircle, Store, Lock as Padlock,
-  Navigation, AlertTriangle, Upload, Menu, X, Users
+  Navigation, AlertTriangle, Upload, Menu, X, Users, Sparkles, MessageSquare
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
@@ -21,7 +21,7 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
   );
 }
 
-type Tab = 'dashboard' | 'radar' | 'kanban' | 'activation' | 'upgrade';
+type Tab = 'dashboard' | 'menu' | 'radar' | 'kanban' | 'activation' | 'upgrade';
 
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
@@ -41,7 +41,28 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     };
   }, []);
 
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTabState] = useState<Tab>('dashboard');
+
+  const setTab = (newTab: Tab, isPop = false) => {
+    setTabState(newTab);
+    if (!isPop) {
+      window.history.pushState({ vendorTab: newTab, appScreen: 'vendor' }, '', `#vendor/${newTab}`);
+    }
+  };
+
+  useEffect(() => {
+    window.history.replaceState({ vendorTab: 'dashboard', appScreen: 'vendor' }, '', '#vendor/dashboard');
+
+    const handleVendorPopState = (e: PopStateEvent) => {
+      if (e.state && e.state.vendorTab) {
+        setTabState(e.state.vendorTab);
+      }
+    };
+
+    window.addEventListener('popstate', handleVendorPopState);
+    return () => window.removeEventListener('popstate', handleVendorPopState);
+  }, []);
+
   const [vendor, setVendor] = useState<VendorType | null>(null);
   const [activePlan, setActivePlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,6 +119,29 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       }
     })();
   }, [vendorPhone]);
+
+  // Stable ref so refetchVendor always reads current phone without stale closure
+  const vendorPhoneRef = useRef(vendorPhone);
+  vendorPhoneRef.current = vendorPhone;
+
+  const refetchVendor = async () => {
+    try {
+      const qPhone = vendorPhoneRef.current || '';
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'vendors', action: 'select', filters: qPhone ? { phone: qPhone } : {} })
+      });
+      const d = await res.json();
+      if (d.data && d.data.length > 0) {
+        setVendor(d.data[0]);
+      }
+    } catch (e) {
+      console.error('refetchVendor failed:', e);
+    }
+  };
+
+
 
   // POS Beep Chime Generator using browser AudioContext
   const playPOSChime = () => {
@@ -166,6 +210,18 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       }
     });
 
+    socket.on('vendorUpdated', (updatedVendor: VendorType) => {
+      if (vendor && ((updatedVendor as any)._id === (vendor as any)._id || updatedVendor.id === vendor.id)) {
+        setVendor(updatedVendor);
+        show('🎉 Your subscription plan has been updated by Super Admin!', 'success');
+      }
+    });
+
+    // When Super-Admin edits any plan, re-fetch this vendor to pick up cascaded changes
+    socket.on('planUpdated', () => {
+      refetchVendor();
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -175,17 +231,18 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     if (!vendor) return 5;
     if (vendor.plan_name === 'Premium') return Infinity;
     if (vendor.plan_name === 'Standard') return 25;
-    if (vendor.plan_name === 'Basic') return 10;
+    if (vendor.plan_name === 'Basic' || vendor.plan_name === 'Starter') return 10;
     return 5;
   };
   const navLabels = {
-    en: { dashboard: 'Dashboard', radar: 'Order Radar', kanban: 'Active Orders', activation: 'Plan Activation', upgrade: "Plan's", exit: 'Exit' },
-    hi: { dashboard: 'डैशबोर्ड', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लान एक्टिवेशन', upgrade: 'प्लान्स', exit: 'बाहर निकलें' },
-    mr: { dashboard: 'डॅशबोर्ड', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लॅन ॲक्टिव्हेशन', upgrade: 'प्लॅन्स', exit: 'बाहेर पडा' },
+    en: { dashboard: 'Dashboard', menu: 'My Plan Items', radar: 'Order Radar', kanban: 'Active Orders', activation: 'Plan Activation', upgrade: "Plan's", exit: 'Exit' },
+    hi: { dashboard: 'डैशबोर्ड', menu: 'मेरी योजना आइटम', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लान एक्टिवेशन', upgrade: 'प्लान्स', exit: 'बाहर निकलें' },
+    mr: { dashboard: 'डॅशबोर्ड', menu: 'माझ्या प्लॅन आयटम', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लॅन ॲक्टिव्हेशन', upgrade: 'प्लॅन्स', exit: 'बाहेर पडा' },
   }[lang];
 
   const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: navLabels.dashboard, icon: LayoutDashboard },
+    { id: 'menu', label: navLabels.menu, icon: Package },
     { id: 'radar', label: navLabels.radar, icon: Radar },
     { id: 'kanban', label: navLabels.kanban, icon: Navigation },
     { id: 'activation', label: navLabels.activation, icon: CheckCircle2 },
@@ -218,15 +275,85 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           <p className="font-bold text-sm truncate text-text">{vendor.shop_name}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <LanguageSelector />
+          <LanguageSelector direction="down" showLabel={true} />
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-text" aria-label="Toggle Menu">
              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
 
+      {/* ====== GRACE PERIOD BANNER ====== */}
+      {vendor.status === 'grace_period' && (
+        <div className="fixed top-14 lg:top-0 left-0 right-0 z-50 flex items-center justify-between gap-3 bg-amber-500 text-white px-5 py-2.5 shadow-lg">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0" />
+            <span className="text-sm font-bold">
+              ⚠️ Your plan has expired — you are in a <strong>3-day grace period</strong>. You can still view orders but cannot accept new ones.
+            </span>
+          </div>
+          <button
+            onClick={() => setTab('upgrade')}
+            className="shrink-0 px-4 py-1.5 rounded-xl bg-white text-amber-700 text-xs font-extrabold hover:bg-amber-50 transition-colors"
+          >
+            Renew Now →
+          </button>
+        </div>
+      )}
+
+      {/* ====== EXPIRY GATE OVERLAY (full lockout after grace period) ====== */}
+      {vendor.status === 'expired' && (
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center animate-scale-in border border-red-200">
+            <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-5">
+              <AlertCircle size={32} className="text-red-600" />
+            </div>
+            <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Subscription Expired</h2>
+            <p className="text-sm text-gray-500 mb-2">
+              Your subscription has ended and your <strong className="text-gray-800">{vendor.plan_name || 'plan'}</strong> is no longer active.
+            </p>
+            <p className="text-xs text-gray-400 mb-6">
+              Renew your plan to restore full access to orders, radar, kanban, and inventory management.
+            </p>
+
+            <div className="bg-gray-50 rounded-2xl p-4 mb-6 text-left space-y-2 border border-gray-200">
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Your Expired Subscriptions</p>
+              {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
+                vendor.active_subscriptions.map((sub: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-gray-700">{sub.category_name || sub.plan_name || 'General'}</span>
+                    <span className="text-red-500 font-bold">Expired: {sub.subscription_end || 'N/A'}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-700">{vendor.plan_name || 'Basic Plan'}</span>
+                  <span className="text-red-500 font-bold">Expired: {vendor.subscription_end || 'N/A'}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={onExit}
+                className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors"
+              >
+                Exit Portal
+              </button>
+              <button
+                onClick={() => setTab('upgrade')}
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-[#4A0E17] to-[#6d1324] text-[#C5A059] font-extrabold text-sm hover:opacity-90 transition-opacity shadow-lg"
+              >
+                🔓 Renew Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
-      <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} ${
+        vendor.status === 'grace_period' ? 'mt-10 lg:mt-0' : ''
+      }`}>
         <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center group-hover:rotate-12 transition-transform">
             <Store size={18} className="text-white" />
@@ -235,35 +362,47 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
             <p className="font-bold text-sm truncate text-text">{vendor.shop_name}</p>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-14 lg:mt-0">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
-                tab === item.id ? 'bg-accent/10 text-accent font-semibold' : 'text-muted hover:text-text hover:bg-surface-2'
-              }`}
-            >
-              {tab === item.id && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-accent rounded-r-full" />}
-              <item.icon size={18} className={tab === item.id ? '' : 'group-hover:scale-110 transition-transform'} />
-              {item.label}
-              {item.id === 'radar' && radarOrders.filter(o => o.client_zip === vendor.zip_code).length > 0 && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-green-500 animate-ping" />
-              )}
-            </button>
-          ))}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1.5 mt-14 lg:mt-0">
+          {navItems.map((item) => {
+            const isActive = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm transition-all duration-200 group relative cursor-pointer ${
+                  isActive
+                    ? 'bg-[#4A0E17] text-[#C5A059] font-black shadow-md border-l-4 border-[#C5A059]'
+                    : 'text-text hover:text-black hover:bg-surface-2 font-extrabold'
+                }`}
+              >
+                <item.icon size={18} className={isActive ? 'text-[#C5A059]' : 'text-muted group-hover:text-text group-hover:scale-110 transition-transform'} />
+                <span className="truncate">{item.label}</span>
+                {item.id === 'radar' && radarOrders.filter(o => o.client_zip === vendor.zip_code).length > 0 && (
+                  <span className="ml-auto w-2.5 h-2.5 rounded-full bg-green-500 animate-ping shrink-0" />
+                )}
+              </button>
+            );
+          })}
         </nav>
         <div className="p-3 border-t border-border space-y-2">
           <div className="flex justify-center pb-1">
-            <LanguageSelector />
+            <LanguageSelector direction="up" showLabel={true} />
           </div>
           <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>Exit</Button>
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto h-screen relative z-10 bg-bg pt-14 lg:pt-0">
-        <div className="p-8 max-w-7xl mx-auto">
-          {tab === 'dashboard' && <VendorDashboard vendor={vendor} onTab={setTab} />}
+        {/* Sticky Top Header Bar */}
+        <div className="sticky top-0 z-30 bg-surface/90 backdrop-blur-md border-b border-border px-4 sm:px-8 py-2.5 flex items-center justify-between shadow-xs">
+          <span className="text-xs font-bold text-muted uppercase tracking-wider hidden sm:block">Kitchen Partner Dashboard</span>
+          <div className="ml-auto flex items-center gap-2">
+            <LanguageSelector direction="down" showLabel={true} />
+          </div>
+        </div>
+        <div className="px-3.5 py-4 sm:p-8 max-w-7xl mx-auto">
+          {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} />}
+          {tab === 'menu' && <VendorMenu vendor={vendor} show={show} />}
           {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
           {tab === 'activation' && <PlanActivation vendor={vendor} activePlan={activePlan} onTab={setTab} />}
@@ -576,7 +715,202 @@ const vTrans = {
   }
 };
 
+/* ─────────────────────────────────────────────────────────
+   📅 Multi-Plan Validity Timeline Component
+───────────────────────────────────────────────────────── */
+function PlanTimeline({ subscriptions, onTab }: { subscriptions: any[]; onTab?: (t: Tab) => void }) {
+  const [livePlans, setLivePlans] = useState<Record<string, any>>({});
+
+  // Fetch live plan data from subscription_plans to always show fresh Super-Admin values
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'subscription_plans', action: 'select' })
+        });
+        const d = await res.json();
+        const map: Record<string, any> = {};
+        (d.data || []).forEach((p: any) => { map[p._id || p.id] = p; });
+        setLivePlans(map);
+      } catch (e) { /* silent fail — snapshot data shown as fallback */ }
+    })();
+  }, []);
+
+  if (!subscriptions || subscriptions.length === 0) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build enriched subscription list (live plan data merged over snapshot)
+  const enriched = subscriptions.map((sub: any) => {
+    const live = livePlans[sub.plan_id] || {};
+    return {
+      ...sub,
+      plan_name: live.name || sub.plan_name || 'Plan',
+      max_items: live.max_items ?? sub.max_items ?? 5,
+      max_clients: live.max_clients ?? sub.max_clients ?? 5,
+      category_name: sub.category_name || live.master_category_name || 'General',
+      subscription_start: sub.subscription_start || null,
+      subscription_end: sub.subscription_end || null,
+    };
+  });
+
+  // Compute global timeline window
+  const validDates = enriched.flatMap((s: any) =>
+    [s.subscription_start, s.subscription_end].filter(Boolean).map((d: string) => new Date(d).getTime())
+  );
+  const globalStart = validDates.length > 0 ? Math.min(...validDates) : today.getTime();
+  const globalEnd = validDates.length > 0
+    ? Math.max(...validDates)
+    : today.getTime() + 365 * 86400000;
+  const totalRange = Math.max(globalEnd - globalStart, 1);
+
+  // Month tick labels
+  const tickDates: Date[] = [];
+  const cursor = new Date(globalStart);
+  cursor.setDate(1);
+  while (cursor.getTime() <= globalEnd) {
+    tickDates.push(new Date(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  const todayPct = Math.min(100, Math.max(0, ((today.getTime() - globalStart) / totalRange) * 100));
+
+  const urgency = (daysLeft: number) => {
+    if (daysLeft <= 0) return { color: 'bg-zinc-400', text: 'text-zinc-500', badge: 'bg-zinc-100 text-zinc-600 border-zinc-300', label: 'Expired', icon: '⬜' };
+    if (daysLeft <= 7) return { color: 'bg-red-500', text: 'text-red-600', badge: 'bg-red-100 text-red-700 border-red-300', label: `${daysLeft}d left 🔴`, icon: '🔴' };
+    if (daysLeft <= 30) return { color: 'bg-amber-400', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700 border-amber-300', label: `${daysLeft}d left ⚠️`, icon: '⚠️' };
+    return { color: 'bg-emerald-500', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700 border-emerald-300', label: `${daysLeft}d left ✅`, icon: '🟢' };
+  };
+
+  const CATEGORY_ICONS: Record<string, string> = {
+    'Tiffin': '🍱', 'Bakery': '🍞', 'Dairy': '🥛', 'Sweets': '🍮',
+    'Snacks': '🥨', 'Beverages': '🥤', 'South Indian': '🥘',
+    'North Indian': '🫕', 'General': '🍲', 'Free Tier': '🎁',
+  };
+
+  const getCategoryIcon = (cat: string) =>
+    CATEGORY_ICONS[cat] || Object.entries(CATEGORY_ICONS).find(([k]) => cat?.toLowerCase().includes(k.toLowerCase()))?.[1] || '🍽️';
+
+  return (
+    <div className="card p-6 bg-surface border border-border space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-extrabold text-base uppercase tracking-wider text-muted flex items-center gap-2">
+            <span className="text-lg">📅</span> Subscription Validity Timeline
+          </h3>
+          <p className="text-[11px] text-muted mt-0.5">All your active plans — side by side. Dynamically synced with Super-Admin.</p>
+        </div>
+        <span className="text-[10px] font-bold text-muted border border-border rounded-lg px-2 py-1">
+          {enriched.length} Plan{enriched.length > 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Mobile Scroll Indicator */}
+      <div className="sm:hidden flex items-center justify-between px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] font-extrabold text-amber-900">
+        <span>📱 Finger-Scrollable Timeline</span>
+        <span className="animate-pulse">Swipe left/right ↔</span>
+      </div>
+
+      <div className="touch-scroll-x">
+        <div className="min-w-[600px] space-y-4">
+          {/* Month Ruler */}
+          <div className="relative h-6 w-full select-none">
+            {tickDates.map((d, i) => {
+              const pct = ((d.getTime() - globalStart) / totalRange) * 100;
+              if (pct < 0 || pct > 100) return null;
+              return (
+                <span
+                  key={i}
+                  className="absolute top-0 text-[9px] font-bold text-muted/70 whitespace-nowrap"
+                  style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}
+                >
+                  {d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })}
+                </span>
+              );
+            })}
+            {/* Today marker line */}
+            <div
+              className="absolute top-4 bottom-0 w-px bg-accent/60 flex flex-col items-center"
+              style={{ left: `${todayPct}%` }}
+            >
+              <span className="bg-accent text-white text-[8px] font-extrabold px-1 py-px rounded whitespace-nowrap -mt-1">TODAY</span>
+            </div>
+          </div>
+
+          {/* Plan Rows */}
+          <div className="space-y-4">
+            {enriched.map((sub: any, i: number) => {
+              const start = sub.subscription_start ? new Date(sub.subscription_start).getTime() : globalStart;
+              const end = sub.subscription_end ? new Date(sub.subscription_end).getTime() : globalEnd;
+              const daysLeft = Math.ceil((end - today.getTime()) / 86400000);
+              const u = urgency(daysLeft);
+
+              const barLeft = Math.max(0, ((start - globalStart) / totalRange) * 100);
+              const barWidth = Math.min(100 - barLeft, ((end - start) / totalRange) * 100);
+              const catIcon = getCategoryIcon(sub.category_name);
+
+              return (
+                <div key={i} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base shrink-0">{catIcon}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold text-text truncate leading-tight">
+                          {sub.category_name}
+                        </p>
+                        <p className="text-[10px] text-muted truncate">{sub.plan_name} · {sub.max_items} items · {sub.max_clients} clients</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${u.badge}`}>
+                        {u.label}
+                      </span>
+                      {daysLeft <= 30 && (
+                        <a
+                          href={`https://wa.me/919175537373?text=Hello%20Vikram%20Ads%20Admin%2C%20I%20would%20like%20to%20renew%2Fupgrade%20my%20${encodeURIComponent(sub.category_name)}%20category%20plan%20(${encodeURIComponent(sub.plan_name)})%20for%20my%20kitchen.`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer active:scale-95 flex items-center gap-1 shadow-xs"
+                        >
+                          Renew / Upgrade →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Progress Bar Track */}
+                  <div className="relative w-full h-3 rounded-full bg-surface-2 border border-border overflow-visible">
+                    {/* Plan bar */}
+                    <div
+                      className={`absolute top-0 h-full rounded-full ${u.color} transition-all duration-700`}
+                      style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
+                    />
+                    {/* Today line overlay on bar */}
+                    <div
+                      className="absolute top-0 h-full w-0.5 bg-white/80 z-10"
+                      style={{ left: `${todayPct}%` }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between text-[9px] text-muted font-medium">
+                    <span>{sub.subscription_start || '—'}</span>
+                    <span>{sub.subscription_end || '—'}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Tab) => void }) {
+
   const [lang, setLang] = useState<Language>(getInitialLanguage);
 
   useEffect(() => {
@@ -618,11 +952,13 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
     } catch (e) { console.error(e); }
   };
 
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+
   useEffect(() => {
     (async () => {
       try {
         const vId = vendor.id || (vendor as any)._id || '';
-        const [oRes, iRes] = await Promise.all([
+        const [oRes, iRes, bRes] = await Promise.all([
           fetch('/api/db', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ table: 'orders', action: 'select', filters: vId ? { vendor_id: vId } : {} })
@@ -631,9 +967,14 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ table: 'vendor_inventory', action: 'select', filters: vId ? { vendor_id: vId } : {} })
           }).then(r => r.json()).catch(() => ({ data: [] })),
+          fetch('/api/db', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: 'broadcasts', action: 'select', sorts: [{ field: 'created_at', ascending: false }] })
+          }).then(r => r.json()).catch(() => ({ data: [] }))
         ]);
         setOrders(oRes?.data || []);
         setItems(iRes?.data || []);
+        setBroadcasts(bRes?.data || []);
         await loadSuggestions();
       } catch (e) {
         console.error('Error loading vendor dashboard metrics:', e);
@@ -696,8 +1037,29 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="animate-fade-in-up">
-        <h1 className="text-3xl font-extrabold tracking-tight">{t.welcome}, {vendor.owner_name}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-up">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">{t.welcome}, {vendor.owner_name}</h1>
+          <p className="text-xs text-muted mt-1">{vendor.shop_name} · Zip Code: {vendor.zip_code}</p>
+        </div>
+
+        {/* Dynamic Category Subscriptions Pills */}
+        <div className="bg-gradient-to-r from-[#4A0E17] to-[#360910] p-3.5 rounded-2xl border border-[#C5A059]/40 text-[#C5A059] shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-wider text-amber-200/80 mb-1">Active Subscriptions Portfolio</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
+              vendor.active_subscriptions.map((sub: any, i: number) => (
+                <span key={i} className="px-2.5 py-1 rounded-full text-xs font-black bg-[#C5A059] text-[#4A0E17] shadow-xs flex items-center gap-1">
+                  🟢 {sub.category_name || sub.plan_name} ({sub.max_items || 5} items limit)
+                </span>
+              ))
+            ) : (
+              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-[#C5A059] text-[#4A0E17]">
+                🟢 {vendor.plan_name || 'Basic Plan'}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 stagger">
@@ -712,6 +1074,11 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
           </SpotlightCard>
         ))}
       </div>
+
+      {/* Multi-Plan Validity Timeline */}
+      {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 && (
+        <PlanTimeline subscriptions={vendor.active_subscriptions} onTab={onTab} />
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Recent orders */}
@@ -729,7 +1096,7 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
                     </div>
                     <div>
                       <p className="text-sm font-bold text-text">{o.item_name}</p>
-                      <p className="text-[10px] text-muted">{o.client_name} · #{(o.id || o._id || 'ORD12345').toString().slice(0, 8).toUpperCase()}</p>
+                      <p className="text-[10px] text-muted">{o.client_name} · #{(o.id || (o as any)._id || 'ORD12345').toString().slice(0, 8).toUpperCase()}</p>
                     </div>
                   </div>
                   <span className="text-sm font-extrabold text-accent">₹{o.price}</span>
@@ -748,8 +1115,8 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
                 <p className="text-xs text-muted uppercase font-bold">{t.activePlan}</p>
                 <p className="text-xl font-extrabold text-accent">{vendor.plan_name || 'Free'}</p>
               </div>
-              <Badge variant={isPlanExpired ? 'error' : vendor.status === 'approved' ? 'success' : 'warning'}>
-                {isPlanExpired ? t.statusExpired : vendor.status === 'approved' ? t.statusApproved : t.statusPending}
+              <Badge variant={isPlanExpired ? 'error' : vendor.status === 'approved' ? 'success' : vendor.status === 'grace_period' ? 'warning' : 'warning'}>
+                {isPlanExpired || vendor.status === 'expired' ? t.statusExpired : vendor.status === 'grace_period' ? '⚠️ Grace Period' : vendor.status === 'approved' ? t.statusApproved : t.statusPending}
               </Badge>
             </div>
             
@@ -757,6 +1124,56 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
               <div className="flex justify-between"><span>{t.clientsLimitCount}</span><span className="font-semibold text-text">{vendor.total_clients} {t.clientsUnit}</span></div>
               <div className="flex justify-between"><span>{t.daysRemaining}</span><span className="font-semibold text-text">{t.until}: {vendor.subscription_end || '—'}</span></div>
             </div>
+
+            {/* Item Limit Progress Bars per Active Subscription */}
+            {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 && (
+              <div className="pt-3 border-t border-border/50 space-y-2.5">
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted">Item Slot Usage</p>
+                {vendor.active_subscriptions.map((sub: any, i: number) => {
+                  const maxItems = sub.max_items || 5;
+                  // We don't have real inventory count here; show max as reference
+                  const pct = 0; // Will be 0 until vendor fetches real count; progress bar shows capacity
+                  const isAtLimit = pct >= 100;
+                  const isWarning = pct >= 80;
+                  return (
+                    <div key={i}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-bold text-text truncate">{sub.category_name || sub.plan_name || 'General'}</span>
+                        <span className={`text-[10px] font-extrabold ${isAtLimit ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-green-600'}`}>
+                          {maxItems} slots
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-surface-2 border border-border overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${isAtLimit ? 'bg-red-500' : isWarning ? 'bg-amber-400' : 'bg-green-500'}`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                      {sub.subscription_end && (
+                        <p className="text-[9px] text-muted mt-0.5">Expires: {sub.subscription_end}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Grace Period Warning */}
+            {vendor.status === 'grace_period' && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 rounded-xl text-xs space-y-1.5">
+                <p className="font-bold flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                  <AlertCircle size={14} /> Grace Period Active
+                </p>
+                <p className="text-xs leading-relaxed font-medium">
+                  Your plan expired. You have a 3-day grace window — renew now to avoid full lockout.
+                </p>
+                {onTab && (
+                  <Button size="sm" className="w-full mt-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2" onClick={() => onTab('upgrade')}>
+                    Renew Now →
+                  </Button>
+                )}
+              </div>
+            )}
             
             {isPlanExpired && (
               <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-600 rounded-xl text-xs space-y-2.5">
@@ -779,7 +1196,28 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
             )}
           </div>
         </div>
+
       </div>
+
+      {/* Announcements from Super Admin */}
+      {broadcasts.length > 0 && (
+        <div className="card p-6 bg-surface border border-accent/30">
+          <h3 className="font-extrabold text-base mb-4 uppercase tracking-wider text-accent flex items-center gap-2">
+            <MessageSquare size={16} /> Platform Announcements
+          </h3>
+          <div className="space-y-3">
+            {broadcasts.slice(0, 5).map((b: any) => (
+              <div key={b._id || b.id} className="flex gap-3 p-3.5 rounded-xl bg-accent/5 border border-accent/20">
+                <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-text">{b.message}</p>
+                  <p className="text-[10px] text-muted mt-1">{new Date(b.created_at).toLocaleString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Support & Suggestions */}
       <div className="card p-6 bg-surface border border-border">
@@ -842,6 +1280,7 @@ interface OrderRadarProps {
 
 function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadarProps) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     const handleStorage = () => {
@@ -881,10 +1320,13 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
   }, [radarOrders]);
 
   const acceptOrder = async (order: Order, otpAttempt: string) => {
-    if (vendor.status === 'expired') {
-      onTab('upgrade');
+    // Strictly block Free / Unsubscribed or Expired vendors from accepting client orders
+    if (vendor.plan_name === 'Free' || !vendor.plan_name || vendor.status === 'expired' || vendor.status !== 'approved') {
+      setShowUpgradeModal(true);
+      show('Upgrade Subscription Plan Now to accept live client orders.', 'error');
       return;
     }
+
     if (!otpAttempt) {
       show('Please enter the client OTP to confirm', 'error');
       return;
@@ -922,6 +1364,23 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
     onTab('kanban'); // Move to Kanban board
   };
 
+  const visibleRadarOrders = radarOrders;
+
+  const isFreeOrUnsubscribed = vendor.plan_name === 'Free' || !vendor.plan_name || vendor.status === 'expired' || vendor.status !== 'approved';
+
+  // Helper to check if vendor has active subscription covering the order's category
+  const hasCategoryAccess = (orderCategory?: string | null) => {
+    if (isFreeOrUnsubscribed) return false;
+    if (!orderCategory) return true; // General category
+    // Check main active plan category
+    if (!activePlan?.master_category_name || activePlan.master_category_name === orderCategory) return true;
+    // Check multi-subscriptions array
+    if (Array.isArray(vendor.active_subscriptions)) {
+      return vendor.active_subscriptions.some((sub: any) => !sub.category_name || sub.category_name === orderCategory);
+    }
+    return false;
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader 
@@ -931,50 +1390,80 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {radarOrders.filter(o => o.master_category_name === (activePlan?.master_category_name || vendor.plan_name)).map((o) => {
+        {visibleRadarOrders.map((o) => {
           const orderId = o.id || (o as any)._id || '';
-          const isZipMatch = o.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3);
+          const isZipMatch = (o.client_zip || '').substring(0, 3) === (vendor.zip_code || '').substring(0, 3);
           const isActive = vendor.status === 'approved';
-          const isExpired = vendor.status === 'expired';
           const remaining = timers[orderId] ?? 60;
+          const categoryAllowed = hasCategoryAccess(o.master_category_name);
+          const isLockedUpsell = isZipMatch && (!categoryAllowed || isFreeOrUnsubscribed);
           
-          const mins = Math.floor(remaining / 60);
+          const hours = Math.floor(remaining / 3600);
+          const mins = Math.floor((remaining % 3600) / 60);
           const secs = remaining % 60;
-          const formattedTimer = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          const formattedTimer = hours > 0
+            ? `${hours}h ${mins.toString().padStart(2, '0')}m`
+            : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
           // Button classes evaluation based on specifications
           let btnLabel = t.confirmOrder;
           let disabled = false;
-          let showRenew = false;
+          let showUpgradeButton = isLockedUpsell;
 
           if (!isZipMatch) {
             btnLabel = t.outOfZone;
             disabled = true;
-          } else if (isExpired) {
-            btnLabel = t.renewToAccept;
-            showRenew = true;
-          } else if (vendor.plan_name === 'Free' || !vendor.plan_name) {
-            btnLabel = t.paidPlanRequired;
-            disabled = true;
-          } else if (!isActive) {
-            btnLabel = t.awaitingActivation;
-            disabled = true;
+          } else if (isLockedUpsell) {
+            btnLabel = 'Upgrade Subscription Plan Now';
           }
 
           return (
             <div 
               key={orderId} 
-              className={`card p-6 border transition-all flex flex-col justify-between ${
+              className={`card p-6 border transition-all flex flex-col justify-between relative overflow-hidden ${
                 !isZipMatch 
                   ? 'bg-surface-2/40 border-border text-muted/65 shadow-inner' 
+                  : isLockedUpsell
+                  ? 'bg-gradient-to-br from-amber-50/90 to-orange-50/90 border-amber-300 shadow-md ring-2 ring-amber-400/20'
                   : 'bg-surface border-accent/20 shadow-md ring-2 ring-accent/5 scale-[1.02]'
               }`}
             >
+              {/* Blurred Locked Card Overlay for Unsubscribed Categories */}
+              {isLockedUpsell && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-[3px] z-20 p-5 flex flex-col justify-between items-center text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 animate-pulse mt-2">
+                    <Padlock size={24} />
+                  </div>
+                  
+                  <div className="space-y-1 my-auto">
+                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black uppercase tracking-wider">
+                      📍 Nearby Area Cluster ({vendor.zip_code?.substring(0, 3)}xxx)
+                    </span>
+                    <h4 className="font-black text-gray-900 text-base mt-2">
+                      Live Client Order Available
+                    </h4>
+                    <p className="text-xs font-bold text-amber-800 max-w-xs mx-auto">
+                      Category: <span className="font-extrabold text-gray-900">{o.master_category_name || 'General'}</span>
+                    </p>
+                    <p className="text-[11px] text-gray-600 max-w-xs mx-auto italic mt-1">
+                      Upgrade your plan to unlock and claim live client orders in this category!
+                    </p>
+                  </div>
+
+                  <Button 
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer py-3" 
+                    onClick={() => setShowUpgradeModal(true)}
+                  >
+                    <Sparkles size={16} /> Upgrade Plan to Unlock
+                  </Button>
+                </div>
+              )}
+
               <div>
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-extrabold text-base text-text">{o.item_name}</h3>
-                    <p className="text-[10px] text-muted">Proximity: {o.distance_km || '0.8'} km away</p>
+                    <p className="text-[10px] text-muted">Proximity: {o.distance_km || '0.8'} km away (Zip: {o.client_zip})</p>
                   </div>
                   {/* Timer Display */}
                   <Badge variant={remaining < 120 ? 'error' : 'warning'}>
@@ -998,12 +1487,12 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
                     {/* Order Category and Order Summary Items below Landmark */}
                     <div className="mt-2 p-2 bg-amber-100/80 rounded-lg border border-amber-300/80 text-amber-950 space-y-1">
                       <p className="text-xs font-bold text-amber-900">
-                        🏷️ <span className="font-semibold">{t.orderCategory || 'Category'}:</span> <span className="font-extrabold text-amber-950">{getItemTranslation(o.master_category_name || '', lang) || o.master_category_name || 'General'}</span>
+                        🏷️ <span className="font-semibold">{(t as any).orderCategory || 'Category'}:</span> <span className="font-extrabold text-amber-950">{getItemTranslation(o.master_category_name || '', lang) || o.master_category_name || 'General'}</span>
                       </p>
                       <p className="text-xs font-extrabold text-amber-900 flex items-start gap-1">
                         <span>📦</span>
                         <span>
-                          <span className="font-bold">{t.orderItemsSummary || 'Order Items & Quantity'}:</span>{' '}
+                          <span className="font-bold">{(t as any).orderItemsSummary || 'Order Items & Quantity'}:</span>{' '}
                           <span className="font-black text-amber-950 text-sm">{getItemTranslation(o.item_name || '', lang)}</span>
                         </span>
                       </p>
@@ -1011,7 +1500,7 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
                     <p className="text-[10px] text-amber-700/80 mt-1 italic">{t.fullInfoNote}</p>
                   </div>
                   
-                  {isZipMatch && isActive && (
+                  {isZipMatch && isActive && !isFreeOrUnsubscribed && categoryAllowed && (
                     <div className="pt-3">
                       <input
                         type="text"
@@ -1026,12 +1515,12 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
               </div>
 
               <div className="mt-4 pt-4 border-t border-border/50">
-                {showRenew ? (
+                {showUpgradeButton ? (
                   <Button 
-                    className="w-full bg-red-600 hover:bg-red-700 text-white font-extrabold" 
-                    onClick={() => onTab('upgrade')}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold shadow-md flex items-center justify-center gap-1.5 cursor-pointer" 
+                    onClick={() => setShowUpgradeModal(true)}
                   >
-                    Renew Plan to Accept
+                    <Sparkles size={15} /> Upgrade Subscription Plan Now
                   </Button>
                 ) : (
                   <div className="relative group/tooltip">
@@ -1041,7 +1530,13 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
                           ? 'bg-muted/30 border border-border text-muted pointer-events-none' 
                           : 'bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-md'
                       }`}
-                      onClick={() => acceptOrder(o, otpInputs[o.id] || '')}
+                      onClick={() => {
+                        if (isFreeOrUnsubscribed) {
+                          setShowUpgradeModal(true);
+                        } else {
+                          acceptOrder(o, otpInputs[o.id] || '');
+                        }
+                      }}
                       disabled={disabled || (isZipMatch && !(otpInputs[o.id]?.trim()))}
                     >
                       {!isZipMatch && <Padlock size={14} />}
@@ -1061,7 +1556,7 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
           );
         })}
 
-        {radarOrders.filter(o => o.master_category_name === (activePlan?.master_category_name || vendor.plan_name)).length === 0 && (
+        {visibleRadarOrders.length === 0 && (
           <div className="col-span-full">
             <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-amber-500/15 via-orange-500/15 to-amber-500/15 border-2 border-amber-500/40 text-center shadow-xl animate-fade-in my-4 relative overflow-hidden">
               <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-400/20 blur-2xl pointer-events-none" />
@@ -1076,16 +1571,53 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
                   Start receiving live order broadcasts directly from nearby clients on your vendor radar.
                 </p>
                 <button
-                  onClick={() => onTab('subscription')}
+                  onClick={() => setShowUpgradeModal(true)}
                   className="mt-6 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-black text-sm transition-all shadow-xl shadow-amber-500/30 inline-flex items-center gap-2.5 cursor-pointer"
                 >
-                  <Sparkles size={18} /> Upgrade Subscription Plan
+                  <Sparkles size={18} /> Upgrade Subscription Plan Now
                 </button>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* ── Upgrade Subscription Plan Now Modal ── */}
+      {showUpgradeModal && (
+        <Modal
+          open={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          title="Upgrade Subscription Plan Now"
+        >
+          <div className="text-center space-y-5 p-3">
+            <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mx-auto flex items-center justify-center shadow-inner">
+              <Sparkles size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-extrabold text-[#111827]">Upgrade Subscription Plan Now</h3>
+              <p className="text-xs text-[#6B7280] mt-2 max-w-sm mx-auto leading-relaxed">
+                Free Tier accounts cannot claim or accept client orders. Please upgrade your subscription plan to connect with clients and accept live orders.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowUpgradeModal(false)} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setShowUpgradeModal(false);
+                  onTab('upgrade');
+                }}
+                className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <Sparkles size={14} /> Upgrade Subscription Plan Now
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -1203,11 +1735,11 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                   <div>
                     <p className="font-bold text-base text-text">{getItemTranslation(o.item_name || '', lang)}</p>
                     <div className="mt-2 p-2.5 rounded-lg bg-surface border border-border/50 space-y-1 text-xs text-text">
-                      <p><span className="text-muted font-medium">{t.fullName || 'Name'}:</span> <span className="font-bold">{o.client_name || 'N/A'}</span></p>
-                      <p><span className="text-muted font-medium">{t.phone || 'Phone'}:</span> <span className="font-bold text-accent">{o.client_phone || 'N/A'}</span></p>
-                      <p><span className="text-muted font-medium">{t.fullAddress || 'Address'}:</span> {o.client_address || 'N/A'}</p>
-                      <p><span className="text-muted font-medium">{t.pinCode || 'PIN Code'}:</span> {o.client_zip || 'N/A'}</p>
-                      {o.client_landmark && <p><span className="text-muted font-medium">{t.landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
+                      <p><span className="text-muted font-medium">{(t as any).fullName || 'Name'}:</span> <span className="font-bold">{o.client_name || 'N/A'}</span></p>
+                      <p><span className="text-muted font-medium">{(t as any).phone || 'Phone'}:</span> <span className="font-bold text-accent">{o.client_phone || 'N/A'}</span></p>
+                      <p><span className="text-muted font-medium">{(t as any).fullAddress || 'Address'}:</span> {o.client_address || 'N/A'}</p>
+                      <p><span className="text-muted font-medium">{(t as any).pinCode || 'PIN Code'}:</span> {o.client_zip || 'N/A'}</p>
+                      {o.client_landmark && <p><span className="text-muted font-medium">{(t as any).landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -1243,11 +1775,11 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                   <div>
                     <p className="font-bold text-base text-text">{getItemTranslation(o.item_name || '', lang)}</p>
                     <div className="mt-2 p-2.5 rounded-lg bg-surface border border-border/50 space-y-1 text-xs text-text">
-                      <p><span className="text-muted font-medium">{t.fullName || 'Name'}:</span> <span className="font-bold">{o.client_name || 'N/A'}</span></p>
-                      <p><span className="text-muted font-medium">{t.phone || 'Phone'}:</span> <span className="font-bold text-accent">{o.client_phone || 'N/A'}</span></p>
-                      <p><span className="text-muted font-medium">{t.fullAddress || 'Address'}:</span> {o.client_address || 'N/A'}</p>
-                      <p><span className="text-muted font-medium">{t.pinCode || 'PIN Code'}:</span> {o.client_zip || 'N/A'}</p>
-                      {o.client_landmark && <p><span className="text-muted font-medium">{t.landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
+                      <p><span className="text-muted font-medium">{(t as any).fullName || 'Name'}:</span> <span className="font-bold">{o.client_name || 'N/A'}</span></p>
+                      <p><span className="text-muted font-medium">{(t as any).phone || 'Phone'}:</span> <span className="font-bold text-accent">{o.client_phone || 'N/A'}</span></p>
+                      <p><span className="text-muted font-medium">{(t as any).fullAddress || 'Address'}:</span> {o.client_address || 'N/A'}</p>
+                      <p><span className="text-muted font-medium">{(t as any).pinCode || 'PIN Code'}:</span> {o.client_zip || 'N/A'}</p>
+                      {o.client_landmark && <p><span className="text-muted font-medium">{(t as any).landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
                     </div>
                   </div>
                   <Button size="sm" className="w-full bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => transitionOrder(oId, 'delivered')}>
@@ -1274,11 +1806,11 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                 <div key={oId} className="p-3.5 rounded-xl bg-surface-2/50 border border-border/60 space-y-1 text-xs">
                   <p className="font-bold text-sm text-text">{getItemTranslation(o.item_name || '', lang)}</p>
                   <div className="text-xs text-muted space-y-0.5 pt-1 border-t border-border/30">
-                    <p><span className="font-medium">{t.fullName || 'Name'}:</span> <span className="font-bold text-text">{o.client_name || 'N/A'}</span></p>
-                    <p><span className="font-medium">{t.phone || 'Phone'}:</span> {o.client_phone || 'N/A'}</p>
-                    <p><span className="font-medium">{t.fullAddress || 'Address'}:</span> {o.client_address || 'N/A'}</p>
-                    <p><span className="font-medium">{t.pinCode || 'PIN Code'}:</span> {o.client_zip || 'N/A'}</p>
-                    {o.client_landmark && <p><span className="font-medium">{t.landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
+                    <p><span className="font-medium">{(t as any).fullName || 'Name'}:</span> <span className="font-bold text-text">{o.client_name || 'N/A'}</span></p>
+                    <p><span className="font-medium">{(t as any).phone || 'Phone'}:</span> {o.client_phone || 'N/A'}</p>
+                    <p><span className="font-medium">{(t as any).fullAddress || 'Address'}:</span> {o.client_address || 'N/A'}</p>
+                    <p><span className="font-medium">{(t as any).pinCode || 'PIN Code'}:</span> {o.client_zip || 'N/A'}</p>
+                    {o.client_landmark && <p><span className="font-medium">{(t as any).landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
                   </div>
                 </div>
               );
@@ -1600,7 +2132,451 @@ function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; act
             </Button>
           </div>
         </div>
+
+        {/* ── Official Guide Documents & Images Section ── */}
+        <VendorGuidesList />
       </div>
+    </div>
+  );
+}
+
+function VendorGuidesList() {
+  const [guides, setGuides] = useState<any[]>([]);
+  const [selectedGuideImg, setSelectedGuideImg] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/db', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'guides', action: 'select' })
+        });
+        const d = await res.json();
+        setGuides(d.data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, []);
+
+  return (
+    <div className="card p-6 bg-surface border border-border shadow-sm space-y-4 mt-6">
+      <h3 className="text-lg font-extrabold text-text flex items-center gap-2">
+        <span>📚</span> Official Guide Documents & Operating Images
+      </h3>
+      {guides.length === 0 ? (
+        <p className="text-xs text-muted italic">No custom guide documents or images uploaded yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {guides.map((g: any) => {
+            const isImage = g.file_data && (g.file_data.startsWith('data:image') || /\.(png|jpg|jpeg|webp|gif|svg)($|\?)/i.test(g.file_name || ''));
+            return (
+              <div key={g.id || g._id} className="p-4 rounded-2xl bg-surface-2 border border-border space-y-3 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-extrabold text-sm text-text">{g.title}</h4>
+                  {g.file_name && <p className="text-[11px] text-muted font-semibold mt-0.5">{g.file_name}</p>}
+                  {isImage && (
+                    <div className="mt-3 relative group cursor-pointer" onClick={() => setSelectedGuideImg(g.file_data)}>
+                      <img src={g.file_data} alt={g.title} className="w-full h-auto max-h-56 object-contain rounded-xl border border-border/80 bg-white" />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center text-white text-xs font-bold">
+                        Click to View Full Image
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="pt-2">
+                  {isImage ? (
+                    <button
+                      onClick={() => setSelectedGuideImg(g.file_data)}
+                      className="w-full py-2 px-3 bg-accent text-white rounded-xl text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>🔍</span> View Full Image
+                    </button>
+                  ) : g.file_data ? (
+                    <a
+                      href={g.file_data}
+                      download={g.file_name || 'document'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-2 px-3 bg-accent text-white rounded-xl text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                    >
+                      <span>📄</span> Download Document
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal for full image viewing */}
+      <Modal open={!!selectedGuideImg} onClose={() => setSelectedGuideImg(null)} title="Full Image View">
+        {selectedGuideImg && (
+          <div className="space-y-4 text-center">
+            <img src={selectedGuideImg} alt="Guide" className="w-full h-auto max-h-[75vh] object-contain rounded-xl border border-border bg-white mx-auto shadow-md" />
+            <a
+              href={selectedGuideImg}
+              download="guide_image.png"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center px-5 py-2.5 bg-accent text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer"
+            >
+              Download Original Image
+            </a>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────
+   My Active Plan Items Tab Component (Enhanced)
+──────────────────────────────────────────────── */
+function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, type?: any) => void }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+
+  const subs: any[] = Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0
+    ? vendor.active_subscriptions
+    : [{ category_name: vendor.plan_name || 'General', plan_name: vendor.plan_name || 'Free Tier', max_items: 5, max_clients: 5, subscription_end: vendor.subscription_end, status: vendor.status }];
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Is a particular subscription expired?
+  const isPlanExpired = (sub: any) =>
+    sub.status === 'expired' || (sub.subscription_end && sub.subscription_end < today);
+
+  // Total overall item limit (summed across all active subs)
+  const totalCapacity = subs.reduce((acc: number, sub: any) => {
+    const m = sub.max_items ?? 5;
+    return m === -1 ? Infinity : acc + m;
+  }, 0);
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'vendor_inventory',
+          action: 'select',
+          filters: { vendor_id: vendor.id || (vendor as any)._id }
+        })
+      });
+      const d = await res.json();
+      let vendorItems = d.data || [];
+
+      // Fallback: load master items grouped by subscription categories
+      if (vendorItems.length === 0) {
+        const masterRes = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'master_inventory', action: 'select' })
+        });
+        const masterData = await masterRes.json();
+        const masters = masterData.data || [];
+
+        vendorItems = [];
+        subs.forEach((sub: any) => {
+          const subLimit = sub.max_items === -1 ? 10 : (sub.max_items ?? 5);
+          const catItems = masters
+            .filter((m: any) =>
+              !sub.category_name ||
+              sub.category_name === 'General' ||
+              (m.category || '').toLowerCase() === sub.category_name.toLowerCase()
+            )
+            .slice(0, subLimit)
+            .map((m: any) => ({
+              _id: m._id || m.id,
+              id: m.id || m._id,
+              vendor_id: vendor.id || (vendor as any)._id,
+              item_name: m.name,
+              category: sub.category_name || m.category || 'General',
+              plan_category: sub.category_name || 'General',
+              plan_name: sub.plan_name || 'Free Tier',
+              price: m.base_price || 120,
+              image_url: m.image_url,
+              in_stock: true
+            }));
+          vendorItems.push(...catItems);
+        });
+      }
+
+      // Tag each item with its plan_category if not already set
+      vendorItems = vendorItems.map((it: any) => ({
+        ...it,
+        plan_category: it.plan_category || it.category || 'General',
+        plan_name: it.plan_name || vendor.plan_name || 'Free Tier'
+      }));
+
+      setItems(vendorItems);
+    } catch (err) {
+      console.error('Failed to load plan items:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchItems(); }, [vendor]);
+
+  const toggleAvailability = async (item: any) => {
+    const newStock = !(item.in_stock ?? true);
+    setItems(prev => prev.map(i => (i.id === item.id || i._id === item._id ? { ...i, in_stock: newStock } : i)));
+    try {
+      await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'vendor_inventory',
+          action: 'upsert',
+          data: { ...item, vendor_id: vendor.id || (vendor as any)._id, in_stock: newStock }
+        })
+      });
+      show(`Item "${item.item_name}" is now ${newStock ? 'IN STOCK 🟢' : 'OUT OF STOCK 🔴'}`, newStock ? 'success' : 'info');
+    } catch {
+      show('Failed to update item availability', 'error');
+    }
+  };
+
+  // Items matching the active filter chip
+  const filteredItems = activeFilter === 'all'
+    ? items
+    : items.filter(it => (it.plan_category || it.category) === activeFilter);
+
+  // Group filtered items by plan category
+  const groups: Record<string, any[]> = {};
+  filteredItems.forEach(it => {
+    const key = it.plan_category || it.category || 'General';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(it);
+  });
+
+  const CATEGORY_ICONS: Record<string, string> = {
+    'Tiffin': '🍱', 'Bakery': '🍞', 'Dairy': '🥛', 'Sweets': '🍮',
+    'Snacks': '🥨', 'Beverages': '🥤', 'South Indian': '🥘',
+    'North Indian': '🫕', 'General': '🍲', 'Free Tier': '🎁',
+  };
+  const getCatIcon = (cat: string) =>
+    CATEGORY_ICONS[cat] ||
+    Object.entries(CATEGORY_ICONS).find(([k]) => cat?.toLowerCase().includes(k.toLowerCase()))?.[1] || '🍽️';
+
+  const totalCapacityText = totalCapacity === Infinity ? 'Unlimited' : `${items.length} / ${totalCapacity}`;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="My Active Plan Items 📋"
+        subtitle={`Items linked to your active subscription plans · ${vendor.plan_name || 'Free Tier'}`}
+        action={
+          <div className="px-4 py-2.5 rounded-2xl bg-amber-50 border border-amber-300 flex items-center gap-3 shadow-xs">
+            <Package className="text-amber-600 shrink-0" size={20} />
+            <div>
+              <p className="text-[10px] font-black uppercase text-amber-800 tracking-wider">Total Capacity</p>
+              <p className="text-xs font-bold text-amber-900">{totalCapacityText} Items</p>
+            </div>
+          </div>
+        }
+      />
+
+      {/* ── Plan Filter Chips ── */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setActiveFilter('all')}
+          className={`px-3 py-1.5 rounded-full text-xs font-extrabold border transition-all cursor-pointer ${
+            activeFilter === 'all'
+              ? 'bg-accent text-white border-accent shadow-sm'
+              : 'bg-surface text-muted border-border hover:border-accent/50'
+          }`}
+        >
+          All Plans ({items.length})
+        </button>
+        {subs.map((sub: any, i: number) => {
+          const cat = sub.category_name || 'General';
+          const count = subs.length === 1
+            ? items.length
+            : items.filter(it =>
+                (it.plan_category || it.category || 'General').toLowerCase() === cat.toLowerCase()
+              ).length;
+          const expired = isPlanExpired(sub);
+          return (
+            <button
+              key={i}
+              onClick={() => setActiveFilter(cat)}
+              className={`px-3 py-1.5 rounded-full text-xs font-extrabold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeFilter === cat
+                  ? 'bg-accent text-white border-accent shadow-sm'
+                  : expired
+                  ? 'bg-zinc-100 text-zinc-500 border-zinc-300 opacity-70'
+                  : 'bg-surface text-muted border-border hover:border-accent/50'
+              }`}
+            >
+              {getCatIcon(cat)} {cat} ({count}) {expired && '🔒'}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading ? (
+        <div className="p-12 text-center bg-surface rounded-2xl border border-border">
+          <Spinner />
+          <p className="text-xs text-muted mt-2 font-medium">Loading your active plan items...</p>
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<Package size={24} />}
+          title="No Items Allocated Yet"
+          subtitle="Your active plan items will appear here automatically based on your subscription tiers."
+        />
+      ) : (
+        <div className="space-y-8">
+          {subs
+            .filter((sub: any) => {
+              const cat = sub.category_name || 'General';
+              return activeFilter === 'all' || activeFilter === cat;
+            })
+            .map((sub: any, si: number) => {
+              const cat = sub.category_name || 'General';
+              const planName = sub.plan_name || 'Free Tier';
+              const maxItems = sub.max_items === -1 ? Infinity : (sub.max_items ?? 5);
+              // Primary: exact category match; fallback: show all filtered items (handles vendor_inventory without plan_category tag)
+              const groupItems = (groups[cat] && groups[cat].length > 0)
+                ? groups[cat]
+                : subs.length === 1
+                  ? filteredItems
+                  : filteredItems.filter(it =>
+                      (it.plan_category || it.category || 'General').toLowerCase() === cat.toLowerCase() ||
+                      it.plan_category === cat ||
+                      it.category === cat
+                    );
+              const usedCount = groupItems.length;
+              const pct = maxItems === Infinity ? 0 : Math.min(100, (usedCount / maxItems) * 100);
+              const expired = isPlanExpired(sub);
+              const catIcon = getCatIcon(cat);
+
+              return (
+                <div key={si} className="space-y-4">
+                  {/* ── Plan Group Header ── */}
+                  <div className={`p-4 rounded-2xl border ${expired ? 'bg-zinc-50 border-zinc-300' : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'}`}>
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{catIcon}</span>
+                        <div>
+                          <p className={`font-extrabold text-sm ${expired ? 'text-zinc-500' : 'text-text'}`}>
+                            {cat}
+                            {expired && <span className="ml-2 text-[10px] font-black text-red-600 bg-red-100 border border-red-300 px-1.5 py-px rounded-full">EXPIRED</span>}
+                          </p>
+                          <p className="text-[10px] text-muted font-bold">{planName}</p>
+                        </div>
+                      </div>
+
+                      {/* Per-plan capacity pill */}
+                      <div className="text-right shrink-0">
+                        <p className={`text-xs font-extrabold ${pct >= 100 ? 'text-red-600' : pct >= 80 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {maxItems === Infinity ? `${usedCount} / Unlimited` : `${usedCount} / ${maxItems}`} items
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Capacity progress bar */}
+                    {maxItems !== Infinity && (
+                      <div className="mt-3">
+                        <div className="w-full h-2 rounded-full bg-white border border-border overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${
+                              expired ? 'bg-zinc-400' : pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-400' : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        {expired && (
+                          <p className="text-[10px] text-red-600 font-bold mt-1">
+                            🔒 Plan expired — renew to re-activate these items
+                          </p>
+                        )}
+                        {!expired && sub.subscription_end && (
+                          <p className="text-[9px] text-muted mt-1">Valid until {sub.subscription_end}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Item Cards Grid ── */}
+                  {groupItems.length === 0 ? (
+                    <p className="text-xs text-muted italic pl-2">No items in this plan category yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {groupItems.map((item: any) => {
+                        const inStock = item.in_stock ?? true;
+                        return (
+                          <div
+                            key={item.id || item._id}
+                            className={`relative card p-4 sm:p-5 bg-surface border transition-all duration-200 flex flex-col justify-between space-y-4 ${
+                              expired
+                                ? 'border-zinc-200 opacity-60 pointer-events-none'
+                                : inStock
+                                ? 'border-border hover:border-amber-400/60 shadow-xs'
+                                : 'border-red-200 bg-red-50/20 opacity-80'
+                            }`}
+                          >
+                            {/* 🔒 Expired Plan Overlay */}
+                            {expired && (
+                              <div className="absolute inset-0 z-10 rounded-[inherit] flex flex-col items-center justify-center bg-zinc-100/80 backdrop-blur-[2px] gap-1">
+                                <span className="text-2xl">🔒</span>
+                                <p className="text-[10px] font-extrabold text-zinc-600 text-center px-3">Plan Expired<br/>Renew to re-activate</p>
+                              </div>
+                            )}
+
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center overflow-hidden shrink-0">
+                                  {item.image_url ? (
+                                    <img src={item.image_url} alt={item.item_name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-2xl">🍲</span>
+                                  )}
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 ${
+                                  inStock ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-800 border border-red-300'
+                                }`}>
+                                  <span className={`w-2 h-2 rounded-full ${inStock ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                                  {inStock ? 'In Stock' : 'Out of Stock'}
+                                </span>
+                              </div>
+
+                              <div>
+                                <h3 className="font-extrabold text-base text-text leading-snug">{getItemTranslation(item.item_name, 'en')}</h3>
+                                <p className="text-xs text-muted font-bold mt-0.5">{item.category || 'General'}</p>
+                              </div>
+
+                              <p className="text-lg font-black text-amber-600">₹{item.price}</p>
+                            </div>
+
+                            <div className="pt-3 border-t border-border/80">
+                              <button
+                                onClick={() => toggleAvailability(item)}
+                                className={`w-full h-11 px-4 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                                  inStock
+                                    ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-300'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                }`}
+                              >
+                                {inStock ? '🔴 Mark Out of Stock' : '🟢 Mark In Stock'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }

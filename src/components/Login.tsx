@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff,
   UserPlus, ChevronLeft, Phone, MapPin, Calendar,
-  Hash, Store, Users, Shield
+  Hash, Store, Users, Shield, UtensilsCrossed
 } from 'lucide-react';
 import { Spinner, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { AntigravitySuccessModal, CelebratorySubmitButton } from './AntigravitySuccessModal';
@@ -18,10 +18,10 @@ const loginTranslations = {
     userPlaceholder: "admin@email.com or +91 99999...",
     passLabel: "Password / Date of Birth",
     passPlaceholder: "Password or DDMMYYYY (e.g. 19072004)",
-    hint: "Vendors: enter your DOB as 8 digits with no spaces, slashes, or dashes.",
-    registration: "Registration",
+    hint: "Kitchen accounts: enter your DOB as 8 digits with no spaces, slashes, or dashes.",
+    registration: "New Registration",
     signIn: "Sign In to Dashboard",
-    vendorRegTitle: "Vendor Sign-Up",
+    vendorRegTitle: "Kitchen Partner Sign-Up",
     vendorRegSub: "Register your kitchen to start receiving orders instantly.",
     loginCredTitle: "YOUR LOGIN CREDENTIALS",
     usernameRule: "🔑 Username = Your Phone Number",
@@ -49,10 +49,10 @@ const loginTranslations = {
     userPlaceholder: "admin@email.com या +91 99999...",
     passLabel: "पासवर्ड / जन्म तिथि (DOB)",
     passPlaceholder: "पासवर्ड या DDMMYYYY (उदा. 19072004)",
-    hint: "विक्रेता: अपनी जन्म तिथि 8 अंकों में बिना किसी स्पेस या डैश के दर्ज करें।",
+    hint: "रसोई खाते: अपनी जन्म तिथि 8 अंकों में बिना किसी स्पेस या डैश के दर्ज करें।",
     registration: "नया पंजीकरण",
     signIn: "डैशबोर्ड में साइन इन करें",
-    vendorRegTitle: "विक्रेता (वेंडर) साइन-अप",
+    vendorRegTitle: "रसोई पार्टनर साइन-अप",
     vendorRegSub: "तुरंत ऑर्डर प्राप्त करना शुरू करने के लिए अपनी रसोई पंजीकृत करें।",
     loginCredTitle: "आपके लॉगिन क्रेडेंशियल",
     usernameRule: "🔑 यूजरनेम = आपका फोन नंबर",
@@ -80,10 +80,10 @@ const loginTranslations = {
     userPlaceholder: "admin@email.com किंवा +91 99999...",
     passLabel: "पासवर्ड / जन्मतारीख (DOB)",
     passPlaceholder: "पासवर्ड किंवा DDMMYYYY (उदा. 19072004)",
-    hint: "विक्रेते: तुमची जन्मतारीख ८ अंकांत कोणत्याही स्पेसशिवाय प्रविष्ट करा.",
+    hint: "किचन खाती: तुमची जन्मतारीख ८ अंकांत कोणत्याही स्पेसशिवाय प्रविष्ट करा.",
     registration: "नवीन नोंदणी",
     signIn: "डॅशबोर्डवर साइन इन करा",
-    vendorRegTitle: "विक्रेता (व्हेंडर) सायनिं-अप",
+    vendorRegTitle: "किचन पार्टनर सायनिं-अप",
     vendorRegSub: "झटपट ऑर्डर मिळवणे सुरू करण्यासाठी तुमच्या किचनची नोंदणी करा.",
     loginCredTitle: "तुमची लॉगिन माहिती (क्रेडेंशियल्स)",
     usernameRule: "🔑 युझरनेम = तुमचा फोन नंबर",
@@ -145,10 +145,11 @@ function Field({
 
 /* ── Main Component ────────────────────────────── */
 export function Login({
-  onLogin, onBack
+  onLogin, onBack, initialMode = 'login'
 }: {
   onLogin: (r: 'super_admin' | 'sub_admin' | 'vendor', cred?: string) => void;
   onBack: () => void;
+  initialMode?: AuthMode;
 }) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const t = loginTranslations[lang];
@@ -168,7 +169,7 @@ export function Login({
     };
   }, []);
 
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -177,7 +178,7 @@ export function Login({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const [sf, setSf] = useState({ name: '', phone: '', dob: '', address: '', pincode: '' });
+  const [sf, setSf] = useState({ name: '', shop_name: '', category: 'Tiffin', phone: '', dob: '', address: '', pincode: '' });
   const patch = (k: keyof typeof sf) => (v: string) => setSf(p => ({ ...p, [k]: v }));
 
   const switchMode = (m: AuthMode) => { setMode(m); setError(''); setSuccess(''); };
@@ -202,10 +203,11 @@ export function Login({
   const handleSignup = async () => {
     setError(''); setSuccess('');
     if (!sf.name || !sf.phone || !sf.dob || !sf.address || !sf.pincode) {
-      setError('All fields are required'); return;
+      setError('All required fields must be completed'); return;
     }
-    if (!/^\d{8}$/.test(sf.dob)) {
-      setError('Date of Birth must be exactly 8 digits in DDMMYYYY format'); return;
+    const cleanDob = sf.dob.replace(/\D/g, '');
+    if (cleanDob.length !== 8) {
+      setError('Date of Birth must be exactly 8 digits in DDMMYYYY format (e.g. 19072004)'); return;
     }
     if (!/^\d{6}$/.test(sf.pincode)) {
       setError('PIN Code must be exactly 6 digits.'); return;
@@ -217,10 +219,11 @@ export function Login({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           owner_name: sf.name,
-          shop_name: sf.name,
+          shop_name: sf.shop_name || sf.name,
+          category: sf.category || 'Tiffin',
           phone: sf.phone,
-          dob: sf.dob,
-          birthdate: sf.dob,
+          dob: cleanDob,
+          birthdate: cleanDob,
           address: sf.address,
           zip_code: sf.pincode
         })
@@ -228,9 +231,12 @@ export function Login({
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Registration failed');
       else {
+        // Pre-fill login credentials for seamless 1-click login!
+        setUsername(sf.phone);
+        setPassword(cleanDob);
         setShowAntigravityModal(true);
-        setSuccess('Application submitted! Your vendor account is active with Free Tier.');
-        setSf({ name: '', phone: '', dob: '', address: '', pincode: '' });
+        setSuccess('Application submitted! Your account is active with Free Tier.');
+        setSf({ name: '', shop_name: '', category: 'Tiffin', phone: '', dob: '', address: '', pincode: '' });
       }
     } catch { setError('Network error — please try again'); }
     finally { setLoading(false); }
@@ -255,33 +261,32 @@ export function Login({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8F8FF] px-6 py-12 relative" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F4EF] px-4 sm:px-6 py-6 sm:py-12 relative" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
         <AntigravitySuccessModal
           open={showAntigravityModal}
           onClose={() => setShowAntigravityModal(false)}
-          title="Application Submitted!"
-          subtitle="Your vendor application has been executed in a zero-gravity isolated workspace. All systems operational — Free Tier Plan Auto-Assigned!"
-          primaryActionText="Submit"
+          title="Registration Successful!"
+          subtitle="Your application has been submitted successfully. Your login credentials have been prepared."
+          primaryActionText="OK, Sign In"
           onPrimaryAction={() => switchMode('login')}
         />
 
-        {/* Back button */}
-        <button
-          onClick={onBack}
-          className="absolute top-6 left-6 flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-semibold transition-colors group"
-        >
-          <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          {t.backToHome}
-        </button>
-
-        {/* Language Selector Top Right */}
-        <div className="absolute top-6 right-6">
-          <LanguageSelector />
+        {/* Top-right Language Selector & Back button */}
+        <div className="absolute top-6 left-6 right-6 flex items-center justify-between pointer-events-none z-10">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-semibold transition-colors group pointer-events-auto"
+          >
+            <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            {t.backToHome}
+          </button>
+          <div className="pointer-events-auto">
+            <LanguageSelector />
+          </div>
         </div>
 
         <div className="w-full max-w-md animate-scale-in">
-
           {/* ── LOGIN ───────────────────────────── */}
           {mode === 'login' && (
             <div className="space-y-6">
@@ -316,7 +321,7 @@ export function Login({
                     <button
                       type="button"
                       onClick={() => switchMode('signup')}
-                      className="text-xs text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1 hover:underline"
+                      className="text-xs text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1 hover:underline cursor-pointer"
                     >
                       <UserPlus size={13} /> {t.registration}
                     </button>
@@ -332,7 +337,7 @@ export function Login({
                 <button
                   onClick={handleLogin}
                   disabled={loading || !username || !password}
-                  className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-sm transition-all shadow-lg shadow-amber-200 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+                  className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-sm transition-all shadow-lg shadow-amber-200 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {loading ? <Spinner /> : <><ArrowRight size={16} /> {t.signIn}</>}
                 </button>
@@ -363,6 +368,8 @@ export function Login({
 
               <div className="space-y-3">
                 <Field label={t.fullNameLabel} placeholder={t.fullNamePlaceholder} value={sf.name} onChange={patch('name')} icon={UserPlus} />
+                <Field label="SHOP / KITCHEN NAME" placeholder="e.g. Kolhapur Tiffin Express (optional)" value={sf.shop_name} onChange={patch('shop_name')} icon={Store} />
+
                 <Field
                   label={t.phoneLabel}
                   placeholder={t.phonePlaceholder}
@@ -375,7 +382,8 @@ export function Login({
                 <Field
                   label={t.dobLabel}
                   placeholder={t.dobPlaceholder}
-                  value={sf.dob} onChange={patch('dob')}
+                  value={sf.dob}
+                  onChange={(v) => patch('dob')(v.replace(/\D/g, '').slice(0, 8))}
                   icon={Calendar}
                   maxLength={8}
                   hint="Strictly 8 digits — no slashes, dashes, or spaces. Example: 19072004 for July 19, 2004."

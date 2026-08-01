@@ -47,7 +47,10 @@ const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024 } // 15 MB limit
 });
 
-// Connect to MongoDB
+// Disable Mongoose query buffering so disconnected DB immediately returns error instead of 10s timeout
+mongoose.set('bufferCommands', false);
+
+// Connect to MongoDB with automatic fallback
 let MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI || MONGODB_URI.includes('<db_password>')) {
   console.log('Using local MongoDB fallback as no password was provided in .env');
@@ -55,9 +58,25 @@ if (!MONGODB_URI || MONGODB_URI.includes('<db_password>')) {
 }
 console.log('Connecting to MongoDB...');
 
-mongoose.connect(MONGODB_URI)
-  .then(async () => {
-    console.log('Connected to MongoDB successfully.');
+const initDb = async () => {
+  try {
+    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
+    console.log('Connected to MongoDB Atlas successfully.');
+  } catch (err) {
+    console.error('MongoDB primary connection notice:', err.message);
+    if (MONGODB_URI !== 'mongodb://127.0.0.1:27017/vikram_advertising') {
+      console.log('⚠️ Atlas IP restriction detected. Attempting local MongoDB fallback (mongodb://127.0.0.1:27017/vikram_advertising)...');
+      try {
+        await mongoose.connect('mongodb://127.0.0.1:27017/vikram_advertising', { serverSelectionTimeoutMS: 5000 });
+        console.log('Connected to local MongoDB successfully.');
+      } catch (localErr) {
+        console.error('Local MongoDB connection failed as well:', localErr.message);
+        console.log('💡 Tip: Whitelist your current IP (0.0.0.0/0 for dev) in MongoDB Atlas Network Access.');
+      }
+    }
+  }
+
+  if (mongoose.connection.readyState === 1) {
     try {
       await Vendor.updateMany(
         { $or: [{ plan_name: null }, { plan_name: 'Free' }, { plan_name: 'pending' }, { plan_name: { $exists: false } }] },
@@ -66,11 +85,93 @@ mongoose.connect(MONGODB_URI)
     } catch (err) {
       console.error('Vendor plan auto-migration notice:', err.message);
     }
-  })
-  .catch(err => {
-    console.error('MongoDB connection error:', err);
-    console.log('Please make sure a local MongoDB instance is running, or specify a valid MONGODB_URI with credentials in your .env file.');
-  });
+
+    try {
+      // Legacy Vendors Auto-Repair Migration: seed missing active_subscriptions
+      const legacyVendors = await Vendor.find({
+        $or: [
+          { active_subscriptions: { $exists: false } },
+          { active_subscriptions: { $size: 0 } },
+          { active_subscriptions: null }
+        ]
+      });
+      for (const lv of legacyVendors) {
+        const defaultSub = {
+          id: crypto.randomUUID(),
+          plan_name: lv.plan_name || 'Free Tier',
+          category_name: 'General',
+          subscription_start: lv.subscription_start || new Date().toISOString().slice(0, 10),
+          subscription_end: lv.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+          max_items: 5,
+          max_clients: lv.total_clients || 10,
+          status: lv.status === 'expired' ? 'expired' : 'active'
+        };
+        await Vendor.updateOne({ _id: lv._id }, { $set: { active_subscriptions: [defaultSub] } });
+        console.log(`[MIGRATION] Seeded active_subscriptions for legacy vendor: ${lv.shop_name}`);
+      }
+    } catch (err) {
+      console.error('Legacy vendor auto-repair notice:', err.message);
+    }
+
+    // ─── Auto-Expiry & Grace Period Cron (runs every 24 hours) ───────────────────
+    const runExpiryCron = async () => {
+      try {
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+        const graceCutoff = new Date(now.getTime() - 3 * 86400000).toISOString().slice(0, 10);
+
+        // 1. Vendors past 3-day grace period → full expired lockout
+        const fullyExpired = await Vendor.find({
+          status: { $in: ['approved', 'grace_period'] },
+          subscription_end: { $lt: graceCutoff }
+        });
+        for (const v of fullyExpired) {
+          const updatedSubs = (v.active_subscriptions || []).map(s => ({ ...s, status: 'expired' }));
+          await Vendor.updateOne({ _id: v._id }, { $set: { status: 'expired', active_subscriptions: updatedSubs } });
+          console.log(`[CRON] Fully expired: ${v.shop_name}`);
+        }
+
+        // 2. Vendors expired today OR within last 3 days → grace period
+        const inGrace = await Vendor.find({
+          status: 'approved',
+          subscription_end: { $gte: graceCutoff, $lt: todayStr }
+        });
+        for (const v of inGrace) {
+          await Vendor.updateOne({ _id: v._id }, { $set: { status: 'grace_period' } });
+          console.log(`[CRON] Grace period: ${v.shop_name}`);
+        }
+
+        // 3. Send renewal reminders via broadcasts table (7d, 1d, 0d before expiry)
+        const in7Days = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+        const in1Day  = new Date(now.getTime() + 1 * 86400000).toISOString().slice(0, 10);
+
+        const remindVendors = await Vendor.find({
+          status: 'approved',
+          subscription_end: { $in: [in7Days, in1Day, todayStr] }
+        });
+        for (const v of remindVendors) {
+          const daysLeft = Math.ceil((new Date(v.subscription_end).getTime() - now.getTime()) / 86400000);
+          const msg = daysLeft > 1
+            ? `⚠️ ${v.shop_name}: Your plan expires in ${daysLeft} days. Renew now to avoid service disruption.`
+            : daysLeft === 1
+              ? `🚨 URGENT — ${v.shop_name}: Your plan expires TOMORROW. Tap here to renew instantly.`
+              : `🔴 ${v.shop_name}: Your plan has expired today. Your store is now in a 3-day grace period.`;
+          await Broadcast.create({ message: msg, type: 'warning', target_vendor_id: String(v._id) });
+          console.log(`[CRON] Renewal reminder sent: ${v.shop_name} (${daysLeft}d)`);
+        }
+
+        console.log('[CRON] Expiry sweep complete.');
+      } catch (err) {
+        console.error('[CRON] Expiry cron error:', err.message);
+      }
+    };
+
+    runExpiryCron();
+    setInterval(runExpiryCron, 24 * 60 * 60 * 1000);
+  }
+};
+
+initDb();
 
 const schemaOptions = {
   toJSON: {
@@ -118,7 +219,9 @@ const planSchema = new mongoose.Schema({
   max_items: { type: Number, required: true },
   max_clients: { type: Number, required: true },
   master_category_name: { type: String, default: null },
+  badge: { type: String, default: null },
   status: { type: String, default: 'active' },
+  features: { type: [String], default: [] },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
@@ -128,6 +231,8 @@ const addonSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   validity_days: { type: Number, required: true },
   max_clients: { type: Number, required: true },
+  addon_type: { type: String, default: 'client_extension' },
+  max_items: { type: Number, default: 0 },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
@@ -144,8 +249,9 @@ const masterItemSchema = new mongoose.Schema({
 
 const subInventorySchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
-  master_inventory_id: { type: String, required: true },
-  name: { type: String, required: true },
+  vendor_id: { type: String, required: true },
+  item_name: { type: String, required: true },
+  category: { type: String, default: null },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true },
   uom: { type: String, default: 'pc' },
@@ -175,6 +281,7 @@ const vendorSchema = new mongoose.Schema({
   total_clients: { type: Number, default: 0 },
   addon_max_clients: { type: Number, default: 0 },
   addon_name: { type: String, default: null },
+  active_subscriptions: { type: Array, default: [] },
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
@@ -227,6 +334,9 @@ const settingsSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   logo_url: { type: String, default: null },
   qr_url: { type: String, default: null },
+  maintenance_mode: { type: Boolean, default: false },
+  live_orders_offset: { type: Number, default: 764 },
+  support_email: { type: String, default: 'support@vikramads.com' },
   updated_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
@@ -245,6 +355,13 @@ const upgradeRequestSchema = new mongoose.Schema({
   requested_plan: { type: String, required: true },
   payment_status: { type: String, default: 'Pending' },
   status: { type: String, default: 'pending' },
+  created_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
+const broadcastSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  message: { type: String, required: true },
+  type: { type: String, default: 'info' }, // info, warning, success
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
@@ -272,6 +389,7 @@ const Settings = mongoose.model('Settings', settingsSchema, 'settings');
 const Activity = mongoose.model('Activity', activitySchema, 'activity_log');
 const UpgradeRequest = mongoose.model('UpgradeRequest', upgradeRequestSchema, 'upgrade_requests');
 const ClientProfile = mongoose.model('ClientProfile', clientSchema, 'clients');
+const Broadcast = mongoose.model('Broadcast', broadcastSchema, 'broadcasts');
 
 const Addon = mongoose.model('Addon', addonSchema, 'addons');
 
@@ -303,6 +421,20 @@ const vendorSuggestionSchema = new mongoose.Schema({
 
 const VendorSuggestion = mongoose.model('VendorSuggestion', vendorSuggestionSchema, 'vendor_suggestions');
 
+const faqSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  question: { type: String, required: true },
+  answer: { type: String, required: true },
+  category: { type: String, default: 'general' }, // 'general' | 'vendor' | 'sub_admin' | 'platform'
+  allowed_roles: { type: [String], default: ['vendor', 'sub_admin'] },
+  is_pinned: { type: Boolean, default: false },
+  read_count: { type: Number, default: 0 },
+  created_at: { type: String, default: () => new Date().toISOString() },
+  updated_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
+const Faq = mongoose.model('Faq', faqSchema, 'faqs');
+
 const models = {
   super_admins: SuperAdmin,
   sub_admins: SubAdmin,
@@ -314,10 +446,12 @@ const models = {
   vendor_inventory: VendorItem,
   orders: Order,
   guides: Guide,
+  faqs: Faq,
   settings: Settings,
   activity_log: Activity,
   upgrade_requests: UpgradeRequest,
   subadmin_requests: SubadminRequest,
+  broadcasts: Broadcast,
   vendor_suggestions: VendorSuggestion,
   clients: ClientProfile
 };
@@ -461,6 +595,10 @@ app.get('/api/uploads/:key', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Database is connecting or offline. Please verify your internet connection or MongoDB Atlas IP whitelist.' });
+  }
+
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Missing credentials' });
@@ -567,12 +705,27 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/vendors/signup', async (req, res) => {
   try {
-    const { owner_name, shop_name, phone, birthdate, dob, address, zip_code } = req.body;
+    const { owner_name, shop_name, category, primary_category, phone, birthdate, dob, address, zip_code } = req.body;
     const rawPhone = (phone || '').toString().trim();
     const rawDob = (birthdate || dob || '').toString().trim();
     const cleanPhone = rawPhone.replace(/\D/g, '');
     const cleanDob = rawDob.replace(/\D/g, '');
     const passwordVal = cleanDob || rawDob;
+    const catName = (category || primary_category || 'General').trim();
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const nextYearStr = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
+
+    const defaultSub = {
+      id: crypto.randomUUID(),
+      category_name: catName,
+      plan_name: 'Free Tier',
+      status: 'active',
+      max_items: 5,
+      max_clients: 5,
+      subscription_start: todayStr,
+      subscription_end: nextYearStr
+    };
 
     // Check if vendor with phone already exists
     const existing = await Vendor.findOne({
@@ -588,6 +741,10 @@ app.post('/api/vendors/signup', async (req, res) => {
       existing.password = passwordVal;
       existing.status = 'approved';
       existing.plan_name = existing.plan_name || 'Free Tier';
+      if (shop_name) existing.shop_name = shop_name.trim();
+      if (!Array.isArray(existing.active_subscriptions) || existing.active_subscriptions.length === 0) {
+        existing.active_subscriptions = [defaultSub];
+      }
       await existing.save();
       return res.json({ data: existing, error: null });
     }
@@ -602,6 +759,7 @@ app.post('/api/vendors/signup', async (req, res) => {
       zip_code: (zip_code || '').trim(),
       status: 'approved',
       plan_name: 'Free Tier',
+      active_subscriptions: [defaultSub],
       subscription_start: new Date().toISOString(),
       subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
     });
@@ -609,9 +767,13 @@ app.post('/api/vendors/signup', async (req, res) => {
     await newVendor.save();
     
     await Activity.create({
-      action: `New vendor ${owner_name} signed up and auto-assigned Free Tier plan`,
+      action: `New vendor ${shop_name || owner_name} (${catName}) signed up and auto-assigned Free Tier plan`,
       actor: cleanPhone || rawPhone
     });
+
+    // Real-time broadcast to Super-Admin and Sub-Admin dashboards
+    io.emit('vendorAdded', newVendor);
+    io.emit('activityAdded');
     
     res.json({ data: newVendor, error: null });
   } catch (err) {
@@ -621,6 +783,10 @@ app.post('/api/vendors/signup', async (req, res) => {
 
 // Generic Database Handler matching Supabase JS queries
 app.post('/api/db', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Database is connecting or offline. Please check your internet connection or MongoDB Atlas IP whitelist.' });
+  }
+
   const { table, action, data, filters, sorts, limit, single } = req.body;
   const Model = models[table];
   
@@ -733,6 +899,11 @@ app.post('/api/db', async (req, res) => {
           }, 10 * 60 * 1000);
           orderTimers.set(doc.id, timer);
         }
+
+        // Broadcast new plan to all connected vendor dashboards
+        if (table === 'subscription_plans') {
+          io.emit('planUpdated', responseData);
+        }
         break;
       }
 
@@ -810,6 +981,43 @@ app.post('/api/db', async (req, res) => {
             }
           }
         }
+
+        // When a subscription plan is edited by Super-Admin:
+        // 1. Cascade updated name/limits to all vendors holding this plan
+        // 2. Emit vendorUpdated for each affected vendor so their dashboards refresh
+        // 3. Emit planUpdated so all vendor frontends re-fetch live plan list
+        if (table === 'subscription_plans' && updated.length > 0) {
+          const updatedPlan = updated[0];
+          try {
+            const affectedVendors = await Vendor.find({
+              'active_subscriptions.plan_id': updatedPlan._id
+            });
+            for (const v of affectedVendors) {
+              v.active_subscriptions = v.active_subscriptions.map(sub =>
+                sub.plan_id === updatedPlan._id
+                  ? {
+                      ...sub,
+                      plan_name: updatedPlan.name,
+                      max_items: updatedPlan.max_items,
+                      max_clients: updatedPlan.max_clients
+                    }
+                  : sub
+              );
+              await v.save();
+              io.emit('vendorUpdated', v.toJSON());
+            }
+            console.log(`[Plan Cascade] Plan "${updatedPlan.name}" updated → cascaded to ${affectedVendors.length} vendor(s)`);
+          } catch (cascadeErr) {
+            console.error('[Plan Cascade] Error cascading plan update to vendors:', cascadeErr);
+          }
+          io.emit('planUpdated', updatedPlan);
+        }
+
+        if (table === 'vendors' && updated.length > 0) {
+          for (const vDoc of updated) {
+            io.emit('vendorUpdated', vDoc);
+          }
+        }
         break;
       }
 
@@ -846,6 +1054,11 @@ app.post('/api/db', async (req, res) => {
           await doc.deleteOne();
         }
         responseData = { success: true, count: docs.length };
+
+        // Notify all vendor dashboards that a plan was removed
+        if (table === 'subscription_plans') {
+          io.emit('planUpdated', { deleted: true });
+        }
         break;
       }
 
@@ -1003,6 +1216,60 @@ app.post('/api/init-db', async (req, res) => {
     res.json({ success: true, message: 'Database initialized and seeded successfully' });
   } catch (err) {
     console.error('Seeding error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Vendor Inventory Item Limit Guard
+app.post('/api/vendor-inventory/check-limit', async (req, res) => {
+  try {
+    const { vendor_id, category } = req.body;
+    if (!vendor_id) return res.status(400).json({ error: 'vendor_id required' });
+
+    const vendor = await Vendor.findById(vendor_id);
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    // Find the matching active subscription for this category
+    const activeSubs = Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0
+      ? vendor.active_subscriptions
+      : [{ category_name: 'General', max_items: 5, status: 'active' }];
+
+    const sub = category
+      ? activeSubs.find(s => s.category_name === category || s.plan_name === category)
+      : activeSubs[0];
+
+    const limit = sub?.max_items ?? 5;
+    const currentCount = await VendorItem.countDocuments({ vendor_id });
+
+    res.json({
+      currentCount,
+      limit,
+      canAdd: limit <= 0 || currentCount < limit,
+      percentUsed: limit > 0 ? Math.round((currentCount / limit) * 100) : 0,
+      category: sub?.category_name || 'General'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// At-Risk Vendors Summary for Super Admin
+app.get('/api/vendors/at-risk', async (req, res) => {
+  try {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const in7Days  = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+    const in3Days  = new Date(now.getTime() + 3 * 86400000).toISOString().slice(0, 10);
+    const grace3   = new Date(now.getTime() - 3 * 86400000).toISOString().slice(0, 10);
+
+    const [expired, critical, warning] = await Promise.all([
+      Vendor.find({ subscription_end: { $lt: grace3 } }).select('shop_name owner_name phone plan_name subscription_end active_subscriptions status').lean(),
+      Vendor.find({ subscription_end: { $gte: grace3, $lt: in3Days } }).select('shop_name owner_name phone plan_name subscription_end active_subscriptions status').lean(),
+      Vendor.find({ subscription_end: { $gte: in3Days, $lt: in7Days } }).select('shop_name owner_name phone plan_name subscription_end active_subscriptions status').lean(),
+    ]);
+
+    res.json({ expired, critical, warning });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -101,129 +101,52 @@ export function CelebratorySubmitButton({
 export function AntigravitySuccessModal({
   open,
   onClose,
-  title = "Application Submitted!",
-  subtitle = "Your vendor application has been executed in a zero-gravity isolated workspace. All systems operational — Free Tier Plan Auto-Assigned!",
-  primaryActionText = "Submit",
+  title = "Registration Successful!",
+  subtitle = "Your vendor account has been created successfully! You can now log in using your phone number and password.",
+  primaryActionText = "OK",
   onPrimaryAction
 }: AntigravitySuccessModalProps) {
   if (!open) return null;
 
+  const handleAction = () => {
+    if (onPrimaryAction) onPrimaryAction();
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-r from-[#3B82F6] to-[#6366F1] animate-fade-in relative overflow-hidden">
-      
-      {/* Translucent Dot-Grid Pattern Backdrop */}
-      <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-25 pointer-events-none" />
-
-      {/* Ambient Pulsing Glow Blobs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-400/30 rounded-full blur-3xl pointer-events-none animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-400/30 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
-
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md animate-fade-in w-screen h-screen overflow-y-auto">
       {/* Main Glassmorphic Modal Card */}
-      <div className="relative max-w-lg w-full rounded-3xl bg-slate-950/80 backdrop-blur-2xl border border-white/20 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.4)] text-center overflow-hidden animate-scale-in">
+      <div className="relative max-w-sm sm:max-w-md w-full rounded-3xl bg-white border border-amber-200/80 p-6 sm:p-8 shadow-2xl text-center overflow-hidden animate-scale-in my-auto">
         
         {/* Floating Orbital Ring with Glowing Checkmark Icon */}
-        <div className="relative mx-auto w-24 h-24 mb-6 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border-2 border-cyan-400/60 animate-ping opacity-30" />
-          <div className="absolute inset-1 rounded-full border border-orange-400/60 shadow-[0_0_30px_rgba(255,87,34,0.4)] animate-spin-slow" />
-          
-          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.6)]">
+        <div className="relative mx-auto w-20 h-20 mb-5 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-2 border-amber-400/50 animate-ping opacity-30" />
+          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
             <Check className="w-9 h-9 text-white stroke-[3.5]" />
           </div>
         </div>
 
         {/* Headline & Subtitle */}
         <div className="space-y-2 relative z-10">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 border border-white/20 text-cyan-300 text-xs font-mono uppercase tracking-widest backdrop-blur-md">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-            <span>Zero-G Execution Confirmed</span>
-          </div>
-
-          <h2 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-amber-200 tracking-tight pt-2">
-            {title}
+          <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+            Registration Successful!
           </h2>
 
-          <p className="text-slate-200 text-sm leading-relaxed max-w-md mx-auto pt-1 font-medium">
+          <p className="text-gray-600 text-sm leading-relaxed max-w-sm mx-auto pt-1 font-semibold">
             {subtitle}
           </p>
         </div>
 
-        {/* System Operational Status Box */}
-        <div className="my-6 p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 text-left font-mono text-xs text-slate-300 flex items-center justify-between shadow-inner">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-emerald-400 font-bold">ALL SYSTEMS OPERATIONAL</span>
-          </div>
-          <span className="text-slate-400 text-[10px]">Free Tier Active</span>
-        </div>
-
-        {/* Celebratory Pill Button Action */}
-        <div className="pt-2 flex justify-center">
-          <CelebratorySubmitButton
-            text={primaryActionText || "Submit"}
-            onClick={() => {
-              if (onPrimaryAction) onPrimaryAction();
-              onClose();
-            }}
-          />
+        {/* Action Button */}
+        <div className="pt-6 flex justify-center">
+          <button
+            onClick={handleAction}
+            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-extrabold text-sm transition-all shadow-lg shadow-amber-500/30 cursor-pointer"
+          >
+            {primaryActionText}
+          </button>
         </div>
       </div>
-
-      {/* Burst & Confetti Animations Keyframes */}
-      <style>{`
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin-slow {
-          animation: spin-slow 12s linear infinite;
-        }
-        @keyframes burst-left {
-          0% { transform: scale(0.4) translate(15px, 0); opacity: 0; }
-          60% { transform: scale(1.25) translate(-10px, -5px); opacity: 1; }
-          100% { transform: scale(1) translate(0, 0); opacity: 1; }
-        }
-        .animate-burst-left {
-          animation: burst-left 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        @keyframes burst-right {
-          0% { transform: scale(0.4) translate(-15px, 0); opacity: 0; }
-          60% { transform: scale(1.25) translate(10px, -5px); opacity: 1; }
-          100% { transform: scale(1) translate(0, 0); opacity: 1; }
-        }
-        .animate-burst-right {
-          animation: burst-right 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        @keyframes star-pop {
-          0% { transform: scale(0) rotate(-45deg); opacity: 0; }
-          70% { transform: scale(1.3) rotate(15deg); opacity: 1; }
-          100% { transform: scale(1) rotate(0deg); opacity: 1; }
-        }
-        .animate-star-pop {
-          animation: star-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-        @keyframes squiggle {
-          0% { stroke-dashoffset: 50; opacity: 0; }
-          100% { stroke-dashoffset: 0; opacity: 1; }
-        }
-        .animate-squiggle {
-          animation: squiggle 0.8s ease-out forwards;
-        }
-        @keyframes dot-float {
-          0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-6px) scale(1.2); }
-        }
-        .animate-dot-float {
-          animation: dot-float 2.5s ease-in-out infinite;
-        }
-        @keyframes button-pop {
-          0% { transform: scale(0.95); }
-          50% { transform: scale(1.08); }
-          100% { transform: scale(1); }
-        }
-        .animate-button-pop {
-          animation: button-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-      `}</style>
     </div>
   );
 }

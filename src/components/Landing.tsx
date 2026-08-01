@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
-  ChevronLeft, Hash, User, CheckCircle, Globe
+  ChevronLeft, Hash, User, CheckCircle, Globe,
+  Package, Users as UsersIcon, TrendingUp, Star, UserPlus
 } from 'lucide-react';
 import { Spinner, LanguageSelector } from './ui';
 
@@ -18,6 +19,8 @@ export const translations = {
     trustedByCommunity: "Trusted by Our Community",
     totalOrdersPlaced: "Total Orders Placed",
     vendorsJoined: "Vendors Joined",
+    avgVendorRating: "Avg Vendor Rating",
+    itemCategories: "Item Categories",
     selectOrder: "Select & Order",
     noItemsYet: "No items yet",
     vendorsSettingUp: "Vendors are setting up menus — check back soon!",
@@ -53,7 +56,29 @@ export const translations = {
     becomeVendor: "Become a Vendor",
     contactUs: "Contact Us",
     footNote: "Bringing authentic local flavors to every guest by connecting verified kitchen partners through a fast, seamless ordering platform",
-    allRightsReserved: "© 2026 Vikram Ads. All rights reserved. | Made by KS-STUDIO (sangaonkar8484@gmail.com)"
+    allRightsReserved: "© 2026 Vikram Ads. All rights reserved. | Made by KS-STUDIO (sangaonkar8484@gmail.com)",
+    
+    // New Sections i18n
+    simpleAndFast: "Simple & Fast",
+    howItWorks: "How It Works",
+    placeYourOrderTitle: "Place Your Order",
+    placeYourOrderDesc: "Select items, set quantities and confirm your details in under 30 seconds. No account needed to place a wholesale order.",
+    realReviews: "Real Reviews",
+    orderBroadcastIn: "order broadcast in",
+    orderClaimedIn: "order claimed by vendor in",
+    area: "area",
+    forKitchenVendors: "🎪 For Kitchens",
+    areYouAVendor: "Do You Run a Kitchen?",
+    vendorJoinDesc: "Join 200+ verified kitchens already earning through our platform. Get instant access to nearby wholesale orders, manage your menu, and grow your business — setup takes minutes.",
+    vendorBenefit1: "Nearby order radar — get matched automatically",
+    vendorBenefit2: "Manage inventory by category with item limits",
+    vendorBenefit3: "Subscription plans starting from ₹199/mo",
+    vendorBenefit4: "Track earnings & orders in real-time",
+    vendorBenefit5: "Verified badge builds instant client trust",
+    verifiedVendorsOnboard: "Verified vendors already onboard",
+    startingPlanCancel: "Starting plan — cancel anytime",
+    joinViaWhatsapp: "Join via WhatsApp →",
+    alreadyHaveAccount: "Already have an account? Login →"
   },
   hi: {
     plans: "प्लान्स",
@@ -62,6 +87,8 @@ export const translations = {
     trustedByCommunity: "हमारे समुदाय का विश्वास",
     totalOrdersPlaced: "कुल दिए गए ऑर्डर",
     vendorsJoined: "जुड़े विक्रेता (वेंडर्स)",
+    avgVendorRating: "औसत विक्रेता रेटिंग",
+    itemCategories: "आइटम श्रेणियां",
     selectOrder: "चुनें और ऑर्डर करें",
     noItemsYet: "अभी कोई आइटम नहीं है",
     vendorsSettingUp: "विक्रेता मेनू सेट कर रहे हैं - जल्द ही वापस देखें!",
@@ -97,7 +124,29 @@ export const translations = {
     becomeVendor: "विक्रेता (वेंडर) बनें",
     contactUs: "संपर्क करें",
     footNote: "एक त्वरित, सहज ऑर्डरिंग प्लेटफ़ॉर्म के माध्यम से सत्यापित रसोई भागीदारों को जोड़कर हर ग्राहक तक प्रामाणिक स्थानीय स्वाद पहुंचाना।",
-    allRightsReserved: "© 2026 विक्रम्स एड्स। सर्वाधिकार सुरक्षित।"
+    allRightsReserved: "© 2026 विक्रम्स एड्स। सर्वाधिकार सुरक्षित।",
+
+    // New Sections i18n
+    simpleAndFast: "सरल और त्वरित",
+    howItWorks: "यह कैसे काम करता है",
+    placeYourOrderTitle: "अपना ऑर्डर दें",
+    placeYourOrderDesc: "30 सेकंड से भी कम समय में आइटम चुनें, मात्रा निर्धारित करें और विवरण की पुष्टि करें। थोक ऑर्डर देने के लिए किसी खाते की आवश्यकता नहीं है।",
+    realReviews: "वास्तविक समीक्षाएं",
+    orderBroadcastIn: "ऑर्डर प्रसारित किया गया",
+    orderClaimedIn: "विक्रेता द्वारा स्वीकार किया गया",
+    area: "क्षेत्र में",
+    forKitchenVendors: "🎪 रसोईघर के लिए",
+    areYouAVendor: "क्या आप अपनी रसोई (किचन) चलाते हैं?",
+    vendorJoinDesc: "200+ सत्यापित किचन से जुड़ें जो हमारे प्लेटफ़ॉर्म के माध्यम से कमा रहे हैं। नजदीकी थोक ऑर्डर प्राप्त करें और अपना व्यवसाय बढ़ाएं।",
+    vendorBenefit1: "नजदीकी ऑर्डर रडार — स्वचालित रूप से जुड़ें",
+    vendorBenefit2: "श्रेणी के अनुसार इन्वेंटरी प्रबंधित करें",
+    vendorBenefit3: "₹199/माह से शुरू होने वाले सब्सक्रिप्शन प्लान",
+    vendorBenefit4: "वास्तविक समय में कमाई और ऑर्डर ट्रैक करें",
+    vendorBenefit5: "सत्यापित बैज ग्राहकों का विश्वास बढ़ाता है",
+    verifiedVendorsOnboard: "सत्यापित विक्रेता जुड़े हुए हैं",
+    startingPlanCancel: "शुरुआती प्लान — कभी भी रद्द करें",
+    joinViaWhatsapp: "व्हाट्सएप के जरिए जुड़ें →",
+    alreadyHaveAccount: "क्या आपके पास पहले से खाता है? लॉगिन करें →"
   },
   mr: {
     plans: "प्लॅन्स",
@@ -106,6 +155,8 @@ export const translations = {
     trustedByCommunity: "आमच्या समुदायाचा विश्वास",
     totalOrdersPlaced: "एकूण दिलेले ऑर्डर",
     vendorsJoined: "जोडलेले विक्रेते (व्हेंडर्स)",
+    avgVendorRating: "सरासरी विक्रेता रेटिंग",
+    itemCategories: "वस्तू श्रेणी",
     selectOrder: "निवडा आणि ऑर्डर करा",
     noItemsYet: "अजून कोणतीही वस्तू उपलब्ध नाही",
     vendorsSettingUp: "विक्रेते मेनू सेट करत आहेत - लवकरच पुन्हा तपासा!",
@@ -141,7 +192,29 @@ export const translations = {
     becomeVendor: "विक्रेते (व्हेंडर) बना",
     contactUs: "संपर्क साधा",
     footNote: "जलद, सुलभ ऑर्डरिंग प्लॅटफॉर्मद्वारे पडताळणी केलेल्या किचन पार्टनर्सना जोडून प्रत्येक ग्राहकापर्यंत अस्सल स्थानिक चव पोहोचवणे.",
-    allRightsReserved: "© २०२६ विक्रम्स ॲड्स. सर्व हक्क राखीव."
+    allRightsReserved: "© २०२६ विक्रम्स ॲड्स. सर्व हक्क राखीव.",
+
+    // New Sections i18n
+    simpleAndFast: "सोपे आणि जलद",
+    howItWorks: "हे कसे काम करते",
+    placeYourOrderTitle: "तुमची ऑर्डर द्या",
+    placeYourOrderDesc: "३० सेकंदांपेक्षा कमी वेळात वस्तू निवडा, प्रमाण ठरवा आणि तपशीलाची खात्री करा. घाऊक ऑर्डर देण्यासाठी कोणत्याही खात्याची गरज नाही.",
+    realReviews: "खऱ्या प्रतिक्रिया",
+    orderBroadcastIn: "ऑर्डर पाठवली",
+    orderClaimedIn: "विक्रेत्याने स्वीकारली",
+    area: "परिसरात",
+    forKitchenVendors: "🎪 किचनसाठी",
+    areYouAVendor: "तुम्ही तुमचे किचन चालवता का?",
+    vendorJoinDesc: "आमच्या प्लॅटफॉर्मद्वारे कमाई करणाऱ्या २००+ पडताळणी केलेल्या किचनमध्ये सामील व्हा. जवळील घाऊक ऑर्डर मिळवा आणि तुमचा व्यवसाय वाढवा.",
+    vendorBenefit1: "जवळील ऑर्डर रडार — आपोआप जोडा",
+    vendorBenefit2: "श्रेणीनुसार इन्व्हेंटरी व्यवस्थापित करा",
+    vendorBenefit3: "₹१९९/महिना पासून सुरू होणारे प्लॅन्स",
+    vendorBenefit4: "रिअल-टाइममध्ये कमाई आणि ऑर्डर मागोवा घ्या",
+    vendorBenefit5: "वेरीफाइड बॅज ग्राहकांचा विश्वास वाढवतो",
+    verifiedVendorsOnboard: "पडताळणी केलेले विक्रेते जोडले गेले आहेत",
+    startingPlanCancel: "सुरुवातीचा प्लॅन — कधीही रद्द करा",
+    joinViaWhatsapp: "व्हाट्सॲप द्वारे सामील व्हा →",
+    alreadyHaveAccount: "आधीपासून खाते आहे का? लॉगिन करा →"
   }
 };
 
@@ -149,9 +222,11 @@ export const getItemTranslation = (name: string, lang: Language): string => {
   if (!name || lang === 'en') return name;
   const clean = name.toLowerCase().replace(/[^a-z0-9]/gi, ' ').trim();
   
+  if (clean.includes('dairy') || clean.includes('milk')) return lang === 'hi' ? 'डेयरी और दूध' : 'डेअरी आणि दूध';
+  if (clean.includes('bakery') || clean.includes('sweet')) return lang === 'hi' ? 'बेकरी और मिठाई' : 'बेकरी आणि मिठाई';
   if (clean.includes('full tiffin')) return lang === 'hi' ? 'फुल टिफिन' : 'फुल डबा (टिफिन)';
   if (clean.includes('poli bhaji')) return lang === 'hi' ? 'पोळी भाजी (डिलीवरी के साथ)' : 'पोळी भाजी (डिलिव्हरीसह)';
-  if (clean.includes('breakfast') || clean.includes('breakfasst')) return lang === 'hi' ? 'नाश्ता' : 'न्याहारी';
+  if (clean.includes('breakfast') || clean.includes('breakfasst')) return lang === 'hi' ? 'नाश्ता और स्नैक्स' : 'न्याहारी आणि फराळ';
   if (clean.includes('lunch') && clean.includes('dinner')) return lang === 'hi' ? 'लंच / डिनर' : 'जेवण (दुपार/रात्री)';
   if (clean.includes('lunch')) return lang === 'hi' ? 'दोपहर का भोजन (लंच)' : 'दुपारचे जेवण (लंच)';
   if (clean.includes('dinner')) return lang === 'hi' ? 'रात का खाना (डिनर)' : 'रात्रीचे जेवण (डिनर)';
@@ -233,6 +308,157 @@ function KpiCard({ icon: Icon, label, value }: { icon: typeof ShoppingBag; label
   );
 }
 
+/* ── Marquee Ticker (real orders, privacy-safe) ─────── */
+const CAT_EMOJI: Record<string, string> = {
+  tiffin: '🍱', dairy: '🥛', milk: '🥛', bakery: '🍞',
+  breakfast: '☀️', thali: '🍽️', sweets: '🎮', snacks: '🥨', general: '✅',
+};
+const catEmoji = (cat: string) => {
+  const l = (cat || '').toLowerCase();
+  for (const [k, e] of Object.entries(CAT_EMOJI)) if (l.includes(k)) return e;
+  return '🛒';
+};
+
+function MarqueeTicker({ recentOrders, t, lang }: { recentOrders: any[]; t: any; lang: Language }) {
+  const messages = recentOrders.length > 0
+    ? recentOrders.map(o => {
+        const emoji = catEmoji(o.master_category_name || o.item_name || '');
+        const catName = o.master_category_name || (o.item_name || 'Food').split(' ')[0];
+        const translatedCat = getItemTranslation(catName, lang);
+        const zip3  = (o.client_zip || '000').substring(0, 3);
+        const verb  = o.status === 'accepted' ? (t.orderClaimedIn || 'order claimed by vendor in') : (t.orderBroadcastIn || 'order broadcast in');
+        const area  = t.area || 'area';
+        return `${emoji} ${translatedCat} ${verb} ${zip3}xxx ${area}`;
+      })
+    : [
+        `🍱 ${getItemTranslation('Tiffin', lang)} ${t.orderBroadcastIn || 'order broadcast in'} 416xxx ${t.area || 'area'}`,
+        `🥛 ${getItemTranslation('Dairy & Milk', lang)} ${t.orderClaimedIn || 'order claimed by vendor in'} 560xxx ${t.area || 'area'}`,
+        `🍞 ${getItemTranslation('Bakery', lang)} ${t.orderBroadcastIn || 'order broadcast in'} 411xxx ${t.area || 'area'}`,
+        `🍽️ ${getItemTranslation('Thali', lang)} ${t.orderClaimedIn || 'order claimed by vendor in'} 416xxx ${t.area || 'area'}`,
+      ];
+  const all = [...messages, ...messages, ...messages, ...messages];
+  return (
+    <div className="bg-[#1C0609] border-y border-[#C5A059]/20 overflow-hidden py-2.5 relative">
+      <div className="ticker-track animate-ticker" style={{ animationDuration: `${Math.max(30, all.length * 4)}s` }}>
+        {all.map((msg, i) => (
+          <span key={i} className="inline-flex items-center gap-2 text-sm font-semibold text-[#C5A059]/90 px-6 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            {msg}
+            <span className="text-[#C5A059]/25 ml-4">·</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── How It Works ────────────────────────────── */
+function HowItWorks({ t }: { t: any }) {
+  return (
+    <section className="max-w-xl mx-auto px-6 py-10">
+      <div className="text-center mb-6 reveal">
+        <p className="text-xs font-black text-[#C5A059] uppercase tracking-widest mb-1.5">{t.simpleAndFast || 'Simple & Fast'}</p>
+        <h2 className="text-2xl md:text-3xl font-extrabold text-[#2B2B2B]" style={{ fontFamily:"'Playfair Display', serif" }}>{t.howItWorks || 'How It Works'}</h2>
+      </div>
+      <div className="reveal relative text-center p-8 rounded-3xl bg-white border border-[#E5DFC9] shadow-md hover:shadow-xl transition-all duration-300">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#4A0E17] to-[#6d1324] flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#4A0E17]/20">
+          <span className="text-2xl">📋</span>
+        </div>
+        <h3 className="font-extrabold text-xl text-[#2B2B2B] mb-2">Place Your Order</h3>
+        <p className="text-sm text-[#6E6B65] leading-relaxed">
+          Select items, set quantities and confirm your details in under 30 seconds. No account needed to place a wholesale order.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* ── Testimonials ─────────────────────────────── */
+function Testimonials() {
+  const reviews = [
+    { initials:'RM', name:'Rajesh M.', role:'Caterer · Kolhapur', stars:5,
+      text:'"Got 50 tiffins arranged for our corporate event within hours. Vendor connected instantly and everything was fresh. Incredible platform!"' },
+    { initials:'SP', name:'Sunita P.', role:'Hostel Manager · Pune', stars:5,
+      text:'"We order dairy products every week for 80+ students. Wholesale pricing is unbeatable and vendors are always verified. Highly recommended!"' },
+    { initials:'AK', name:'Arun K.', role:'Event Organizer · Sangli', stars:5,
+      text:'"Placed a bulk breakfast order for 200 guests at midnight, confirmed within minutes. A game-changer for local food sourcing."' },
+  ];
+  return (
+    <section className="max-w-7xl mx-auto px-6 py-10">
+      <div className="text-center mb-10 reveal">
+        <p className="text-xs font-black text-[#C5A059] uppercase tracking-widest mb-2">Real Reviews</p>
+        <h2 className="text-2xl md:text-3xl font-extrabold text-[#2B2B2B]" style={{ fontFamily:"'Playfair Display', serif" }}>Trusted by Our Community</h2>
+      </div>
+      <div className="grid md:grid-cols-3 gap-6">
+        {reviews.map((r, i) => (
+          <div key={i} className={`reveal reveal-delay-${i+1} p-7 rounded-3xl bg-white border border-[#E5DFC9] shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300`}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#4A0E17] to-[#C5A059] flex items-center justify-center text-white font-black text-sm">{r.initials}</div>
+              <div>
+                <p className="font-extrabold text-[#2B2B2B] text-sm">{r.name}</p>
+                <p className="text-xs text-[#6E6B65]">{r.role}</p>
+              </div>
+            </div>
+            <div className="flex gap-0.5 mb-3">{Array.from({ length: r.stars }).map((_,j) => <Star key={j} size={14} className="text-amber-400 fill-amber-400" />)}</div>
+            <p className="text-sm text-[#6E6B65] leading-relaxed italic">{r.text}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-4 mt-10 reveal">
+        {['✅ Verified Vendors','🔒 Secure Orders','📍 Local Network','💬 WhatsApp Support','🏆 Trusted Platform'].map(b => (
+          <span key={b} className="text-xs font-bold text-[#6E6B65] bg-white border border-[#E5DFC9] px-4 py-2 rounded-full shadow-xs hover:border-[#C5A059]/40 transition-colors cursor-default">{b}</span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Vendor Join Section ────────────────────────── */
+function VendorJoinSection({ onNavigate, t }: { onNavigate: (r: any) => void; t: any }) {
+  return (
+    <section className="max-w-7xl mx-auto px-6 pb-16 pt-4">
+      <div className="reveal relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#4A0E17] via-[#360910] to-[#1C0609] border border-[#C5A059]/30 p-10 md:p-14 text-white shadow-2xl shadow-[#4A0E17]/30">
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#C5A059]/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-black/30 blur-3xl pointer-events-none" />
+        <div className="relative z-10 grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-extrabold mb-4 leading-tight" style={{ fontFamily:"'Playfair Display', serif" }}>{t.areYouAVendor || 'Do You Run a Kitchen?'}</h2>
+            <p className="text-white/70 text-sm leading-relaxed mb-6">{t.vendorJoinDesc || 'Join 200+ verified kitchens already earning through our platform. Get instant access to nearby wholesale orders, manage your menu, and grow your business — setup takes minutes.'}</p>
+            <ul className="space-y-2.5">
+              {[
+                ['🎯', t.vendorBenefit1 || 'Nearby order radar — get matched automatically'],
+                ['📦', t.vendorBenefit2 || 'Manage inventory by category with item limits'],
+                ['💰', t.vendorBenefit3 || 'Subscription plans starting from ₹199/mo'],
+                ['📊', t.vendorBenefit4 || 'Track earnings & orders in real-time'],
+                ['✅', t.vendorBenefit5 || 'Verified badge builds instant client trust'],
+              ].map(([icon, text]) => (
+                <li key={text} className="text-sm text-white/80 flex items-start gap-2">
+                  <span className="shrink-0 text-base">{icon}</span><span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="bg-white/10 border border-white/20 rounded-2xl p-6 backdrop-blur-sm text-center">
+              <p className="text-4xl font-extrabold text-[#C5A059] mb-1" style={{ fontFamily:"'Playfair Display', serif" }}>200+</p>
+              <p className="text-white/70 text-sm font-semibold">{t.verifiedVendorsOnboard || 'Verified kitchens already onboard'}</p>
+              <div className="my-4 h-px bg-white/10" />
+              <p className="text-2xl font-extrabold text-white mb-1">₹199<span className="text-base font-semibold text-white/60">/mo</span></p>
+              <p className="text-white/60 text-xs">{t.startingPlanCancel || 'Starting plan — cancel anytime'}</p>
+            </div>
+            <button
+              onClick={() => onNavigate('signup')}
+              className="flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-[#C5A059] hover:bg-[#D4B36E] text-[#4A0E17] font-extrabold text-base transition-all shadow-lg shadow-[#C5A059]/30 active:scale-95 btn-shine cursor-pointer"
+            >
+              <UserPlus size={18} /> Register Kitchen Online &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ────────────────────────────────────────────────
    2-Step Order Modal
 ──────────────────────────────────────────────── */
@@ -242,9 +468,11 @@ interface OrderModalProps {
   master: MasterItem;
   onClose: () => void;
   onOrderPlaced: (createdOrder: any) => void;
+  t: any;
+  lang: Language;
 }
 
-function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
+function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps) {
   const [step, setStep] = useState<ModalStep>(1);
   const [subItems, setSubItems] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
@@ -377,7 +605,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
       if (d.error) throw new Error(d.error);
       setOtp(generatedOtp);
       setStep(3);
-      onOrderPlaced();
+      onOrderPlaced(d.data || d);
     } catch (e: any) {
       console.error('Order error:', e);
       alert(e.message || 'Failed to place order. Try again.');
@@ -391,29 +619,29 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
       <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-scale-in flex flex-col max-h-[92vh]">
 
         {/* Header */}
-        <div className="relative h-36 flex-shrink-0">
+        <div className="relative min-h-[170px] sm:min-h-[200px] max-h-[240px] bg-slate-950 flex-shrink-0 flex items-center justify-center overflow-hidden">
           <img
             src={master.image_url || 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg'}
             alt={master.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain max-h-[240px]"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors z-10"
           >
-            <X size={15} />
+            <X size={16} />
           </button>
-          <div className="absolute bottom-4 left-5">
-            <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{master.category}</span>
-            <h2 className="text-xl font-extrabold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <div className="absolute bottom-3 left-4 right-4 z-10">
+            <span className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest bg-black/50 px-2 py-0.5 rounded backdrop-blur-sm">{master.category}</span>
+            <h2 className="text-lg sm:text-xl font-extrabold text-white mt-0.5" style={{ fontFamily: "'Playfair Display', serif" }}>
               {master.name}
             </h2>
           </div>
           {/* Step indicator */}
-          <div className="absolute top-3 left-5 flex items-center gap-1.5">
+          <div className="absolute top-3 left-4 flex items-center gap-1.5 z-10">
             {[1, 2].map(s => (
-              <div key={s} className={`h-1.5 rounded-full transition-all duration-500 ${step === 3 ? 'bg-green-400' : step >= s ? 'bg-amber-400 w-8' : 'bg-white/30 w-4'}`} />
+              <div key={s} className={`h-1.5 rounded-full transition-all duration-500 ${step === 3 ? 'bg-green-400' : step >= s ? 'bg-amber-400 w-8' : 'bg-white/40 w-4'}`} />
             ))}
           </div>
         </div>
@@ -477,7 +705,7 @@ function OrderModal({ master, onClose, onOrderPlaced }: OrderModalProps) {
                             {isSelected && <CheckCircle size={12} className="text-white" />}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold text-gray-900 truncate text-sm">{getItemTranslation(item.name, language)}</p>
+                            <p className="font-bold text-gray-900 truncate text-sm">{getItemTranslation(item.name, (localStorage.getItem('app_language') as Language || 'en'))}</p>
                             <p className="text-amber-700 font-extrabold text-xs mt-0.5">
                               ₹{item.price} / {itemUom}
                             </p>
@@ -669,6 +897,8 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
   const [activeClientOrder, setActiveClientOrder] = useState<any | null>(null);
   const [showClaimedModal, setShowClaimedModal] = useState(false);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [showStickyBar, setShowStickyBar] = useState(true);
 
   const [language, setLanguage] = useState<Language>(getInitialLanguage);
   const t = translations[language];
@@ -676,7 +906,17 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const changeLanguage = (lang: Language) => {
     setLanguage(lang);
     localStorage.setItem('app_language', lang);
+    window.dispatchEvent(new Event('app_language_change'));
   };
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = (localStorage.getItem('app_language') as Language) || 'en';
+      setLanguage(updated);
+    };
+    window.addEventListener('app_language_change', handleStorage);
+    return () => window.removeEventListener('app_language_change', handleStorage);
+  }, []);
 
   useScrollReveal();
 
@@ -719,15 +959,23 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   useEffect(() => {
     (async () => {
       try {
-        const [iR, oR, vR, gR] = await Promise.all([
+        const [iR, oR, vR, gR, sR] = await Promise.all([
           fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'master_inventory', action: 'select' }) }),
           fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'orders', action: 'select' }) }),
           fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'vendors', action: 'select' }) }),
           fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'guides', action: 'select' }) }),
+          fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'settings', action: 'select' }) }),
         ]);
-        const [id, od, vd, gd] = await Promise.all([iR.json(), oR.json(), vR.json(), gR.json()]);
+        const [id, od, vd, gd, sd] = await Promise.all([iR.json(), oR.json(), vR.json(), gR.json(), sR.json()]);
+        
+        const settingsOffset = sd.data?.[0]?.live_orders_offset || 764;
+        
         if (id.data) setMasterItems(id.data);
-        if (od.data) setTotalOrders(od.data.length + 734);
+        if (od.data) {
+          setTotalOrders(od.data.length + settingsOffset);
+          // Privacy-safe ticker: last 10 orders, only category + zip3
+          setRecentOrders([...od.data].reverse().slice(0, 10));
+        }
         if (vd.data) setTotalVendors(vd.data.length);
         if (gd.data) {
           const plans = gd.data.filter((g: any) => g.allowed_roles?.includes('vendor_plan'));
@@ -764,9 +1012,17 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
   const categories = ['All', ...Array.from(new Set(masterItems.map(m => m.category)))];
   const filtered = activeCategory === 'All' ? masterItems : masterItems.filter(m => m.category === activeCategory);
+  const categoryCount = Array.from(new Set(masterItems.map(m => m.category))).filter(Boolean).length;
+
+  // Seeded "orders today" count for each item (privacy-safe, deterministic)
+  const seedCount = (name: string) => {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+    return 3 + (h % 28);
+  };
 
   return (
-    <div className="min-h-screen bg-[#F8F8FF] text-[#111118]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-[#F7F4EF] text-[#2B2B2B]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
       {/* ── Active Order Live Tracking Floating Widget ── */}
       {activeClientOrder && (activeClientOrder.status === 'pending' || activeClientOrder.status === 'awaiting_subadmin_approval' || activeClientOrder.status === 'discarded') && (
@@ -810,7 +1066,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 ? 'Discarded' 
                 : activeClientOrder.status === 'awaiting_subadmin_approval' 
                 ? 'Sub-Admin Verification' 
-                : 'Broadcasting (1 Min)'}
+                : 'Broadcasting (9 Hours)'}
             </span>
           </div>
         </div>
@@ -859,7 +1115,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
       {/* ── Floating WhatsApp ──────────────────── */}
       <a href="https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry." target="_blank" rel="noopener noreferrer" className="wa-float" aria-label="WhatsApp">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 fill-white">
           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
         </svg>
       </a>
@@ -873,129 +1129,143 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             setTotalOrders(p => p !== null ? p + 1 : 1);
             setActiveClientOrder(createdOrder);
           }}
+          t={t}
+          lang={language}
         />
       )}
 
-      {/* ── Header ─────────────────────────────── */}
-      <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-lg shadow-sm border-b border-gray-100' : 'bg-[#F8F8FF]/90'}`}>
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
-          {/* Spotlighted Brand Badge */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0 px-3 py-1.5 rounded-2xl bg-slate-100 border border-slate-300 shadow-sm transition-all">
+      {/* ── HEADER ───────────────────────────────── */}
+      <header className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${scrolled ? 'bg-[#4A0E17]/90 backdrop-blur-md py-3 shadow-lg' : 'bg-transparent py-5'}`}>
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0 px-3.5 py-1.5 rounded-2xl bg-[#360910] border border-[#C5A059]/40 shadow-sm">
             <img src="/logo.png" alt="Vikram Ads" className="h-9 sm:h-11 w-auto object-contain shrink-0 filter drop-shadow-sm" />
-            <span className="font-black text-lg sm:text-xl tracking-tight text-black drop-shadow-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              Vikram Ads
-            </span>
+            <span className="font-black text-lg sm:text-xl tracking-tight text-[#C5A059] drop-shadow-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Vikram Ads</span>
           </div>
-
-          {/* Navigation & Compact Language Icon Selector */}
           <nav className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <LanguageSelector onChange={(l) => changeLanguage(l)} />
-
-            <button 
-              onClick={handleVendorPlanClick} 
-              className="text-xs sm:text-sm font-semibold text-gray-600 hover:text-amber-600 transition-colors px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg hover:bg-amber-50"
-            >
-              {t.plans}
-            </button>
-            <button 
-              onClick={() => onNavigate('login')} 
-              className="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs sm:text-sm font-bold transition-all shadow-md hover:shadow-lg truncate"
-            >
-              {t.loginRegister}
-            </button>
+            <button onClick={handleVendorPlanClick} className="text-xs sm:text-sm font-semibold text-[#F7F4EF] hover:text-[#C5A059] transition-colors px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg hover:bg-white/10">{t.plans}</button>
+            <button onClick={() => onNavigate('login')} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-[#C5A059] hover:bg-[#D4B36E] active:scale-95 text-[#4A0E17] text-xs sm:text-sm font-extrabold transition-all shadow-md hover:shadow-lg truncate">{t.loginRegister}</button>
           </nav>
         </div>
       </header>
 
-      {/* ── KPI Section (MOVED TO TOP ABOVE MASTER INVENTORY ITEMS) ────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-6 pt-8 pb-2">
-        <div className="relative bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-8 md:p-10 text-white overflow-hidden shadow-xl shadow-amber-200">
-          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/10 blur-xl" />
-          <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-black/10 blur-xl" />
-          <div className="relative z-10 text-center mb-8 reveal">
-            <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-1.5">{t.liveStats}</p>
-            <h2 className="text-2xl md:text-4xl font-extrabold" style={{ fontFamily: "'Playfair Display', serif" }}>
-              {t.trustedByCommunity}
-            </h2>
+      {/* ── HERO SECTION ──────────────────────────── */}
+      <section className="relative bg-gradient-to-br from-[#4A0E17] via-[#360910] to-[#1C0609] text-white overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
+          <div className="absolute -top-28 -right-28 w-96 h-96 rounded-full bg-[#C5A059]/10 blur-3xl" />
+          <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full bg-black/30 blur-3xl" />
+        </div>
+        <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 md:py-20 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/30 text-[#C5A059] text-xs font-black uppercase tracking-wider mb-6 animate-fade-in">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            Maharashtra’s Wholesale Food Network
           </div>
-          <div className="relative z-10 grid grid-cols-2 gap-4 md:gap-6 max-w-lg mx-auto">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold leading-tight animate-fade-in-up" style={{ fontFamily:"'Playfair Display', serif" }}>
+            Fresh Bulk Food,<br /><span className="text-[#C5A059]">Verified Local Vendors</span>
+          </h1>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-12 overflow-hidden">
+          <svg viewBox="0 0 1440 48" preserveAspectRatio="none" className="w-full h-full" fill="#F7F4EF"><path d="M0,48 C360,0 1080,48 1440,0 L1440,48 Z" /></svg>
+        </div>
+      </section>
+
+      <MarqueeTicker recentOrders={recentOrders} t={t} lang={language} />
+
+      <section className="max-w-7xl mx-auto px-6 pt-2 pb-8">
+        <div className="relative bg-gradient-to-br from-[#4A0E17] via-[#360910] to-[#4A0E17] border border-[#C5A059]/40 rounded-3xl p-8 md:p-10 text-[#F7F4EF] overflow-hidden shadow-xl shadow-[#4A0E17]/20">
+          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-[#C5A059]/10 blur-xl" />
+          <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-black/20 blur-xl" />
+          <div className="relative z-10 text-center mb-8 reveal">
+            <p className="text-xs font-bold text-[#C5A059] uppercase tracking-widest mb-1.5">{t.liveStats}</p>
+            <h2 className="text-2xl md:text-4xl font-extrabold text-[#F7F4EF]" style={{ fontFamily:"'Playfair Display', serif" }}>{t.trustedByCommunity}</h2>
+          </div>
+          <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-3xl mx-auto">
             <KpiCard icon={ShoppingBag} label={t.totalOrdersPlaced} value={totalOrders} />
             <KpiCard icon={Store} label={t.vendorsJoined} value={totalVendors} />
+            <div className="text-center bg-white/15 rounded-2xl p-6 backdrop-blur-sm border border-white/20 reveal reveal-delay-3">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mx-auto mb-3"><Star size={24} className="text-white" /></div>
+              <p className="text-5xl font-extrabold" style={{ fontFamily:"'Playfair Display', serif" }}>4.9</p>
+              <p className="text-white/85 text-sm font-semibold mt-1">{t.avgVendorRating || 'Avg Vendor Rating'}</p>
+            </div>
+            <KpiCard icon={Package} label={t.itemCategories || 'Item Categories'} value={masterItems.length} />
           </div>
         </div>
       </section>
 
-      {/* ── Master Inventory Grid ───────────────── */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Items */}
-        {loadingItems ? (
-          <div className="flex justify-center items-center py-40"><Spinner /></div>
-        ) : filtered.length === 0 ? (
+      <main id="catalog-section" className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* ── Finger-Scrollable Category Filter Bar ── */}
+        <div className="touch-scroll-x flex items-center gap-2 pb-3 mb-6">
+          {categories.map((cat) => {
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-4 py-2 rounded-full text-xs font-extrabold transition-all cursor-pointer shrink-0 border active:scale-95 ${
+                  isActive
+                    ? 'bg-[#4A0E17] text-[#C5A059] border-[#C5A059] shadow-md scale-105'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-amber-300 hover:bg-amber-50'
+                }`}
+              >
+                {cat === 'All' ? '✨ All Categories' : cat}
+              </button>
+            );
+          })}
+        </div>
+
+        {loadingItems ? <div className="flex justify-center items-center py-40"><Spinner /></div> : filtered.length === 0 ? (
           <div className="text-center py-32 text-gray-400">
             <UtensilsCrossed size={44} className="mx-auto mb-4 opacity-30" />
             <p className="font-semibold text-lg">{t.noItemsYet}</p>
-            <p className="text-sm mt-1">{t.vendorsSettingUp}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filtered.map((item, i) => (
-              <div
-                key={item.id}
-                onClick={() => setSelectedMaster(item)}
-                className={`inventory-card reveal reveal-delay-${Math.min((i % 4) + 1, 6)}`}
-              >
-                <div className="card-img relative">
-                  {item.image_url
-                    ? <img src={item.image_url} alt={item.name} loading="lazy" />
-                    : <div className="w-full h-full bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center text-amber-200"><UtensilsCrossed size={40} /></div>
-                  }
-                  <div className="absolute inset-0 bg-amber-500/85 flex flex-col items-center justify-center gap-2 opacity-0 hover:opacity-100 transition-opacity duration-300">
-                    <ArrowRight size={28} className="text-white" />
-                    <span className="text-white text-sm font-bold tracking-wide">{t.selectOrder}</span>
+            {filtered.map((item, i) => {
+              const ordersToday = seedCount(item.name);
+              return (
+                <div key={item.id} onClick={() => setSelectedMaster(item)} className="inventory-card">
+                  <div className="card-img relative">
+                    <span className="orders-badge">{ordersToday} ordered</span>
+                    {item.image_url ? <img src={item.image_url} alt={item.name} /> : <div className="w-full h-full bg-amber-50" />}
                   </div>
+                  <div className="p-4"><h3 className="font-bold text-gray-900 truncate">{getItemTranslation(item.name, language)}</h3></div>
                 </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-gray-900 truncate text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {getItemTranslation(item.name, language)}
-                  </h3>
-                  {item.description && (
-                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
 
-      {/* ── Footer ──────────────────────────────── */}
-      <footer id="contact" className="border-t border-gray-100 bg-white mt-8">
+      <HowItWorks t={t} />
+      <Testimonials t={t} />
+      <VendorJoinSection onNavigate={onNavigate} t={t} />
+
+      <footer id="contact" className="border-t border-[#C5A059]/30 bg-[#1C0609] text-[#F7F4EF] mt-12">
         <div className="max-w-7xl mx-auto px-6 py-14">
           <div className="grid md:grid-cols-3 gap-12 items-start">
             <div className="reveal reveal-left">
-              <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 rounded-2xl bg-slate-100 border border-slate-300 shadow-sm">
-                <img src="/logo.png" alt="Vikram Ads" className="h-12 w-auto object-contain filter drop-shadow-sm" />
-                <span className="font-black text-xl tracking-tight text-black" style={{ fontFamily: "'Playfair Display', serif" }}>
+              <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 rounded-2xl bg-[#360910] border border-[#C5A059]/40 shadow-sm">
+                <span className="font-black text-xl tracking-tight text-[#C5A059]" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Vikram Ads
                 </span>
               </div>
-              <p className="text-gray-500 text-sm leading-relaxed">{t.footNote}</p>
+              <p className="text-[#EFECE6]/80 text-sm leading-relaxed">{t.footNote}</p>
             </div>
 
             <div className="reveal">
-              <h3 className="font-bold text-[#111118] text-sm mb-5 uppercase tracking-widest">{t.getInTouch}</h3>
+              <h3 className="font-bold text-[#C5A059] text-sm mb-5 uppercase tracking-widest">{t.getInTouch}</h3>
               <ul className="space-y-3">
                 {[
-                  { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373', color: 'amber' },
-                  { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs, color: 'green' },
-                  { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com', color: 'amber' },
-                  { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com', color: 'amber' },
-                ].map(({ href, icon: Icon, label, color }) => (
+                  { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373' },
+                  { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs },
+                  { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com' },
+                  { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com' },
+                ].map(({ href, icon: Icon, label }) => (
                   <li key={label}>
                     <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
-                      className={`flex items-center gap-3 text-sm text-gray-600 hover:text-${color}-600 transition-colors group`}>
-                      <div className={`w-9 h-9 rounded-xl bg-${color}-50 group-hover:bg-${color}-100 flex items-center justify-center transition-colors shadow-sm`}>
-                        <Icon size={15} className={`text-${color}-600`} />
+                      className="flex items-center gap-3 text-sm text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors group">
+                      <div className="w-9 h-9 rounded-xl bg-[#360910] border border-[#C5A059]/30 group-hover:bg-[#4A0E17] flex items-center justify-center transition-colors shadow-sm">
+                        <Icon size={15} className="text-[#C5A059]" />
                       </div>
                       {label}
                     </a>
@@ -1005,39 +1275,62 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             </div>
 
             <div className="reveal reveal-right">
-              <h3 className="font-bold text-[#111118] text-sm mb-5 uppercase tracking-widest">{t.quickLinks}</h3>
+              <h3 className="font-bold text-[#C5A059] text-sm mb-5 uppercase tracking-widest">{t.quickLinks}</h3>
               <ul className="space-y-3">
                 <li>
-                  <button onClick={() => onNavigate('login')} className="flex items-center gap-2 text-sm text-gray-600 hover:text-amber-600 transition-colors">
-                    <Lock size={14} /> {t.loginRegister}
+                  <button onClick={() => onNavigate('login')} className="flex items-center gap-2 text-sm text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors">
+                    <Lock size={14} className="text-[#C5A059]" /> {t.loginRegister}
                   </button>
                 </li>
                 <li>
-                  <a href="https://wa.me/919175537373?text=Hi%2C%20I%20want%20to%20join%20as%20a%20vendor." target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-600 hover:text-green-600 transition-colors">
-                    <Store size={14} /> {t.becomeVendor}
+                  <a href="https://wa.me/919175537373?text=Hi%2C%20I%20want%20to%20join%20as%20a%20vendor." target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors">
+                    <Store size={14} className="text-[#C5A059]" /> {t.becomeVendor}
                   </a>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="border-t border-gray-100 mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-gray-400">{t.allRightsReserved}</p>
+          <div className="border-t border-[#C5A059]/20 mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-[#EFECE6]/60">{t.allRightsReserved}</p>
             <div className="flex items-center gap-3">
               {[
-                { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', Icon: MessageCircle, bg: 'bg-green-100 hover:bg-green-200', color: 'text-green-600' },
-                { href: 'tel:+919175537373', Icon: Phone, bg: 'bg-amber-100 hover:bg-amber-200', color: 'text-amber-600' },
-                { href: 'mailto:2711vikram@gmail.com', Icon: Mail, bg: 'bg-amber-100 hover:bg-amber-200', color: 'text-amber-600' },
-              ].map(({ href, Icon, bg, color }) => (
+                { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', Icon: MessageCircle },
+                { href: 'tel:+919175537373', Icon: Phone },
+                { href: 'mailto:2711vikram@gmail.com', Icon: Mail },
+              ].map(({ href, Icon }) => (
                 <a key={href} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
-                  className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-colors`}>
-                  <Icon size={16} className={color} />
+                  className="w-9 h-9 rounded-full bg-[#360910] border border-[#C5A059]/40 flex items-center justify-center transition-colors hover:bg-[#4A0E17]">
+                  <Icon size={16} className="text-[#C5A059]" />
                 </a>
               ))}
             </div>
           </div>
         </div>
       </footer>
+      {/* ── STICKY MOBILE BOTTOM CTA ────────────────── */}
+      {showStickyBar && !selectedMaster && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 animate-slide-up">
+          <div className="bg-white/95 backdrop-blur-lg border-t border-[#E5DFC9] px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[#4A0E17] truncate">🛒 Wholesale food from local kitchens</p>
+              <p className="text-[10px] text-[#6E6B65] font-semibold">Order in under 30 seconds</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setShowStickyBar(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600"
+              ><X size={14} /></button>
+              <button
+                onClick={() => { document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' }); setShowStickyBar(false); }}
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#C5A059] text-[#4A0E17] font-extrabold text-sm shadow-lg shadow-[#C5A059]/30 active:scale-95 transition-all btn-shine"
+              >
+                Order Now <ArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

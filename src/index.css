@@ -7,20 +7,55 @@
 @theme {
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --font-display: 'Playfair Display', Georgia, serif;
+
+  --color-bg: #F7F4EF;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #EFECE6;
+  --color-border: #E5DFC9;
+  --color-text: #2B2B2B;
+  --color-muted: #6E6B65;
+  --color-accent: #C5A059;
+  --color-accent-2: #D4B36E;
+  --color-primary: #4A0E17;
+  --color-primary-dark: #360910;
+  --color-success: #1E824C;
+  --color-warning: #C5A059;
+  --color-error: #A92323;
 }
 
 :root {
-  --bg: #F8F8FF; /* Ghost White — pearlish ultra-clean foundation */
-  --surface: #FFFFFF; /* Pure white cards & panels */
-  --surface-2: #F0F0F8; /* Cool pearl gray for inset areas */
-  --border: #E2E2EE; /* Ultra-thin cool-grey border */
-  --text: #111118; /* Sleek near-black for maximum contrast */
-  --muted: #52525E; /* Cool dark-grey for secondary text */
-  --accent: #C87A2F; /* Premium warm orange */
-  --accent-2: #E8A261; /* Soft warm neutral orange */
+  --bg: #F7F4EF; /* Warm Champagne / Cream (60%) */
+  --surface: #FFFFFF; /* Pure Cream White cards & panels */
+  --surface-2: #EFECE6; /* Soft Oatmeal / Inset areas */
+  --border: #E5DFC9; /* Soft Muted Gold border */
+  --text: #2B2B2B; /* Deep Charcoal / Espresso */
+  --muted: #6E6B65; /* Warm Muted Gray */
+  --accent: #C5A059; /* Muted Gold / Brushed Brass (10%) */
+  --accent-2: #D4B36E; /* Light Brushed Gold */
+  --primary: #4A0E17; /* Deep Oxblood / Burgundy (30%) */
+  --primary-dark: #360910; /* Dark Oxblood */
   --success: #1E824C; /* Confident green */
-  --warning: #D97706; /* Warm amber */
-  --error: #C0392B; /* Alert red */
+  --warning: #C5A059; /* Warm gold */
+  --error: #A92323; /* Deep oxblood red */
+}
+
+/* Fallback color utility classes */
+.bg-surface-2 { background-color: var(--surface-2, #EFECE6) !important; }
+.border-border { border-color: var(--border, #E5DFC9) !important; }
+.text-text { color: var(--text, #2B2B2B) !important; }
+.text-muted { color: var(--muted, #6E6B65) !important; }
+.bg-primary { background-color: var(--primary, #4A0E17) !important; }
+.text-primary { color: var(--primary, #4A0E17) !important; }
+.bg-accent { background-color: var(--accent, #C5A059) !important; }
+.text-accent { color: var(--accent, #C5A059) !important; }
+.border-accent { border-color: var(--accent, #C5A059) !important; }
+
+/* Touch-friendly momentum scrolling for tables on mobile */
+.touch-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  touch-action: pan-x pan-y;
 }
 
 * {
@@ -30,7 +65,7 @@
 
 html, body, #root {
   height: 100%;
-  background: linear-gradient(175deg, #F8F8FF 0%, #F0F0FA 45%, #EEEEF6 100%);
+  background-color: #F7F4EF;
   color: var(--text);
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 }
@@ -396,3 +431,70 @@ html, body, #root {
   transition: width 2.2s cubic-bezier(0.22,1,0.36,1);
 }
 .kpi-bar-fill.animate { width: 100%; }
+
+/* ── Hero Floating Emoji Particles ─────────────────── */
+@keyframes hero-float-1 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.08; }
+  50% { transform: translateY(-22px) rotate(8deg); opacity: 0.18; }
+}
+@keyframes hero-float-2 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.06; }
+  50% { transform: translateY(-32px) rotate(-10deg); opacity: 0.14; }
+}
+@keyframes hero-float-3 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.07; }
+  50% { transform: translateY(-18px) rotate(14deg); opacity: 0.16; }
+}
+.animate-hero-float-1 { animation: hero-float-1 7s ease-in-out infinite; }
+.animate-hero-float-2 { animation: hero-float-2 9s ease-in-out infinite; }
+.animate-hero-float-3 { animation: hero-float-3 8s ease-in-out infinite; }
+
+/* Bounce slow for floating widgets */
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-bounce-slow { animation: bounce-slow 3s ease-in-out infinite; }
+
+/* Sticky bar slide up */
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.22,1,0.36,1) 0.8s both; }
+
+/* Marquee pause on hover */
+.ticker-track { display: flex; width: max-content; }
+.ticker-track:hover { animation-play-state: paused; }
+
+/* ── Inventory Card Popular Badge ─────────────────── */
+.popular-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: linear-gradient(135deg, #4A0E17, #7a1a29);
+  color: #C5A059;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(74,14,23,0.4);
+  z-index: 5;
+}
+.orders-badge {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px);
+  color: #4A0E17;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(197,160,89,0.4);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 5;
+}

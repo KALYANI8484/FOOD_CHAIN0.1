@@ -1,6 +1,18 @@
 // Custom MongoDB-backed mock Supabase Client for VIKRAM ADVERTISING
 // This replicates the supabase-js query builder syntax to avoid breaking existing frontend code.
 
+export type VendorSubscription = {
+  id?: string;
+  plan_id?: string;
+  plan_name: string;
+  category_name?: string | null;
+  subscription_start?: string | null;
+  subscription_end?: string | null;
+  max_items?: number;
+  max_clients?: number;
+  status?: string;
+};
+
 export type Plan = {
   id: string;
   name: string;
@@ -9,7 +21,9 @@ export type Plan = {
   max_items: number;
   max_clients: number;
   master_category_name?: string | null;
+  badge?: string | null;
   status: string;
+  features?: string[];
   created_at: string;
 };
 
@@ -57,6 +71,7 @@ export type Vendor = {
   total_clients: number;
   addon_max_clients?: number;
   addon_name?: string | null;
+  active_subscriptions?: VendorSubscription[];
   created_at: string;
 };
 

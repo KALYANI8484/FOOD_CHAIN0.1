@@ -1,6 +1,14 @@
 import { useEffect, useState, useRef, type ReactNode, type MouseEvent } from 'react';
 
-export function LanguageSelector({ onChange }: { onChange?: (lang: Language) => void }) {
+export function LanguageSelector({
+  onChange,
+  direction = 'down',
+  showLabel = true
+}: {
+  onChange?: (lang: Language) => void;
+  direction?: 'up' | 'down' | 'auto';
+  showLabel?: boolean;
+}) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -38,47 +46,56 @@ export function LanguageSelector({ onChange }: { onChange?: (lang: Language) => 
     setOpen(false);
   };
 
-  const options: { code: Language; label: string; flag: string }[] = [
-    { code: 'en', label: 'English', flag: '🇬🇧' },
-    { code: 'hi', label: 'हिंदी', flag: '🇮🇳' },
-    { code: 'mr', label: 'मराठी', flag: '🇮🇳' },
+  const options: { code: Language; label: string; flag: string; short: string }[] = [
+    { code: 'en', label: 'English', flag: '🇬🇧', short: 'EN' },
+    { code: 'hi', label: 'हिंदी', flag: '🇮🇳', short: 'HI' },
+    { code: 'mr', label: 'मराठी', flag: '🇮🇳', short: 'MR' },
   ];
 
+  const currentOpt = options.find(o => o.code === lang) || options[0];
+
+  const menuPosClass = direction === 'up'
+    ? 'bottom-full mb-2 right-0'
+    : 'top-full mt-2 right-0';
+
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
-      {/* Globe Icon Button ONLY */}
+    <div className="relative inline-block text-left z-[99999]" ref={menuRef}>
+      {/* Globe Icon Pill Button */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-9 h-9 rounded-xl bg-gray-100/90 hover:bg-amber-100/80 border border-gray-200/90 flex items-center justify-center text-amber-700 shadow-sm transition-all active:scale-95 group"
+        className="h-9 px-3 rounded-xl bg-white hover:bg-amber-50 border border-amber-200 flex items-center gap-1.5 text-amber-800 shadow-sm transition-all active:scale-95 cursor-pointer"
         title="Change Language / भाषा बदलें / भाषा बदला"
         aria-label="Change Language"
       >
-        <span className="text-base leading-none group-hover:rotate-12 transition-transform">🌐</span>
+        <span className="text-base leading-none">🌐</span>
+        {showLabel && (
+          <span className="text-xs font-black uppercase tracking-wider text-slate-800">{currentOpt.short}</span>
+        )}
       </button>
 
       {/* Floating Dropdown Menu */}
       {open && (
-        <div className="absolute right-0 mt-2 w-36 rounded-2xl bg-white shadow-xl border border-gray-100 py-1.5 z-50 animate-scale-in">
-          <div className="px-3 py-1 border-b border-gray-100 mb-1">
-            <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Select Language</p>
+        <div className={`absolute ${menuPosClass} w-48 rounded-2xl bg-white shadow-2xl border border-amber-200 py-2 z-[99999] animate-scale-in min-w-[185px]`}>
+          <div className="px-3.5 py-1.5 border-b border-amber-100 mb-1">
+            <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Select Language</p>
           </div>
           {options.map((opt) => (
             <button
               key={opt.code}
               type="button"
               onClick={() => change(opt.code)}
-              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold transition-colors cursor-pointer ${
                 lang === opt.code
-                  ? 'bg-amber-50 text-amber-700 font-extrabold'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-amber-100/70 text-amber-900 font-black'
+                  : 'text-slate-700 hover:bg-amber-50/60'
               }`}
             >
-              <span className="flex items-center gap-2">
-                <span>{opt.flag}</span>
-                <span>{opt.label}</span>
+              <span className="flex items-center gap-2.5">
+                <span className="text-base">{opt.flag}</span>
+                <span className="font-extrabold text-sm text-slate-900">{opt.label}</span>
               </span>
-              {lang === opt.code && <span className="text-amber-600 font-bold">✓</span>}
+              {lang === opt.code && <span className="text-amber-700 font-black text-sm">✓</span>}
             </button>
           ))}
         </div>
@@ -116,18 +133,18 @@ export function Modal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="absolute inset-0 bg-[#111118]/30 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${sizes[size]} card glass max-h-[90vh] overflow-y-auto animate-scale-in`}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className={`relative w-full ${sizes[size]} bg-[#FAF8F5] text-slate-900 border-t sm:border border-amber-200/80 shadow-2xl rounded-t-3xl sm:rounded-3xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-scale-in`}>
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 glass z-10">
-            <h3 className="text-lg font-bold">{title}</h3>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-2 transition-colors group">
-              <X size={18} className="text-muted group-hover:text-text transition-colors" />
+          <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10 rounded-t-3xl">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
+              <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
   );
@@ -155,19 +172,19 @@ export function Drawer({
 
   return (
     <div className="fixed inset-0 z-50 animate-fade-in">
-      <div className="absolute inset-0 bg-[#111118]/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
-        className={`absolute top-0 ${side === 'right' ? 'right-0 animate-slide-in-right' : 'left-0 animate-slide-in-left'} h-full w-full max-w-md card glass overflow-y-auto`}
+        className={`absolute top-0 ${side === 'right' ? 'right-0 animate-slide-in-right' : 'left-0 animate-slide-in-left'} h-full w-full max-w-md bg-[#FAF8F5] text-slate-900 border-l border-amber-200 shadow-2xl overflow-y-auto`}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 glass z-10">
-            <h3 className="text-lg font-bold">{title}</h3>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-2 transition-colors group">
-              <X size={18} className="text-muted group-hover:text-text transition-colors" />
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
+              <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
   );
@@ -195,16 +212,17 @@ export function useToast() {
   return { toast, show };
 }
 
-export function Badge({ children, variant = 'default' }: { children: ReactNode; variant?: 'default' | 'success' | 'warning' | 'error' | 'accent' }) {
+export function Badge({ children, variant = 'default', className = '' }: { children: ReactNode; variant?: 'default' | 'success' | 'warning' | 'error' | 'accent' | 'info'; className?: string }) {
   const variants = {
-    default: 'bg-surface-2 text-muted border-border',
-    success: 'bg-green-500/10 text-green-400 border-green-500/20',
-    warning: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    error: 'bg-red-500/10 text-red-400 border-red-500/20',
-    accent: 'bg-accent/10 text-accent border-accent/20',
+    default: 'bg-surface-2 text-text border-border font-extrabold',
+    success: 'bg-green-100 text-green-800 border-green-300 font-extrabold',
+    warning: 'bg-amber-100 text-amber-900 border-amber-300 font-extrabold',
+    error: 'bg-red-100 text-red-800 border-red-300 font-extrabold',
+    accent: 'bg-[#4A0E17] text-[#C5A059] border-[#C5A059]/40 font-extrabold',
+    info: 'bg-blue-100 text-blue-800 border-blue-300 font-extrabold',
   };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${variants[variant]}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${variants[variant] || variants.default} ${className}`}>
       {children}
     </span>
   );
@@ -329,7 +347,7 @@ export function EmptyState({ icon, title, subtitle }: { icon: ReactNode; title: 
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center text-muted mb-4">{icon}</div>
-      <p className="text-white font-semibold">{title}</p>
+      <p className="text-text font-extrabold text-base">{title}</p>
       {subtitle && <p className="text-muted text-sm mt-1">{subtitle}</p>}
     </div>
   );

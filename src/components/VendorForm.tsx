@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
 import { supabase, type Plan } from '../lib/supabase';
 import { Input, Select, Button, Spinner, getInitialLanguage, type Language } from './ui';
 
@@ -117,6 +116,25 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     qr_url: initialData?.qr_url || '',
   });
 
+  useEffect(() => {
+    if (initialData) {
+      setForm({
+        owner_name: initialData.owner_name || '',
+        phone: initialData.phone || '',
+        email: initialData.email || '',
+        shop_name: initialData.shop_name || '',
+        address: initialData.address || '',
+        zip_code: initialData.zip_code || '',
+        birthdate: normalizeDateInputValue(initialData.birthdate || ''),
+        password: '',
+        confirm_password: '',
+        plan_id: initialData.plan_id || '',
+        logo_url: initialData.logo_url || '',
+        qr_url: initialData.qr_url || '',
+      });
+    }
+  }, [initialData]);
+
   const selectedPlan = plans.find((p) => p.id === form.plan_id);
   const today = new Date();
   const startDate = today.toISOString().slice(0, 10);
@@ -126,13 +144,20 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('subscription_plans').select('*').eq('status', 'active');
-      const activePlans = data || [];
-      setPlans(activePlans);
-      if (activePlans.length > 0 && !form.plan_id) {
-        setForm((f) => ({ ...f, plan_id: activePlans[0].id }));
+      try {
+        const { data } = await supabase.from('subscription_plans').select('*');
+        const allPlans = data || [];
+        const activePlans = allPlans.filter(p => !p.status || p.status === 'active');
+        const finalPlans = activePlans.length > 0 ? activePlans : allPlans;
+        setPlans(finalPlans);
+        if (finalPlans.length > 0 && !form.plan_id) {
+          setForm((f) => ({ ...f, plan_id: finalPlans[0].id }));
+        }
+      } catch (err) {
+        console.error("Error loading plans in VendorForm:", err);
+      } finally {
+        setLoadingPlans(false);
       }
-      setLoadingPlans(false);
     })();
   }, []);
 
@@ -165,8 +190,6 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
       setSubmitting(false);
     }
   };
-
-  if (loadingPlans) return <Spinner />;
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
@@ -224,7 +247,10 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
           label={t.subPlan}
           value={form.plan_id}
           onChange={(v) => setForm({ ...form, plan_id: v })}
-          options={plans.map((p) => ({ value: p.id, label: `${p.name} — ₹${p.price}` }))}
+          options={loadingPlans 
+            ? [{ value: form.plan_id || '', label: 'Loading subscription plans...' }]
+            : plans.map((p) => ({ value: p.id, label: `${p.name} — ₹${p.price}` }))
+          }
         />
       </div>
 
