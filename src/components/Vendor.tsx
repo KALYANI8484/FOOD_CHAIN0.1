@@ -2,13 +2,28 @@ import { useEffect, useState, useRef } from 'react';
 import {
   LayoutDashboard, Package, ShoppingBag, CreditCard, Radar, Trash2,
   DollarSign, Clock, CheckCircle2, AlertCircle, Store, Lock as Padlock,
-  Navigation, AlertTriangle, Upload, Menu, X, Sparkles, MessageSquare
+  Navigation, AlertTriangle, Upload, Menu, X, Sparkles, MessageSquare,
+  MessageCircle, Phone
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { getItemTranslation } from './Landing';
 import { AntigravitySuccessModal } from './AntigravitySuccessModal';
+
+// Shared WhatsApp/call link builders for vendor-to-client contact (claim popup + Kanban cards)
+function buildClientWhatsAppMessage(clientName: string, shopName: string, itemName: string, extra?: string) {
+  const base = `Hello ${clientName}, this is ${shopName} regarding your order for ${itemName}.`;
+  return extra ? `${base} ${extra}` : base;
+}
+function buildClientWhatsAppLink(clientPhone: string, message: string) {
+  const cleanPhone = (clientPhone || '').replace(/\D/g, '');
+  return `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`;
+}
+function buildClientTelLink(clientPhone: string) {
+  const cleanPhone = (clientPhone || '').replace(/\D/g, '');
+  return `tel:+91${cleanPhone}`;
+}
 
 function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
@@ -75,6 +90,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   const [radarOrders, setRadarOrders] = useState<Order[]>([]);
   const socketRef = useRef<any>(null);
   const [approvalPopup, setApprovalPopup] = useState<{ planName: string; subscriptionEnd?: string | null; maxItems?: number; maxClients?: number } | null>(null);
+  const [claimPopup, setClaimPopup] = useState<{ clientName: string; clientPhone: string; itemName: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -421,7 +437,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         <div className="px-3.5 py-4 sm:p-8 max-w-7xl mx-auto">
           {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} radarOrders={radarOrders} />}
           {tab === 'menu' && <VendorMenu vendor={vendor} show={show} />}
-          {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
+          {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} onOrderClaimed={setClaimPopup} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
           {tab === 'activation' && <PlanActivation vendor={vendor} activePlan={activePlan} onTab={setTab} />}
           {tab === 'upgrade' && <UpgradePlan vendor={vendor} />}
@@ -454,6 +470,35 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
                 <strong className="text-gray-900">{approvalPopup.maxItems}</strong>
               </div>
             )}
+          </div>
+        )}
+      </AntigravitySuccessModal>
+
+      <AntigravitySuccessModal
+        open={!!claimPopup}
+        onClose={() => setClaimPopup(null)}
+        title="🎉 Order Claimed Successfully!"
+        subtitle="Reach out to your client right away:"
+      >
+        {claimPopup && (
+          <div className="mt-4 flex flex-col gap-2.5">
+            <a
+              href={buildClientWhatsAppLink(
+                claimPopup.clientPhone,
+                buildClientWhatsAppMessage(claimPopup.clientName, vendor?.shop_name || '', claimPopup.itemName, 'We have accepted your order and are preparing it now!')
+              )}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-3 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-green-500/20"
+            >
+              <MessageCircle size={16} /> Chat with Client on WhatsApp 💬
+            </a>
+            <a
+              href={buildClientTelLink(claimPopup.clientPhone)}
+              className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/20"
+            >
+              <Phone size={16} /> Call Client 📞
+            </a>
           </div>
         )}
       </AntigravitySuccessModal>
@@ -1362,9 +1407,10 @@ interface OrderRadarProps {
   radarOrders: Order[];
   onTab: (tab: Tab) => void;
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
+  onOrderClaimed: (payload: { clientName: string; clientPhone: string; itemName: string }) => void;
 }
 
-function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadarProps) {
+function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaimed }: OrderRadarProps) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
@@ -1445,6 +1491,15 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
       show(d.error || 'Failed to confirm order', 'error');
       return;
     }
+
+    // radarOrders redacts client_name/client_phone while an order is still 'pending' (see
+    // server.js), so pull the real contact details from the update response, not from `order`.
+    const freshOrder = Array.isArray(d.data) ? d.data[0] : d.data;
+    onOrderClaimed({
+      clientName: freshOrder?.client_name || '',
+      clientPhone: freshOrder?.client_phone || '',
+      itemName: freshOrder?.item_name || order.item_name || ''
+    });
 
     show('Order confirmed and frozen successfully!');
     onTab('kanban'); // Move to Kanban board
@@ -1830,14 +1885,22 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                   </div>
                   <div className="flex gap-2">
                     {o.status === 'accepted' ? (
-                      <Button size="sm" className="w-full" onClick={() => transitionOrder(oId, 'preparing')}>
+                      <Button size="sm" className="flex-1" onClick={() => transitionOrder(oId, 'preparing')}>
                         {t.startPrep}
                       </Button>
                     ) : (
-                      <Button size="sm" className="w-full bg-accent" onClick={() => transitionOrder(oId, 'out_for_delivery')}>
+                      <Button size="sm" className="flex-1 bg-accent" onClick={() => transitionOrder(oId, 'out_for_delivery')}>
                         {t.dispatchRider}
                       </Button>
                     )}
+                    <a
+                      href={buildClientWhatsAppLink(o.client_phone || '', buildClientWhatsAppMessage(o.client_name || '', vendor.shop_name, o.item_name || ''))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold text-xs transition-all shadow-xs shrink-0"
+                    >
+                      <MessageCircle size={14} /> WhatsApp Client 💬
+                    </a>
                   </div>
                 </div>
               );
@@ -1868,9 +1931,19 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                       {o.client_landmark && <p><span className="text-muted font-medium">{(t as any).landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
                     </div>
                   </div>
-                  <Button size="sm" className="w-full bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => transitionOrder(oId, 'delivered')}>
-                    {t.completeHandover}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1 bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => transitionOrder(oId, 'delivered')}>
+                      {t.completeHandover}
+                    </Button>
+                    <a
+                      href={buildClientWhatsAppLink(o.client_phone || '', buildClientWhatsAppMessage(o.client_name || '', vendor.shop_name, o.item_name || ''))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold text-xs transition-all shadow-xs shrink-0"
+                    >
+                      <MessageCircle size={14} /> WhatsApp Client 💬
+                    </a>
+                  </div>
                 </div>
               );
             })}
