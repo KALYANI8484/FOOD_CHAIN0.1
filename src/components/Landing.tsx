@@ -3,7 +3,7 @@ import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
   ChevronLeft, Hash, User, CheckCircle, Globe,
-  Package, Users as UsersIcon, TrendingUp, Star, UserPlus
+  Users as UsersIcon, TrendingUp, Star, UserPlus
 } from 'lucide-react';
 import { Spinner, LanguageSelector } from './ui';
 
@@ -1179,15 +1179,9 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             <p className="text-xs font-bold text-[#C5A059] uppercase tracking-widest mb-1.5">{t.liveStats}</p>
             <h2 className="text-2xl md:text-4xl font-extrabold text-[#F7F4EF]" style={{ fontFamily:"'Playfair Display', serif" }}>{t.trustedByCommunity}</h2>
           </div>
-          <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-3xl mx-auto">
+          <div className="relative z-10 grid grid-cols-2 gap-4 md:gap-6 max-w-3xl mx-auto">
             <KpiCard icon={ShoppingBag} label={t.totalOrdersPlaced} value={totalOrders} />
             <KpiCard icon={Store} label={t.vendorsJoined} value={totalVendors} />
-            <div className="text-center bg-white/15 rounded-2xl p-6 backdrop-blur-sm border border-white/20 reveal reveal-delay-3">
-              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mx-auto mb-3"><Star size={24} className="text-white" /></div>
-              <p className="text-5xl font-extrabold" style={{ fontFamily:"'Playfair Display', serif" }}>4.9</p>
-              <p className="text-white/85 text-sm font-semibold mt-1">{t.avgVendorRating || 'Avg Vendor Rating'}</p>
-            </div>
-            <KpiCard icon={Package} label={t.itemCategories || 'Item Categories'} value={masterItems.length} />
           </div>
         </div>
       </section>
