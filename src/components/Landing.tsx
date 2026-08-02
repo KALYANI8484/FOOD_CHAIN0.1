@@ -898,6 +898,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [activeClientOrder, setActiveClientOrder] = useState<any | null>(null);
   const [showClaimedModal, setShowClaimedModal] = useState(false);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [showStickyBar, setShowStickyBar] = useState(true);
 
   const [language, setLanguage] = useState<Language>(getInitialLanguage);
@@ -975,6 +976,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
           setTotalOrders(od.data.length + settingsOffset);
           // Privacy-safe ticker: last 10 orders, only category + zip3
           setRecentOrders([...od.data].reverse().slice(0, 10));
+          setOrders(od.data);
         }
         if (vd.data) setTotalVendors(vd.data.length);
         if (gd.data) {
@@ -1014,11 +1016,20 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const filtered = activeCategory === 'All' ? masterItems : masterItems.filter(m => m.category === activeCategory);
   const categoryCount = Array.from(new Set(masterItems.map(m => m.category))).filter(Boolean).length;
 
-  // Seeded "orders today" count for each item (privacy-safe, deterministic)
-  const seedCount = (name: string) => {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-    return 3 + (h % 28);
+  // Real lifetime order counts per dish, keyed by master item name (matches order.master_category_name,
+  // not order.item_name — the latter is a formatted "name (qty uom)" checkout summary string).
+  // "System Denied" orders are excluded: that status means no vendor accepted the order within the
+  // pickup window, so it never represents real fulfilled demand.
+  const realOrderCounts: Record<string, number> = {};
+  for (const o of orders) {
+    if (o.status === 'System Denied' || !o.master_category_name) continue;
+    realOrderCounts[o.master_category_name] = (realOrderCounts[o.master_category_name] || 0) + (Number(o.quantity) || 0);
+  }
+
+  const NEW_ITEM_BASELINE_COUNT = 5;
+  const getOrderedCount = (name: string) => {
+    const real = realOrderCounts[name] || 0;
+    return real > 0 ? { value: real, isBaseline: false } : { value: NEW_ITEM_BASELINE_COUNT, isBaseline: true };
   };
 
   return (
@@ -1215,11 +1226,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
             {filtered.map((item, i) => {
-              const ordersToday = seedCount(item.name);
+              const { value: orderedCount, isBaseline } = getOrderedCount(item.name);
               return (
                 <div key={item.id} onClick={() => setSelectedMaster(item)} className="inventory-card">
                   <div className="card-img relative">
-                    <span className="orders-badge">{ordersToday} ordered</span>
+                    <span className="orders-badge">{isBaseline ? '+' : ''}{orderedCount} ordered</span>
                     {item.image_url ? <img src={item.image_url} alt={item.name} /> : <div className="w-full h-full bg-amber-50" />}
                   </div>
                   <div className="p-4"><h3 className="font-bold text-gray-900 truncate">{getItemTranslation(item.name, language)}</h3></div>
