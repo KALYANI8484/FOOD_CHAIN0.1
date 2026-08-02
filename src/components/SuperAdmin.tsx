@@ -1958,10 +1958,27 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     load();
   };
 
+  // Real-time notice to the approved vendor's dashboard, distinct from the generic
+  // vendorUpdated broadcast that already fires from the vendors-table update below —
+  // that one fires for any vendor edit, so it can't by itself distinguish "my upgrade
+  // request was approved" from an unrelated admin correction.
+  const notifyUpgradeApproved = async (payload: { vendor_id: string; plan_name: string; subscription_end: string; max_items?: number; max_clients?: number }) => {
+    try {
+      await fetch('/api/notify/upgrade-approved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.error('Failed to broadcast upgrade approval notification:', e);
+    }
+  };
+
   const handleApproveUpgrade = async (u: UpgradeRequest) => {
     const targetPlan = await supabase.from('subscription_plans').select('*').eq('name', u.requested_plan).maybeSingle();
     const plan = targetPlan?.data as Plan;
     const validityDays = plan?.validity_days || 30;
+    const subscriptionEnd = new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10);
 
     // Update vendor subscription plan details
     await supabase.from('vendors').update({
@@ -1969,7 +1986,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       plan_name: u.requested_plan,
       status: 'approved',
       subscription_start: new Date().toISOString().slice(0, 10),
-      subscription_end: new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10)
+      subscription_end: subscriptionEnd
     }).eq('id', u.vendor_id);
 
     // Approve the upgrade request
@@ -1981,6 +1998,14 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     await supabase.from('activity_log').insert({
       action: `Upgrade request approved for: ${u.vendor_name} to ${u.requested_plan}`,
       actor: 'Super Admin'
+    });
+
+    await notifyUpgradeApproved({
+      vendor_id: u.vendor_id,
+      plan_name: u.requested_plan,
+      subscription_end: subscriptionEnd,
+      max_items: plan?.max_items,
+      max_clients: plan?.max_clients
     });
 
     show(`Upgrade request for ${u.vendor_name} approved!`);
@@ -1999,19 +2024,28 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       for (const u of eligible) {
         const targetPlan = plans.find(p => p.name === u.requested_plan);
         const validityDays = targetPlan?.validity_days || 30;
+        const subscriptionEnd = new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10);
 
         await supabase.from('vendors').update({
           plan_id: targetPlan?.id || null,
           plan_name: u.requested_plan,
           status: 'approved',
           subscription_start: new Date().toISOString().slice(0, 10),
-          subscription_end: new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10)
+          subscription_end: subscriptionEnd
         }).eq('id', u.vendor_id);
 
         await supabase.from('upgrade_requests').update({
           status: 'Approved',
           payment_status: 'Verified'
         }).eq('id', u.id);
+
+        await notifyUpgradeApproved({
+          vendor_id: u.vendor_id,
+          plan_name: u.requested_plan,
+          subscription_end: subscriptionEnd,
+          max_items: targetPlan?.max_items,
+          max_clients: targetPlan?.max_clients
+        });
       }
 
       show(`Batch approved & activated ${eligible.length} subscription upgrades!`, 'success');

@@ -1253,6 +1253,14 @@ app.post('/api/vendor-inventory/check-limit', async (req, res) => {
   }
 });
 
+// Relay a vendor-specific upgrade-approval event over WebSocket so the vendor's
+// dashboard can show a real-time "plan activated" popup, distinct from the generic
+// vendorUpdated broadcast (which fires for any vendor edit, not just approvals).
+app.post('/api/notify/upgrade-approved', (req, res) => {
+  io.emit('upgradeApproved', req.body || {});
+  res.json({ success: true });
+});
+
 // At-Risk Vendors Summary for Super Admin
 app.get('/api/vendors/at-risk', async (req, res) => {
   try {

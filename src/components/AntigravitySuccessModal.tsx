@@ -8,6 +8,7 @@ interface AntigravitySuccessModalProps {
   subtitle?: string;
   primaryActionText?: string;
   onPrimaryAction?: () => void;
+  children?: React.ReactNode;
 }
 
 /* ── Interactive Celebratory Call-To-Action Pill Button with Symmetrical Burst ── */
@@ -104,7 +105,8 @@ export function AntigravitySuccessModal({
   title = "Registration Successful!",
   subtitle = "Your vendor account has been created successfully! You can now log in using your phone number and password.",
   primaryActionText = "OK",
-  onPrimaryAction
+  onPrimaryAction,
+  children
 }: AntigravitySuccessModalProps) {
   if (!open) return null;
 
@@ -129,13 +131,15 @@ export function AntigravitySuccessModal({
         {/* Headline & Subtitle */}
         <div className="space-y-2 relative z-10">
           <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-            Registration Successful!
+            {title}
           </h2>
 
           <p className="text-gray-600 text-sm leading-relaxed max-w-sm mx-auto pt-1 font-semibold">
             {subtitle}
           </p>
         </div>
+
+        {children}
 
         {/* Action Button */}
         <div className="pt-6 flex justify-center">

@@ -8,6 +8,7 @@ import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { getItemTranslation } from './Landing';
+import { AntigravitySuccessModal } from './AntigravitySuccessModal';
 
 function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
@@ -25,6 +26,7 @@ type Tab = 'dashboard' | 'menu' | 'radar' | 'kanban' | 'activation' | 'upgrade';
 
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const t = vTrans[lang];
 
   useEffect(() => {
     const handleStorage = () => {
@@ -72,6 +74,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   // Sockets & Live broadcast radar list
   const [radarOrders, setRadarOrders] = useState<Order[]>([]);
   const socketRef = useRef<any>(null);
+  const [approvalPopup, setApprovalPopup] = useState<{ planName: string; subscriptionEnd?: string | null; maxItems?: number; maxClients?: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -214,6 +217,21 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       if (vendor && ((updatedVendor as any)._id === (vendor as any)._id || updatedVendor.id === vendor.id)) {
         setVendor(updatedVendor);
         show('🎉 Your subscription plan has been updated by Super Admin!', 'success');
+      }
+    });
+
+    // Distinct from vendorUpdated above (which fires for any vendor edit): this fires
+    // specifically when Super Admin approves an upgrade/addon request, so it can safely
+    // trigger a celebratory "plan activated" popup instead of just a toast.
+    socket.on('upgradeApproved', (payload: any) => {
+      const myId = vendor.id || (vendor as any)._id;
+      if (payload && payload.vendor_id === myId) {
+        setApprovalPopup({
+          planName: payload.plan_name,
+          subscriptionEnd: payload.subscription_end,
+          maxItems: payload.max_items,
+          maxClients: payload.max_clients
+        });
       }
     });
 
@@ -406,11 +424,39 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
           {tab === 'activation' && <PlanActivation vendor={vendor} activePlan={activePlan} onTab={setTab} />}
-          {tab === 'upgrade' && <UpgradePlan vendor={vendor} show={show} />}
+          {tab === 'upgrade' && <UpgradePlan vendor={vendor} />}
         </div>
       </main>
 
       {toast && <Toast message={toast.message} type={toast.type} />}
+
+      <AntigravitySuccessModal
+        open={!!approvalPopup}
+        onClose={() => setApprovalPopup(null)}
+        title={t.planActivatedTitle}
+        subtitle={approvalPopup ? `${t.planActivatedMsgPrefix} ${approvalPopup.planName} ${t.planActivatedMsgSuffix}` : ''}
+      >
+        {approvalPopup && (
+          <div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t.planActivatedPlanLabel}</span>
+              <strong className="text-gray-900">{approvalPopup.planName}</strong>
+            </div>
+            {approvalPopup.subscriptionEnd && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">{t.planActivatedValidUntilLabel}</span>
+                <strong className="text-gray-900">{approvalPopup.subscriptionEnd}</strong>
+              </div>
+            )}
+            {approvalPopup.maxItems !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">{t.planActivatedMaxItemsLabel}</span>
+                <strong className="text-gray-900">{approvalPopup.maxItems}</strong>
+              </div>
+            )}
+          </div>
+        )}
+      </AntigravitySuccessModal>
     </div>
   );
 }
@@ -426,6 +472,14 @@ const vTrans = {
     totalEarnedDesc: 'Total overall earned from website',
     activeRadarOpportunities: 'Active Radar Opportunities',
     activeRadarOpportunitiesDesc: 'Live orders in your PIN ready to be claimed right now',
+    requestSubmittedTitle: '📤 Request Submitted!',
+    requestSubmittedMsg: 'Your request has been successfully sent to the owner (Super Admin). You will be notified as soon as your request is reviewed and approved.',
+    planActivatedTitle: '🎉 Request Approved & Plan Activated!',
+    planActivatedMsgPrefix: 'Great news! Your request has been approved by Super Admin. Your plan',
+    planActivatedMsgSuffix: 'is now fully ACTIVATED!',
+    planActivatedPlanLabel: 'Plan',
+    planActivatedValidUntilLabel: 'Valid Until',
+    planActivatedMaxItemsLabel: 'Max Items',
     successfulOrders: 'SUCCESSFUL ORDERS',
     noCompletedOrdersYet: 'No completed orders yet',
     subscriptionHealth: 'SUBSCRIPTION HEALTH',
@@ -525,6 +579,14 @@ const vTrans = {
     totalEarnedDesc: 'वेबसाइट से हुई कुल कमाई',
     activeRadarOpportunities: 'सक्रिय रडार अवसर',
     activeRadarOpportunitiesDesc: 'आपके पिन कोड में अभी स्वीकार करने योग्य लाइव ऑर्डर',
+    requestSubmittedTitle: '📤 अनुरोध सबमिट किया गया!',
+    requestSubmittedMsg: 'आपका अनुरोध सफलतापूर्वक मालिक (सुपर एडमिन) को भेज दिया गया है। समीक्षा और स्वीकृति होते ही आपको सूचित किया जाएगा।',
+    planActivatedTitle: '🎉 अनुरोध स्वीकृत और प्लान सक्रिय!',
+    planActivatedMsgPrefix: 'बढ़िया खबर! सुपर एडमिन ने आपका अनुरोध स्वीकार कर लिया है। आपका प्लान',
+    planActivatedMsgSuffix: 'अब पूरी तरह से सक्रिय है!',
+    planActivatedPlanLabel: 'प्लान',
+    planActivatedValidUntilLabel: 'तक वैध',
+    planActivatedMaxItemsLabel: 'अधिकतम आइटम',
     successfulOrders: 'सफल ऑर्डर',
     noCompletedOrdersYet: 'अभी तक कोई पूर्ण ऑर्डर नहीं है',
     subscriptionHealth: 'सब्सक्रिप्शन स्थिति',
@@ -624,6 +686,14 @@ const vTrans = {
     totalEarnedDesc: 'वेबसाइटवरून झालेली एकूण कमाई',
     activeRadarOpportunities: 'सक्रिय रडार संधी',
     activeRadarOpportunitiesDesc: 'तुमच्या पिन कोडमध्ये आत्ता स्वीकारण्यायोग्य लाइव्ह ऑर्डर्स',
+    requestSubmittedTitle: '📤 विनंती सबमिट झाली!',
+    requestSubmittedMsg: 'तुमची विनंती मालकाला (सुपर ॲडमिन) यशस्वीरित्या पाठवण्यात आली आहे. पुनरावलोकन आणि मंजुरी मिळताच तुम्हाला कळवले जाईल.',
+    planActivatedTitle: '🎉 विनंती मंजूर आणि प्लॅन सक्रिय!',
+    planActivatedMsgPrefix: 'आनंदाची बातमी! सुपर ॲडमिनने तुमची विनंती मंजूर केली आहे. तुमचा प्लॅन',
+    planActivatedMsgSuffix: 'आता पूर्णपणे सक्रिय झाला आहे!',
+    planActivatedPlanLabel: 'प्लॅन',
+    planActivatedValidUntilLabel: 'वैध पर्यंत',
+    planActivatedMaxItemsLabel: 'कमाल आयटम्स',
     successfulOrders: 'यशस्वी ऑर्डर्स',
     noCompletedOrdersYet: 'अद्याप कोणतेही पूर्ण झालेले ऑर्डर्स नाहीत',
     subscriptionHealth: 'सबस्क्रिप्शन आरोग्य',
@@ -935,6 +1005,7 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
   const [suggestionText, setSuggestionText] = useState('');
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showSubmittedModal, setShowSubmittedModal] = useState(false);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const isDateExpired = vendor.subscription_end ? vendor.subscription_end < todayIso : false;
@@ -1015,7 +1086,7 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
       });
       setSuggestionText('');
       await loadSuggestions();
-      alert('Q&A / Suggestion submitted to Super Admin successfully!');
+      setShowSubmittedModal(true);
     } catch (e) {
       alert('Failed to submit suggestion.');
     } finally {
@@ -1273,6 +1344,13 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
           )}
         </div>
       </div>
+
+      <AntigravitySuccessModal
+        open={showSubmittedModal}
+        onClose={() => setShowSubmittedModal(false)}
+        title={t.requestSubmittedTitle}
+        subtitle={t.requestSubmittedMsg}
+      />
     </div>
   );
 }
@@ -1853,7 +1931,7 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
 }
 
 // 4. Upgrade Plan tab
-function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+function UpgradePlan({ vendor }: { vendor: VendorType }) {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
 
   useEffect(() => {
@@ -1876,6 +1954,7 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
   const [addons, setAddons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showSubmittedModal, setShowSubmittedModal] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1906,7 +1985,7 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
       actor: 'Vendor'
     });
 
-    show('Upgrade request submitted to Super Admin');
+    setShowSubmittedModal(true);
     setSubmitting(false);
   };
 
@@ -1988,6 +2067,13 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
           </div>
         </div>
       )}
+
+      <AntigravitySuccessModal
+        open={showSubmittedModal}
+        onClose={() => setShowSubmittedModal(false)}
+        title={t.requestSubmittedTitle}
+        subtitle={t.requestSubmittedMsg}
+      />
     </div>
   );
 }
