@@ -1567,13 +1567,19 @@ function SubAdminLiveOrderTrackerTab({ show }: { show: (m: string, t?: 'success'
 }
 
 // 6. Pending & Missed Orders Tab for Sub-Admin
+// Orders are considered "missed" once they've broadcast past the 9-hour vendor pickup window
+// (kept consistent with the SLA countdown shown on Vendor.tsx and on each order card below).
+const MISSED_ORDER_THRESHOLD_SECS = 32400;
+const isOrderMissed = (o: any) => Math.max(0, Date.now() - new Date(o.created_at).getTime()) / 1000 >= MISSED_ORDER_THRESHOLD_SECS;
+
 function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
   const [orders, setOrders] = useState<any[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [assignModalOrder, setAssignModalOrder] = useState<any | null>(null);
+  const [assignTargets, setAssignTargets] = useState<any[] | null>(null);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
   const [assigning, setAssigning] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   const load = async () => {
     try {
@@ -1618,24 +1624,30 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
     return () => clearInterval(interval);
   }, []);
 
+  // Resets an order's broadcast timer so it re-enters the live vendor pool as brand new.
+  const resumeOrder = async (targetId: string) => {
+    await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orders',
+        action: 'update',
+        filters: { id: targetId },
+        data: {
+          status: 'pending',
+          created_at: new Date().toISOString()
+        },
+        admin_override: true
+      })
+    });
+  };
+
   const handleResumeOrder = async (order: any) => {
+    const targetId = order.id || order._id;
     try {
-      const targetId = order.id || order._id;
-      await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: 'orders',
-          action: 'update',
-          filters: { id: targetId },
-          data: {
-            status: 'pending',
-            created_at: new Date().toISOString()
-          },
-          admin_override: true
-        })
-      });
+      await resumeOrder(targetId);
       show(`Order #${targetId.toString().substring(0, 6).toUpperCase()} resumed & re-broadcasted to nearby active vendors!`, 'success');
+      setSelectedOrderIds(ids => ids.filter(id => id !== targetId));
       load();
     } catch (e) {
       console.error(e);
@@ -1644,7 +1656,7 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
   };
 
   const handleResumeAllMissed = async () => {
-    const missedOrders = orders.filter(o => Date.now() - new Date(o.created_at).getTime() > 60 * 1000);
+    const missedOrders = orders.filter(isOrderMissed);
     if (missedOrders.length === 0) {
       show('No missed orders to resume', 'info');
       return;
@@ -1652,23 +1664,10 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
 
     try {
       for (const order of missedOrders) {
-        const targetId = order.id || order._id;
-        await fetch('/api/db', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            table: 'orders',
-            action: 'update',
-            filters: { id: targetId },
-            data: {
-              status: 'pending',
-              created_at: new Date().toISOString()
-            },
-            admin_override: true
-          })
-        });
+        await resumeOrder(order.id || order._id);
       }
       show(`Successfully resumed and re-broadcasted ${missedOrders.length} missed orders!`, 'success');
+      setSelectedOrderIds([]);
       load();
     } catch (e) {
       console.error(e);
@@ -1676,8 +1675,27 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
     }
   };
 
+  const handleResumeSelected = async () => {
+    if (selectedOrderIds.length === 0) return;
+    try {
+      for (const targetId of selectedOrderIds) {
+        await resumeOrder(targetId);
+      }
+      show(`Resumed ${selectedOrderIds.length} selected order${selectedOrderIds.length > 1 ? 's' : ''}!`, 'success');
+      setSelectedOrderIds([]);
+      load();
+    } catch (e) {
+      console.error(e);
+      show('Failed to resume selected orders', 'error');
+    }
+  };
+
+  const toggleOrderSelected = (targetId: string) => {
+    setSelectedOrderIds(ids => ids.includes(targetId) ? ids.filter(id => id !== targetId) : [...ids, targetId]);
+  };
+
   const handleManualAssign = async () => {
-    if (!assignModalOrder || !selectedVendorId) {
+    if (!assignTargets || assignTargets.length === 0 || !selectedVendorId) {
       show('Please select a target vendor', 'error');
       return;
     }
@@ -1686,25 +1704,33 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
 
     setAssigning(true);
     try {
-      const targetOrderId = assignModalOrder.id || assignModalOrder._id;
-      await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: 'orders',
-          action: 'update',
-          filters: { id: targetOrderId },
-          data: {
-            vendor_id: selectedVendorId,
-            vendor_name: targetVendor.shop_name,
-            vendor_phone: targetVendor.phone,
-            status: 'accepted'
-          },
-          admin_override: true
-        })
-      });
-      show(`Order #${targetOrderId.toString().substring(0, 6).toUpperCase()} force-assigned to ${targetVendor.shop_name}!`, 'success');
-      setAssignModalOrder(null);
+      for (const order of assignTargets) {
+        const targetOrderId = order.id || order._id;
+        await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: 'orders',
+            action: 'update',
+            filters: { id: targetOrderId },
+            data: {
+              vendor_id: selectedVendorId,
+              vendor_name: targetVendor.shop_name,
+              vendor_phone: targetVendor.phone,
+              status: 'accepted'
+            },
+            admin_override: true
+          })
+        });
+      }
+      show(
+        assignTargets.length === 1
+          ? `Order #${(assignTargets[0].id || assignTargets[0]._id).toString().substring(0, 6).toUpperCase()} force-assigned to ${targetVendor.shop_name}!`
+          : `${assignTargets.length} orders force-assigned to ${targetVendor.shop_name}!`,
+        'success'
+      );
+      setSelectedOrderIds(ids => ids.filter(id => !assignTargets.some(o => (o.id || o._id) === id)));
+      setAssignTargets(null);
       setSelectedVendorId('');
       load();
     } catch (e) {
@@ -1716,7 +1742,17 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
 
   if (loading) return <Spinner />;
 
-  const missedOrdersList = orders.filter(o => Date.now() - new Date(o.created_at).getTime() > 60 * 1000);
+  const missedOrdersList = orders.filter(isOrderMissed);
+  const selectedMissedIds = selectedOrderIds.filter(id => missedOrdersList.some(o => (o.id || o._id) === id));
+  const allMissedSelected = missedOrdersList.length > 0 && selectedMissedIds.length === missedOrdersList.length;
+
+  const toggleSelectAll = () => {
+    if (allMissedSelected) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(missedOrdersList.map(o => o.id || o._id));
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -1732,19 +1768,28 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
             )}
           </div>
           <p className="text-[#6B7280] text-sm mt-1">
-            Monitor live 9-hour vendor broadcasting countdowns and resume missed client orders for partner kitchens.
+            Orders that missed the 9-hour vendor pickup window. Select one or more to resume or force-assign to a vendor.
           </p>
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
           {missedOrdersList.length > 0 && (
-            <button
-              onClick={handleResumeAllMissed}
-              className="px-4 py-2 rounded-xl bg-[#4A0E17] hover:bg-[#360910] text-[#C5A059] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-[#C5A059]/40 cursor-pointer"
-              title="Re-broadcast all missed orders to nearby vendors simultaneously"
-            >
-              <RefreshCw size={14} className="animate-spin-slow" /> Resume All Missed ({missedOrdersList.length})
-            </button>
+            <>
+              <button
+                onClick={toggleSelectAll}
+                className="px-4 py-2 rounded-xl bg-white hover:bg-gray-100 text-[#374151] text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs border border-gray-300 cursor-pointer"
+              >
+                <CheckCircle2 size={14} className={allMissedSelected ? 'text-[#F1A80A]' : 'text-gray-400'} />
+                {allMissedSelected ? 'Deselect All' : `Select All (${missedOrdersList.length})`}
+              </button>
+              <button
+                onClick={handleResumeAllMissed}
+                className="px-4 py-2 rounded-xl bg-[#4A0E17] hover:bg-[#360910] text-[#C5A059] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-[#C5A059]/40 cursor-pointer"
+                title="Re-broadcast all missed orders to nearby vendors simultaneously"
+              >
+                <RefreshCw size={14} className="animate-spin-slow" /> Resume All Missed ({missedOrdersList.length})
+              </button>
+            </>
           )}
 
           <button
@@ -1756,28 +1801,45 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
         </div>
       </div>
 
+      {/* Batch Selection Toolbar */}
+      {selectedMissedIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-2xl p-3 px-4">
+          <span className="text-xs font-bold text-blue-900">
+            {selectedMissedIds.length} order{selectedMissedIds.length > 1 ? 's' : ''} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAssignTargets(missedOrdersList.filter(o => selectedMissedIds.includes(o.id || o._id)))}
+              className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-[#374151] font-bold text-xs border border-gray-300 transition-all cursor-pointer flex items-center gap-1"
+            >
+              <Store size={12} /> Assign Selected 🏪
+            </button>
+            <button
+              onClick={handleResumeSelected}
+              className="px-3 py-1.5 rounded-lg bg-[#2E7D32] hover:bg-green-800 text-white font-extrabold text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw size={12} /> Resume Selected 🔄
+            </button>
+            <button
+              onClick={() => setSelectedOrderIds([])}
+              className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-[#6B7280] font-bold text-xs border border-gray-300 transition-all cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Orders Grid / Empty State */}
-      {orders.length === 0 ? (
-        <EmptyState icon={<Clock size={32} />} title="No pending orders" subtitle="All incoming orders have been accepted or fulfilled." />
+      {missedOrdersList.length === 0 ? (
+        <EmptyState icon={<Clock size={32} />} title="No missed orders" subtitle="All pending orders are still within their 9-hour vendor pickup window." />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {orders.map((o) => {
+          {missedOrdersList.map((o) => {
             const targetId = o.id || o._id;
             const formattedCode = `#${targetId.toString().substring(0, 6).toUpperCase()}`;
-            const elapsedMs = Math.max(0, Date.now() - new Date(o.created_at).getTime());
-            const elapsedSecs = Math.floor(elapsedMs / 1000);
-            const isMissed = elapsedSecs >= 32400; // 9 Hours (32,400s)
-            const remainingSecs = Math.max(0, 32400 - elapsedSecs);
+            const isSelected = selectedOrderIds.includes(targetId);
             const cleanPhone = (o.client_phone || '').replace(/\D/g, '');
-
-            const formatRemainingTime = (secs: number) => {
-              const h = Math.floor(secs / 3600);
-              const m = Math.floor((secs % 3600) / 60);
-              const s = secs % 60;
-              if (h > 0) return `${h}h ${m}m ${s}s`;
-              if (m > 0) return `${m}m ${s}s`;
-              return `${s}s`;
-            };
 
             // Vendor match count for this PIN code
             const matchingVendors = vendors.filter(v => v.zip_code === o.client_zip);
@@ -1786,29 +1848,32 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
               <div
                 key={targetId}
                 className={`rounded-2xl border p-5 flex flex-col justify-between transition-all shadow-xs ${
-                  isMissed ? 'bg-red-50/40 border-red-200' : 'bg-white border-gray-200'
+                  isSelected ? 'bg-blue-50/60 border-blue-300 ring-2 ring-blue-400' : 'bg-red-50/40 border-red-200'
                 }`}
               >
                 <div>
-                  {/* Card Header: Code & Live SLA Badge */}
+                  {/* Card Header: Checkbox, Code & Missed Badge */}
                   <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-extrabold text-lg text-[#111827]">{formattedCode}</h3>
-                      <span className="text-xs text-[#6B7280] block font-normal">
-                        Placed: {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleOrderSelected(targetId)}
+                        className="mt-1 w-4 h-4 rounded border-gray-300 text-[#F1A80A] focus:ring-[#F1A80A] cursor-pointer accent-[#F1A80A]"
+                        aria-label={`Select order ${formattedCode}`}
+                      />
+                      <div>
+                        <h3 className="font-extrabold text-lg text-[#111827]">{formattedCode}</h3>
+                        <span className="text-xs text-[#6B7280] block font-normal">
+                          Placed: {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex flex-col items-end gap-1">
-                      {isMissed ? (
-                        <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-800 font-extrabold text-xs border border-red-300 animate-pulse">
-                          ⚠️ Missed (Expired)
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs border border-amber-300">
-                          ⏱ {formatRemainingTime(remainingSecs)} remaining
-                        </span>
-                      )}
+                      <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-800 font-extrabold text-xs border border-red-300 animate-pulse">
+                        ⚠️ Missed (Expired)
+                      </span>
                     </div>
                   </div>
 
@@ -1857,7 +1922,7 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
                     {/* Manual Assign Button */}
                     <button
                       onClick={() => {
-                        setAssignModalOrder(o);
+                        setAssignTargets([o]);
                         setSelectedVendorId('');
                       }}
                       className="px-3 py-1.5 rounded-lg bg-[#F3F4F6] hover:bg-gray-200 text-[#374151] font-bold text-xs border border-gray-300 transition-all cursor-pointer flex items-center gap-1"
@@ -1870,7 +1935,7 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
                     <button
                       onClick={() => handleResumeOrder(o)}
                       className="px-3 py-1.5 rounded-lg bg-[#2E7D32] hover:bg-green-800 active:scale-95 text-white font-extrabold text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                      title="Resume & restart 60-second broadcast to nearby vendors"
+                      title="Resume & restart the vendor broadcast window"
                     >
                       <RefreshCw size={12} /> Resume 🔄
                     </button>
@@ -1883,19 +1948,36 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
       )}
 
       {/* ── Manual Vendor Assignment Modal ── */}
-      {assignModalOrder && (
+      {assignTargets && assignTargets.length > 0 && (
         <Modal
-          open={!!assignModalOrder}
-          onClose={() => setAssignModalOrder(null)}
-          title={`Direct Assign Order #${(assignModalOrder.id || assignModalOrder._id).toString().substring(0, 6).toUpperCase()}`}
+          open={!!assignTargets}
+          onClose={() => setAssignTargets(null)}
+          title={
+            assignTargets.length === 1
+              ? `Direct Assign Order #${(assignTargets[0].id || assignTargets[0]._id).toString().substring(0, 6).toUpperCase()}`
+              : `Direct Assign ${assignTargets.length} Orders`
+          }
         >
           <div className="space-y-4 text-xs text-[#374151]">
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-1">
-              <p className="font-bold text-[#111827]">Order Details:</p>
-              <p>Item: <strong className="text-[#D97706]">{assignModalOrder.item_name}</strong> (₹{assignModalOrder.price || assignModalOrder.total_price})</p>
-              <p>Client: <strong>{assignModalOrder.client_name}</strong> ({assignModalOrder.client_phone})</p>
-              <p>PIN Code: <strong>{assignModalOrder.client_zip}</strong> | Landmark: {assignModalOrder.client_landmark}</p>
-            </div>
+            {assignTargets.length === 1 ? (
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-1">
+                <p className="font-bold text-[#111827]">Order Details:</p>
+                <p>Item: <strong className="text-[#D97706]">{assignTargets[0].item_name}</strong> (₹{assignTargets[0].price || assignTargets[0].total_price})</p>
+                <p>Client: <strong>{assignTargets[0].client_name}</strong> ({assignTargets[0].client_phone})</p>
+                <p>PIN Code: <strong>{assignTargets[0].client_zip}</strong> | Landmark: {assignTargets[0].client_landmark}</p>
+              </div>
+            ) : (
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-1">
+                <p className="font-bold text-[#111827]">{assignTargets.length} orders selected:</p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {assignTargets.map((o) => (
+                    <li key={o.id || o._id}>
+                      #{(o.id || o._id).toString().substring(0, 6).toUpperCase()} — {o.item_name} ({o.client_name}, PIN: {o.client_zip})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="font-bold text-sm text-[#111827] block">Select Target Vendor / Kitchen:</label>
@@ -1907,7 +1989,7 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
                 <option value="">-- Choose Active Vendor --</option>
                 {vendors.map((v) => {
                   const vId = v.id || (v as any)._id;
-                  const isPinMatch = v.zip_code === assignModalOrder.client_zip;
+                  const isPinMatch = assignTargets.some(o => v.zip_code === o.client_zip);
                   return (
                     <option key={vId} value={vId}>
                       {v.shop_name} ({v.phone}) {isPinMatch ? '⭐ PIN MATCH' : `(PIN: ${v.zip_code})`}
@@ -1918,7 +2000,7 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
-              <Button variant="ghost" size="sm" onClick={() => setAssignModalOrder(null)}>
+              <Button variant="ghost" size="sm" onClick={() => setAssignTargets(null)}>
                 Cancel
               </Button>
               <Button variant="primary" size="sm" onClick={handleManualAssign} disabled={assigning || !selectedVendorId}>
