@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import {
   LayoutDashboard, Package, ShoppingBag, CreditCard, Radar, Trash2,
   DollarSign, Clock, CheckCircle2, AlertCircle, Store, Lock as Padlock,
-  Navigation, AlertTriangle, Upload, Menu, X, Users, Sparkles, MessageSquare
+  Navigation, AlertTriangle, Upload, Menu, X, Sparkles, MessageSquare
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
@@ -401,7 +401,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           </div>
         </div>
         <div className="px-3.5 py-4 sm:p-8 max-w-7xl mx-auto">
-          {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} />}
+          {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} radarOrders={radarOrders} />}
           {tab === 'menu' && <VendorMenu vendor={vendor} show={show} />}
           {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
@@ -420,12 +420,12 @@ const vTrans = {
     welcome: 'Welcome',
     totalCompletedOrders: 'Total Completed Orders',
     totalOverallCompletedDesc: 'Total overall orders completed',
-    connectedClients: 'Connected Clients',
-    connectedClientsDesc: 'Clients connected until now',
+    nearbyPinBroadcasts: 'Nearby PIN Broadcasts',
+    nearbyPinBroadcastsDesc: 'Total client order notifications sent in PIN',
     totalOverallEarnings: 'Total Overall Earnings',
     totalEarnedDesc: 'Total overall earned from website',
-    totalOrdersReceived: 'Total Orders Received',
-    lifetimeOrderCount: 'Lifetime order count',
+    activeRadarOpportunities: 'Active Radar Opportunities',
+    activeRadarOpportunitiesDesc: 'Live orders in your PIN ready to be claimed right now',
     successfulOrders: 'SUCCESSFUL ORDERS',
     noCompletedOrdersYet: 'No completed orders yet',
     subscriptionHealth: 'SUBSCRIPTION HEALTH',
@@ -519,12 +519,12 @@ const vTrans = {
     welcome: 'स्वागत है',
     totalCompletedOrders: 'कुल पूर्ण ऑर्डर',
     totalOverallCompletedDesc: 'अब तक पूर्ण किए गए कुल ऑर्डर',
-    connectedClients: 'जुड़े हुए ग्राहक',
-    connectedClientsDesc: 'अब तक जुड़े कुल ग्राहक',
+    nearbyPinBroadcasts: 'निकटवर्ती पिन प्रसारण',
+    nearbyPinBroadcastsDesc: 'पिन कोड में भेजी गई कुल ग्राहक ऑर्डर सूचनाएं',
     totalOverallEarnings: 'कुल कमाई',
     totalEarnedDesc: 'वेबसाइट से हुई कुल कमाई',
-    totalOrdersReceived: 'कुल प्राप्त ऑर्डर',
-    lifetimeOrderCount: 'लाइफटाइम ऑर्डर संख्या',
+    activeRadarOpportunities: 'सक्रिय रडार अवसर',
+    activeRadarOpportunitiesDesc: 'आपके पिन कोड में अभी स्वीकार करने योग्य लाइव ऑर्डर',
     successfulOrders: 'सफल ऑर्डर',
     noCompletedOrdersYet: 'अभी तक कोई पूर्ण ऑर्डर नहीं है',
     subscriptionHealth: 'सब्सक्रिप्शन स्थिति',
@@ -618,12 +618,12 @@ const vTrans = {
     welcome: 'सुस्वागतम्',
     totalCompletedOrders: 'एकूण पूर्ण झालेले ऑर्डर्स',
     totalOverallCompletedDesc: 'आत्तापर्यंत पूर्ण केलेले एकूण ऑर्डर्स',
-    connectedClients: 'जोडलेले ग्राहक',
-    connectedClientsDesc: 'आत्तापर्यंत जोडलेले एकूण ग्राहक',
+    nearbyPinBroadcasts: 'जवळपासचे पिन प्रसारण',
+    nearbyPinBroadcastsDesc: 'पिन कोडमध्ये पाठवलेल्या एकूण ग्राहक ऑर्डर सूचना',
     totalOverallEarnings: 'एकूण कमाई',
     totalEarnedDesc: 'वेबसाइटवरून झालेली एकूण कमाई',
-    totalOrdersReceived: 'एकूण प्राप्त ऑर्डर्स',
-    lifetimeOrderCount: 'लाइफटाइम ऑर्डर संख्या',
+    activeRadarOpportunities: 'सक्रिय रडार संधी',
+    activeRadarOpportunitiesDesc: 'तुमच्या पिन कोडमध्ये आत्ता स्वीकारण्यायोग्य लाइव्ह ऑर्डर्स',
     successfulOrders: 'यशस्वी ऑर्डर्स',
     noCompletedOrdersYet: 'अद्याप कोणतेही पूर्ण झालेले ऑर्डर्स नाहीत',
     subscriptionHealth: 'सबस्क्रिप्शन आरोग्य',
@@ -909,7 +909,7 @@ function PlanTimeline({ subscriptions, onTab }: { subscriptions: any[]; onTab?: 
   );
 }
 
-function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Tab) => void }) {
+function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; onTab?: (t: Tab) => void; radarOrders: Order[] }) {
 
   const [lang, setLang] = useState<Language>(getInitialLanguage);
 
@@ -953,12 +953,13 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
   };
 
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [pinMatchOrders, setPinMatchOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
         const vId = vendor.id || (vendor as any)._id || '';
-        const [oRes, iRes, bRes] = await Promise.all([
+        const [oRes, iRes, bRes, pRes] = await Promise.all([
           fetch('/api/db', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ table: 'orders', action: 'select', filters: vId ? { vendor_id: vId } : {} })
@@ -970,11 +971,18 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
           fetch('/api/db', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ table: 'broadcasts', action: 'select', sorts: [{ field: 'created_at', ascending: false }] })
+          }).then(r => r.json()).catch(() => ({ data: [] })),
+          // All client order notifications ever sent in this vendor's PIN code, regardless of
+          // which vendor (if any) ended up claiming them — deliberately not scoped by vendor_id.
+          fetch('/api/db', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: 'orders', action: 'select', filters: { client_zip: vendor.zip_code } })
           }).then(r => r.json()).catch(() => ({ data: [] }))
         ]);
         setOrders(oRes?.data || []);
         setItems(iRes?.data || []);
         setBroadcasts(bRes?.data || []);
+        setPinMatchOrders(pRes?.data || []);
         await loadSuggestions();
       } catch (e) {
         console.error('Error loading vendor dashboard metrics:', e);
@@ -1020,19 +1028,19 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
   // Calculate exact vendor-specific stats (isolated strictly for this logged-in vendor)
   const vendorCompletedOrders = orders.filter(o => o.status === 'delivered');
   const totalVendorEarnings = vendorCompletedOrders.reduce((s, o) => s + (Number(o.price) || 0), 0);
-  
-  // Unique clients connected by this specific vendor through website orders
-  const uniqueClientsCount = new Set(
-    orders
-      .map(o => (o.client_phone || o.client_name || '').trim())
-      .filter(Boolean)
-  ).size;
+
+  // Total client order notifications ever sent in this vendor's PIN code (any status, any vendor)
+  const pinMatchCount = pinMatchOrders.filter(o => o.client_zip === vendor.zip_code).length;
+
+  // Live pending orders in this vendor's PIN right now, ready to be claimed (same feed/definition
+  // that powers the "radar" nav item's live notification dot)
+  const activeRadarCount = radarOrders.filter(o => o.client_zip === vendor.zip_code).length;
 
   const kpis = [
     { label: t.totalCompletedOrders, value: vendorCompletedOrders.length, desc: t.totalOverallCompletedDesc, icon: ShoppingBag, color: 'text-green-600', bg: 'bg-green-500/10' },
-    { label: t.connectedClients, value: uniqueClientsCount, desc: t.connectedClientsDesc, icon: Users, color: 'text-amber-600', bg: 'bg-amber-500/10' },
+    { label: t.nearbyPinBroadcasts, value: pinMatchCount, desc: `${t.nearbyPinBroadcastsDesc} ${vendor.zip_code}`, icon: Navigation, color: 'text-amber-600', bg: 'bg-amber-500/10' },
     { label: t.totalOverallEarnings, value: `₹${totalVendorEarnings.toLocaleString()}`, desc: t.totalEarnedDesc, icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-500/10' },
-    { label: t.totalOrdersReceived, value: orders.length, desc: t.lifetimeOrderCount, icon: ShoppingBag, color: 'text-purple-600', bg: 'bg-purple-500/10' },
+    { label: t.activeRadarOpportunities, value: activeRadarCount, desc: t.activeRadarOpportunitiesDesc, icon: Radar, color: 'text-purple-600', bg: 'bg-purple-500/10' },
   ];
 
   return (
