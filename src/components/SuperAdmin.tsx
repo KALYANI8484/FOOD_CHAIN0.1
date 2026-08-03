@@ -4,8 +4,8 @@ import {
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
   Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
 } from 'lucide-react';
-import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
+import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription } from '../lib/supabase';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
 type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins';
@@ -50,22 +50,7 @@ const compressImageFile = (file: File, maxWidth = 1024, quality = 0.8): Promise<
   });
 };
 export function SuperAdmin({ onExit }: { onExit: () => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const navLabels = {
     en: { approvals: 'Team Approvals', vendors: 'Vendor Database', plans: 'Pricing Plans', inventory: 'Master Inventory', guides: 'Guide Documents', sub_admins: 'Sub-Admins', exit: 'Exit Dashboard' },
@@ -73,7 +58,28 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
     mr: { approvals: 'टीम मंजुरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'किंमत प्लॅन्स', inventory: 'मास्टर इन्व्हेंटरी', guides: 'मार्गदर्शक दस्तऐवज', sub_admins: 'सब-ॲडमिन', exit: 'डॅशबोर्डवरून बाहेर पडा' },
   }[lang];
 
-  const [tab, setTab] = useState<Tab>('approvals');
+  const [tab, setTabState] = useState<Tab>('approvals');
+
+  const setTab = (newTab: Tab, isPop = false) => {
+    setTabState(newTab);
+    if (!isPop) {
+      window.history.pushState({ superTab: newTab, appScreen: 'super_admin' }, '', `#super_admin/${newTab}`);
+    }
+  };
+
+  useEffect(() => {
+    window.history.replaceState({ superTab: 'approvals', appScreen: 'super_admin' }, '', '#super_admin/approvals');
+
+    const handleSuperAdminPopState = (e: PopStateEvent) => {
+      if (e.state && e.state.superTab) {
+        setTabState(e.state.superTab);
+      }
+    };
+
+    window.addEventListener('popstate', handleSuperAdminPopState);
+    return () => window.removeEventListener('popstate', handleSuperAdminPopState);
+  }, []);
+
   const { toast, show } = useToast();
 
   const navItems: { id: Tab; label: string; icon: any }[] = [
@@ -98,12 +104,15 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
             <span className="text-[9px] text-muted font-bold uppercase tracking-wider">Super Admin</span>
           </div>
         </div>
-        <button 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-xl bg-surface-2 border border-border text-text cursor-pointer hover:bg-border/30 transition-colors"
-        >
-          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <LanguageSelector direction="down" showLabel={true} />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-xl bg-surface-2 border border-border text-text cursor-pointer hover:bg-border/30 transition-colors"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar */}
@@ -134,7 +143,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
         </nav>
         <div className="p-3 border-t border-border space-y-2">
           <div className="flex justify-center pb-1">
-            <LanguageSelector />
+            <LanguageSelector direction="up" showLabel={true} />
           </div>
           <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>
             {navLabels.exit}
@@ -235,22 +244,7 @@ const saTrans = {
 
 // 1. Dashboard Module Tab
 function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = saTrans[lang];
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -560,8 +554,8 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const getVendorItemLimit = (vendor: Vendor | null) => {
     const plan = getVendorPlan(vendor);
     if (!plan) return 5;
-    if (plan.max_items <= 0 || plan.name?.toLowerCase().includes('premium')) return Infinity;
-    return plan.max_items;
+    if (plan.max_items === -1 || plan.name?.toLowerCase().includes('premium')) return Infinity;
+    return Math.max(0, plan.max_items);
   };
   const getVendorLimitLabel = (vendor: Vendor | null) => {
     const limit = getVendorItemLimit(vendor);
@@ -749,14 +743,14 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
     if (targetSub) {
       if (addon.addon_type === 'inventory_items' || addon.max_items > 0) {
-        targetSub.max_items = (targetSub.max_items || 5) + (addon.max_items || 20);
+        targetSub.max_items = (targetSub.max_items ?? 5) + (addon.max_items ?? 20);
       }
       if (addon.addon_type === 'validity_extension' || addon.validity_days > 0) {
         const currentEnd = targetSub.subscription_end ? new Date(targetSub.subscription_end) : new Date();
         targetSub.subscription_end = new Date(currentEnd.getTime() + addon.validity_days * 86400000).toISOString().slice(0, 10);
       }
       if (addon.addon_type === 'client_extension' || addon.max_clients > 0) {
-        targetSub.max_clients = (targetSub.max_clients || 10) + addon.max_clients;
+        targetSub.max_clients = (targetSub.max_clients ?? 10) + addon.max_clients;
       }
       activeSubs[targetIdx >= 0 ? targetIdx : 0] = targetSub;
     }
@@ -1180,8 +1174,8 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
           </div>
           <p className="text-sm font-extrabold text-slate-900 mb-1">{popoverSub.sub.category_name || popoverSub.sub.plan_name}</p>
           <div className="space-y-1.5 text-xs text-slate-600">
-            <div className="flex justify-between"><span>Item Slots Used</span><span className="font-bold text-slate-900">? / {popoverSub.sub.max_items || 5}</span></div>
-            <div className="flex justify-between"><span>Client Limit</span><span className="font-bold text-slate-900">{popoverSub.sub.max_clients || 10}</span></div>
+            <div className="flex justify-between"><span>Item Slots Used</span><span className="font-bold text-slate-900">? / {popoverSub.sub.max_items ?? 5}</span></div>
+            <div className="flex justify-between"><span>Client Limit</span><span className="font-bold text-slate-900">{popoverSub.sub.max_clients ?? 10}</span></div>
             <div className="flex justify-between"><span>Expires</span><span className="font-bold text-slate-900">{popoverSub.sub.subscription_end || 'N/A'}</span></div>
           </div>
           <div className="flex gap-2 mt-3">
@@ -1536,7 +1530,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                   <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-wider">Total Item Quota</p>
                   <p className="text-sm font-extrabold text-white">
                     {(Array.isArray(editVendor.active_subscriptions) && editVendor.active_subscriptions.length > 0
-                      ? editVendor.active_subscriptions.reduce((sum: number, s: any) => sum + (s.max_items || 5), 0)
+                      ? editVendor.active_subscriptions.reduce((sum: number, s: any) => sum + (s.max_items ?? 5), 0)
                       : 5)} Items
                   </p>
                 </div>
@@ -1602,7 +1596,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                             <label className="text-[11px] font-bold text-slate-700 block mb-1">Max Item Capacity Limit</label>
                             <input
                               type="number"
-                              min="1"
+                              min="0"
                               value={inlineEditLimit}
                               onChange={(e) => setInlineEditLimit(Number(e.target.value))}
                               className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-400"
@@ -1640,7 +1634,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                           )}
                         </div>
                         <p className="text-xs text-slate-500">
-                          Valid: <strong className="text-slate-800">{sub.subscription_start || 'N/A'}</strong> to <strong className="text-slate-800">{sub.subscription_end || 'N/A'}</strong> | Item Capacity: <strong className="text-amber-800">{sub.max_items || 5} items</strong>
+                          Valid: <strong className="text-slate-800">{sub.subscription_start || 'N/A'}</strong> to <strong className="text-slate-800">{sub.subscription_end || 'N/A'}</strong> | Item Capacity: <strong className="text-amber-800">{sub.max_items ?? 5} items</strong>
                         </p>
                       </div>
 
@@ -1651,7 +1645,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                           onClick={() => {
                             setInlineEditSubId(subKey);
                             setInlineEditEnd(sub.subscription_end || today);
-                            setInlineEditLimit(sub.max_items || 5);
+                            setInlineEditLimit(sub.max_items ?? 5);
                           }}
                         >
                           <Pencil size={12} /> Edit
@@ -1958,10 +1952,27 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     load();
   };
 
+  // Real-time notice to the approved vendor's dashboard, distinct from the generic
+  // vendorUpdated broadcast that already fires from the vendors-table update below —
+  // that one fires for any vendor edit, so it can't by itself distinguish "my upgrade
+  // request was approved" from an unrelated admin correction.
+  const notifyUpgradeApproved = async (payload: { vendor_id: string; plan_name: string; subscription_end: string; max_items?: number; max_clients?: number }) => {
+    try {
+      await fetch('/api/notify/upgrade-approved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.error('Failed to broadcast upgrade approval notification:', e);
+    }
+  };
+
   const handleApproveUpgrade = async (u: UpgradeRequest) => {
     const targetPlan = await supabase.from('subscription_plans').select('*').eq('name', u.requested_plan).maybeSingle();
     const plan = targetPlan?.data as Plan;
     const validityDays = plan?.validity_days || 30;
+    const subscriptionEnd = new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10);
 
     // Update vendor subscription plan details
     await supabase.from('vendors').update({
@@ -1969,7 +1980,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       plan_name: u.requested_plan,
       status: 'approved',
       subscription_start: new Date().toISOString().slice(0, 10),
-      subscription_end: new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10)
+      subscription_end: subscriptionEnd
     }).eq('id', u.vendor_id);
 
     // Approve the upgrade request
@@ -1981,6 +1992,14 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     await supabase.from('activity_log').insert({
       action: `Upgrade request approved for: ${u.vendor_name} to ${u.requested_plan}`,
       actor: 'Super Admin'
+    });
+
+    await notifyUpgradeApproved({
+      vendor_id: u.vendor_id,
+      plan_name: u.requested_plan,
+      subscription_end: subscriptionEnd,
+      max_items: plan?.max_items,
+      max_clients: plan?.max_clients
     });
 
     show(`Upgrade request for ${u.vendor_name} approved!`);
@@ -1999,19 +2018,28 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       for (const u of eligible) {
         const targetPlan = plans.find(p => p.name === u.requested_plan);
         const validityDays = targetPlan?.validity_days || 30;
+        const subscriptionEnd = new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10);
 
         await supabase.from('vendors').update({
           plan_id: targetPlan?.id || null,
           plan_name: u.requested_plan,
           status: 'approved',
           subscription_start: new Date().toISOString().slice(0, 10),
-          subscription_end: new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10)
+          subscription_end: subscriptionEnd
         }).eq('id', u.vendor_id);
 
         await supabase.from('upgrade_requests').update({
           status: 'Approved',
           payment_status: 'Verified'
         }).eq('id', u.id);
+
+        await notifyUpgradeApproved({
+          vendor_id: u.vendor_id,
+          plan_name: u.requested_plan,
+          subscription_end: subscriptionEnd,
+          max_items: targetPlan?.max_items,
+          max_clients: targetPlan?.max_clients
+        });
       }
 
       show(`Batch approved & activated ${eligible.length} subscription upgrades!`, 'success');
@@ -2065,6 +2093,42 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       } else if (req.action_type === 'edit') {
         const payload = JSON.parse(req.payload);
         await supabase.from('vendors').update(payload).eq('id', req.vendor_id);
+      } else if (req.action_type === 'assign_category') {
+        const payload = JSON.parse(req.payload);
+        const { data: v } = await supabase.from('vendors').select('*').eq('id', req.vendor_id).single();
+        if (v) {
+          const existingSubs: VendorSubscription[] = Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0
+            ? [...v.active_subscriptions]
+            : [{
+                id: 'primary',
+                plan_id: v.plan_id || undefined,
+                plan_name: v.plan_name || 'Basic',
+                category_name: 'General',
+                subscription_start: v.subscription_start || new Date().toISOString().slice(0, 10),
+                subscription_end: v.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+                max_items: 5,
+                max_clients: v.total_clients || 10,
+                status: 'active'
+              }];
+
+          const newSub: VendorSubscription = {
+            id: crypto.randomUUID(),
+            plan_id: payload.plan_id,
+            plan_name: payload.plan_name,
+            category_name: payload.category_name,
+            subscription_start: new Date().toISOString().slice(0, 10),
+            subscription_end: new Date(Date.now() + payload.validity_days * 86400000).toISOString().slice(0, 10),
+            max_items: payload.max_items,
+            max_clients: payload.max_clients,
+            status: 'active'
+          };
+          existingSubs.push(newSub);
+
+          await supabase.from('vendors').update({
+            active_subscriptions: existingSubs,
+            plan_name: payload.plan_name
+          }).eq('id', req.vendor_id);
+        }
       }
 
       await supabase.from('subadmin_requests').update({ status: 'approved' }).eq('id', req.id);
@@ -2530,6 +2594,15 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               {selectedSubadminReq.action_type === 'edit' && (
                 <div className="p-3 bg-surface border border-border rounded-lg mt-2 text-sm text-text">
                   <p className="font-bold mb-1">Proposed Vendor Updates:</p>
+                  <pre className="text-xs whitespace-pre-wrap font-mono text-muted">
+                    {JSON.stringify(JSON.parse(selectedSubadminReq.payload), null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {selectedSubadminReq.action_type === 'assign_category' && (
+                <div className="p-3 bg-accent/10 border border-accent/30 rounded-lg mt-2 text-sm text-text">
+                  <p className="font-bold mb-1">Category Subscription to Assign:</p>
                   <pre className="text-xs whitespace-pre-wrap font-mono text-muted">
                     {JSON.stringify(JSON.parse(selectedSubadminReq.payload), null, 2)}
                   </pre>
@@ -3431,7 +3504,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   
   const [form, setForm] = useState({
     name: '',
-    category: 'Tiffin',
+    category: '',
     base_price: 100,
     quantity: 10,
     description: '',
@@ -3495,7 +3568,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     if (!form.name) return;
     await supabase.from('master_inventory').insert({
       name: form.name,
-      category: form.category || 'Tiffin',
+      category: form.category,
       base_price: Number(form.base_price) || 0,
       quantity: Number(form.quantity) || 1,
       description: form.description || '',
@@ -3504,7 +3577,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
     show(`Master Item ${form.name} created successfully!`);
     setModal(false);
-    setForm({ name: '', category: 'Tiffin', base_price: 100, quantity: 10, description: '', image_url: '' });
+    setForm({ name: '', category: '', base_price: 100, quantity: 10, description: '', image_url: '' });
     load();
   };
 
@@ -3513,7 +3586,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     const targetId = editItem.id || (editItem as any)._id;
     await supabase.from('master_inventory').update({
       name: editItem.name,
-      category: editItem.category || 'Tiffin',
+      category: editItem.category,
       base_price: Number(editItem.base_price) || 0,
       quantity: Number(editItem.quantity) || 1,
       description: editItem.description || '',
@@ -3534,7 +3607,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     }
   };
 
-  const categories = ['Tiffin', 'Breakfast', 'Lunch/Dinner', 'Thali', 'Vegetables'];
+  const categories = useMemo(() => Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(), [items]);
 
   const filtered = items.filter((i) => {
     const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -3563,7 +3636,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         }
       />
 
-      <div className="flex bg-surface p-4 rounded-2xl border border-border">
+      <div className="flex flex-col sm:flex-row gap-3 bg-surface p-4 rounded-2xl border border-border">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
@@ -3573,6 +3646,16 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none"
           />
         </div>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none cursor-pointer"
+        >
+          <option value="all">All Categories</option>
+          {categories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 stagger">
@@ -3610,6 +3693,21 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       <Modal open={modal} onClose={() => setModal(false)} title="Create Master Item">
         <div className="space-y-4">
           <Input label="Item Name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-text block">Category <span className="text-accent">*</span></label>
+            <input
+              type="text"
+              list="master-item-categories"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              placeholder="e.g. Tiffin, Breakfast, Thali..."
+              required
+              className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm"
+            />
+            <datalist id="master-item-categories">
+              {categories.map(cat => <option key={cat} value={cat} />)}
+            </datalist>
+          </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>
@@ -3669,6 +3767,21 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         {editItem && (
           <div className="space-y-4">
             <Input label="Item Name *" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-text block">Category <span className="text-accent">*</span></label>
+              <input
+                type="text"
+                list="master-item-categories"
+                value={editItem.category || ''}
+                onChange={(e) => setEditItem({ ...editItem, category: e.target.value })}
+                placeholder="e.g. Tiffin, Breakfast, Thali..."
+                required
+                className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm"
+              />
+              <datalist id="master-item-categories">
+                {categories.map(cat => <option key={cat} value={cat} />)}
+              </datalist>
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>
@@ -4343,7 +4456,78 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
 }
 
 // 8. Sub-Admin management tab
+const satTrans = {
+  en: {
+    title: 'Sub-Admin Management',
+    subtitle: 'Administer team member accounts and access permissions',
+    createSubAdmin: 'Create Sub-Admin',
+    colName: 'Name',
+    colEmail: 'Email',
+    colPassword: 'Password',
+    colLastActive: 'Last Active',
+    colActions: 'Actions',
+    holdToReveal: 'Hold to reveal',
+    never: 'Never',
+    name: 'Name',
+    emailAddress: 'Email Address',
+    password: 'Password *',
+    passwordPlaceholder: 'Enter or generate password',
+    generate: 'Generate',
+    cancel: 'Cancel',
+    saveCredentials: 'Save Credentials',
+    confirmRemove: (name: string) => `Remove sub-admin ${name}?`,
+    toastCreated: (name: string) => `Sub Admin ${name} created successfully!`,
+    toastRemoved: (name: string) => `Sub Admin ${name} removed`,
+  },
+  hi: {
+    title: 'सब-एडमिन प्रबंधन',
+    subtitle: 'टीम सदस्य खातों और पहुंच अनुमतियों का प्रबंधन करें',
+    createSubAdmin: 'सब-एडमिन बनाएं',
+    colName: 'नाम',
+    colEmail: 'ईमेल',
+    colPassword: 'पासवर्ड',
+    colLastActive: 'अंतिम सक्रिय',
+    colActions: 'कार्रवाई',
+    holdToReveal: 'देखने के लिए दबाए रखें',
+    never: 'कभी नहीं',
+    name: 'नाम',
+    emailAddress: 'ईमेल पता',
+    password: 'पासवर्ड *',
+    passwordPlaceholder: 'पासवर्ड दर्ज करें या जनरेट करें',
+    generate: 'जनरेट करें',
+    cancel: 'रद्द करें',
+    saveCredentials: 'क्रेडेंशियल सहेजें',
+    confirmRemove: (name: string) => `सब-एडमिन ${name} हटाएं?`,
+    toastCreated: (name: string) => `सब एडमिन ${name} सफलतापूर्वक बनाया गया!`,
+    toastRemoved: (name: string) => `सब एडमिन ${name} हटाया गया`,
+  },
+  mr: {
+    title: 'सब-ॲडमिन व्यवस्थापन',
+    subtitle: 'टीम सदस्य खाती आणि प्रवेश परवानग्या व्यवस्थापित करा',
+    createSubAdmin: 'सब-ॲडमिन तयार करा',
+    colName: 'नाव',
+    colEmail: 'ईमेल',
+    colPassword: 'पासवर्ड',
+    colLastActive: 'शेवटचे सक्रिय',
+    colActions: 'कृती',
+    holdToReveal: 'पाहण्यासाठी दाबून ठेवा',
+    never: 'कधीही नाही',
+    name: 'नाव',
+    emailAddress: 'ईमेल पत्ता',
+    password: 'पासवर्ड *',
+    passwordPlaceholder: 'पासवर्ड टाका किंवा तयार करा',
+    generate: 'तयार करा',
+    cancel: 'रद्द करा',
+    saveCredentials: 'क्रेडेन्शियल्स जतन करा',
+    confirmRemove: (name: string) => `सब-ॲडमिन ${name} काढून टाकायचे?`,
+    toastCreated: (name: string) => `सब ॲडमिन ${name} यशस्वीरित्या तयार केले!`,
+    toastRemoved: (name: string) => `सब ॲडमिन ${name} काढले`,
+  },
+};
+
 function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [lang] = useSyncedLanguage();
+  const t = satTrans[lang];
   const [admins, setAdmins] = useState<SubAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
@@ -4382,16 +4566,16 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       actor: 'Super Admin'
     });
 
-    show(`Sub Admin ${form.name} created successfully!`);
+    show(t.toastCreated(form.name));
     setModal(false);
     setForm({ name: '', email: '', password: '' });
     load();
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Remove sub-admin ${name}?`)) {
+    if (confirm(t.confirmRemove(name))) {
       await supabase.from('sub_admins').delete().eq('id', id);
-      show(`Sub Admin ${name} removed`, 'info');
+      show(t.toastRemoved(name), 'info');
       load();
     }
   };
@@ -4400,10 +4584,10 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader 
-        title="Sub-Admin Management" 
-        subtitle="Administer team member accounts and access permissions" 
-        action={<Button onClick={() => setModal(true)}><Plus size={16} /> Create Sub-Admin</Button>}
+      <PageHeader
+        title={t.title}
+        subtitle={t.subtitle}
+        action={<Button onClick={() => setModal(true)}><Plus size={16} /> {t.createSubAdmin}</Button>}
       />
 
       <div className="card overflow-hidden bg-surface border border-border">
@@ -4411,11 +4595,11 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           <table className="w-full text-left text-sm border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Email</th>
-                <th className="px-6 py-4">Password</th>
-                <th className="px-6 py-4">Last Active</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t.colName}</th>
+                <th className="px-6 py-4">{t.colEmail}</th>
+                <th className="px-6 py-4">{t.colPassword}</th>
+                <th className="px-6 py-4">{t.colLastActive}</th>
+                <th className="px-6 py-4 text-right">{t.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -4426,19 +4610,19 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
                   <td className="px-6 py-4 font-mono text-xs">
                     <div className="flex items-center gap-2">
                       <span>{revealedAdminId === a.id ? a.password : '••••••••'}</span>
-                      <button 
+                      <button
                         onMouseDown={() => setRevealedAdminId(a.id)}
                         onMouseUp={() => setRevealedAdminId(null)}
                         onMouseLeave={() => setRevealedAdminId(null)}
                         className="p-1 rounded hover:bg-surface-2 text-muted hover:text-text cursor-pointer"
-                        title="Hold to reveal"
+                        title={t.holdToReveal}
                       >
                         <Eye size={12} />
                       </button>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-xs text-muted">
-                    {a.last_active ? new Date(a.last_active).toLocaleString() : 'Never'}
+                    {a.last_active ? new Date(a.last_active).toLocaleString() : t.never}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => handleDelete(a.id, a.name)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500 hover:bg-border/20 transition-all">
@@ -4453,29 +4637,29 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       </div>
 
       {/* Create Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Create Sub-Admin">
+      <Modal open={modal} onClose={() => setModal(false)} title={t.createSubAdmin}>
         <div className="space-y-4">
-          <Input label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-          <Input label="Email Address" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
-          
+          <Input label={t.name} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <Input label={t.emailAddress} type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
+
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Password *</label>
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">{t.password}</label>
             <div className="flex gap-2">
               <input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
-                placeholder="Enter or generate password"
+                placeholder={t.passwordPlaceholder}
                 className="flex-1 px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
               />
-              <Button variant="outline" onClick={handleGeneratePassword}>Generate</Button>
+              <Button variant="outline" onClick={handleGeneratePassword}>{t.generate}</Button>
             </div>
           </div>
 
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
-            <Button onClick={handleCreate}>Save Credentials</Button>
+            <Button variant="outline" onClick={() => setModal(false)}>{t.cancel}</Button>
+            <Button onClick={handleCreate}>{t.saveCredentials}</Button>
           </div>
         </div>
       </Modal>

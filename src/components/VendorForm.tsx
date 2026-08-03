@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase, type Plan } from '../lib/supabase';
-import { Input, Select, Button, Spinner, getInitialLanguage, type Language } from './ui';
+import { Input, Select, Button, Spinner, useSyncedLanguage, type Language } from './ui';
 
 interface VendorFormProps {
   initialData?: any;
@@ -64,22 +64,7 @@ const vfTrans = {
 };
 
 export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: VendorFormProps) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vfTrans[lang];
   const [plans, setPlans] = useState<Plan[]>([]);

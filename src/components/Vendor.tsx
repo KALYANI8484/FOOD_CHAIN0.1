@@ -2,12 +2,28 @@ import { useEffect, useState, useRef } from 'react';
 import {
   LayoutDashboard, Package, ShoppingBag, CreditCard, Radar, Trash2,
   DollarSign, Clock, CheckCircle2, AlertCircle, Store, Lock as Padlock,
-  Navigation, AlertTriangle, Upload, Menu, X, Users, Sparkles, MessageSquare
+  Navigation, AlertTriangle, Upload, Menu, X, Sparkles, MessageSquare,
+  MessageCircle, Phone
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, getInitialLanguage, type Language } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { getItemTranslation } from './Landing';
+import { AntigravitySuccessModal } from './AntigravitySuccessModal';
+
+// Shared WhatsApp/call link builders for vendor-to-client contact (claim popup + Kanban cards)
+function buildClientWhatsAppMessage(clientName: string, shopName: string, itemName: string, extra?: string) {
+  const base = `Hello ${clientName}, this is ${shopName} regarding your order for ${itemName}.`;
+  return extra ? `${base} ${extra}` : base;
+}
+function buildClientWhatsAppLink(clientPhone: string, message: string) {
+  const cleanPhone = (clientPhone || '').replace(/\D/g, '');
+  return `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`;
+}
+function buildClientTelLink(clientPhone: string) {
+  const cleanPhone = (clientPhone || '').replace(/\D/g, '');
+  return `tel:+91${cleanPhone}`;
+}
 
 function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
@@ -24,22 +40,8 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
 type Tab = 'dashboard' | 'menu' | 'radar' | 'kanban' | 'activation' | 'upgrade';
 
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
+  const t = vTrans[lang];
 
   const [tab, setTabState] = useState<Tab>('dashboard');
 
@@ -51,7 +53,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   };
 
   useEffect(() => {
-    window.history.replaceState({ vendorTab: 'dashboard', appScreen: 'vendor' }, '', '#vendor/dashboard');
+    window.history.replaceState({ vendorTab: 'dashboard', appScreen: 'vendor', cred: vendorPhone }, '', '#vendor/dashboard');
 
     const handleVendorPopState = (e: PopStateEvent) => {
       if (e.state && e.state.vendorTab) {
@@ -72,6 +74,8 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   // Sockets & Live broadcast radar list
   const [radarOrders, setRadarOrders] = useState<Order[]>([]);
   const socketRef = useRef<any>(null);
+  const [approvalPopup, setApprovalPopup] = useState<{ planName: string; subscriptionEnd?: string | null; maxItems?: number; maxClients?: number } | null>(null);
+  const [claimPopup, setClaimPopup] = useState<{ clientName: string; clientPhone: string; itemName: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -214,6 +218,21 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       if (vendor && ((updatedVendor as any)._id === (vendor as any)._id || updatedVendor.id === vendor.id)) {
         setVendor(updatedVendor);
         show('🎉 Your subscription plan has been updated by Super Admin!', 'success');
+      }
+    });
+
+    // Distinct from vendorUpdated above (which fires for any vendor edit): this fires
+    // specifically when Super Admin approves an upgrade/addon request, so it can safely
+    // trigger a celebratory "plan activated" popup instead of just a toast.
+    socket.on('upgradeApproved', (payload: any) => {
+      const myId = vendor.id || (vendor as any)._id;
+      if (payload && payload.vendor_id === myId) {
+        setApprovalPopup({
+          planName: payload.plan_name,
+          subscriptionEnd: payload.subscription_end,
+          maxItems: payload.max_items,
+          maxClients: payload.max_clients
+        });
       }
     });
 
@@ -401,16 +420,73 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           </div>
         </div>
         <div className="px-3.5 py-4 sm:p-8 max-w-7xl mx-auto">
-          {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} />}
+          {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} radarOrders={radarOrders} />}
           {tab === 'menu' && <VendorMenu vendor={vendor} show={show} />}
-          {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} />}
+          {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} onOrderClaimed={setClaimPopup} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
           {tab === 'activation' && <PlanActivation vendor={vendor} activePlan={activePlan} onTab={setTab} />}
-          {tab === 'upgrade' && <UpgradePlan vendor={vendor} show={show} />}
+          {tab === 'upgrade' && <UpgradePlan vendor={vendor} />}
         </div>
       </main>
 
       {toast && <Toast message={toast.message} type={toast.type} />}
+
+      <AntigravitySuccessModal
+        open={!!approvalPopup}
+        onClose={() => setApprovalPopup(null)}
+        title={t.planActivatedTitle}
+        subtitle={approvalPopup ? `${t.planActivatedMsgPrefix} ${approvalPopup.planName} ${t.planActivatedMsgSuffix}` : ''}
+      >
+        {approvalPopup && (
+          <div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t.planActivatedPlanLabel}</span>
+              <strong className="text-gray-900">{approvalPopup.planName}</strong>
+            </div>
+            {approvalPopup.subscriptionEnd && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">{t.planActivatedValidUntilLabel}</span>
+                <strong className="text-gray-900">{approvalPopup.subscriptionEnd}</strong>
+              </div>
+            )}
+            {approvalPopup.maxItems !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">{t.planActivatedMaxItemsLabel}</span>
+                <strong className="text-gray-900">{approvalPopup.maxItems}</strong>
+              </div>
+            )}
+          </div>
+        )}
+      </AntigravitySuccessModal>
+
+      <AntigravitySuccessModal
+        open={!!claimPopup}
+        onClose={() => setClaimPopup(null)}
+        title="🎉 Order Claimed Successfully!"
+        subtitle="Reach out to your client right away:"
+      >
+        {claimPopup && (
+          <div className="mt-4 flex flex-col gap-2.5">
+            <a
+              href={buildClientWhatsAppLink(
+                claimPopup.clientPhone,
+                buildClientWhatsAppMessage(claimPopup.clientName, vendor?.shop_name || '', claimPopup.itemName, 'We have accepted your order and are preparing it now!')
+              )}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-3 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-green-500/20"
+            >
+              <MessageCircle size={16} /> Chat with Client on WhatsApp 💬
+            </a>
+            <a
+              href={buildClientTelLink(claimPopup.clientPhone)}
+              className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/20"
+            >
+              <Phone size={16} /> Call Client 📞
+            </a>
+          </div>
+        )}
+      </AntigravitySuccessModal>
     </div>
   );
 }
@@ -420,12 +496,20 @@ const vTrans = {
     welcome: 'Welcome',
     totalCompletedOrders: 'Total Completed Orders',
     totalOverallCompletedDesc: 'Total overall orders completed',
-    connectedClients: 'Connected Clients',
-    connectedClientsDesc: 'Clients connected until now',
+    nearbyPinBroadcasts: 'Nearby PIN Broadcasts',
+    nearbyPinBroadcastsDesc: 'Total client order notifications sent in PIN',
     totalOverallEarnings: 'Total Overall Earnings',
     totalEarnedDesc: 'Total overall earned from website',
-    totalOrdersReceived: 'Total Orders Received',
-    lifetimeOrderCount: 'Lifetime order count',
+    activeRadarOpportunities: 'Active Radar Opportunities',
+    activeRadarOpportunitiesDesc: 'Live orders in your PIN ready to be claimed right now',
+    requestSubmittedTitle: '📤 Request Submitted!',
+    requestSubmittedMsg: 'Your request has been successfully sent to the owner (Super Admin). You will be notified as soon as your request is reviewed and approved.',
+    planActivatedTitle: '🎉 Request Approved & Plan Activated!',
+    planActivatedMsgPrefix: 'Great news! Your request has been approved by Super Admin. Your plan',
+    planActivatedMsgSuffix: 'is now fully ACTIVATED!',
+    planActivatedPlanLabel: 'Plan',
+    planActivatedValidUntilLabel: 'Valid Until',
+    planActivatedMaxItemsLabel: 'Max Items',
     successfulOrders: 'SUCCESSFUL ORDERS',
     noCompletedOrdersYet: 'No completed orders yet',
     subscriptionHealth: 'SUBSCRIPTION HEALTH',
@@ -519,12 +603,20 @@ const vTrans = {
     welcome: 'स्वागत है',
     totalCompletedOrders: 'कुल पूर्ण ऑर्डर',
     totalOverallCompletedDesc: 'अब तक पूर्ण किए गए कुल ऑर्डर',
-    connectedClients: 'जुड़े हुए ग्राहक',
-    connectedClientsDesc: 'अब तक जुड़े कुल ग्राहक',
+    nearbyPinBroadcasts: 'निकटवर्ती पिन प्रसारण',
+    nearbyPinBroadcastsDesc: 'पिन कोड में भेजी गई कुल ग्राहक ऑर्डर सूचनाएं',
     totalOverallEarnings: 'कुल कमाई',
     totalEarnedDesc: 'वेबसाइट से हुई कुल कमाई',
-    totalOrdersReceived: 'कुल प्राप्त ऑर्डर',
-    lifetimeOrderCount: 'लाइफटाइम ऑर्डर संख्या',
+    activeRadarOpportunities: 'सक्रिय रडार अवसर',
+    activeRadarOpportunitiesDesc: 'आपके पिन कोड में अभी स्वीकार करने योग्य लाइव ऑर्डर',
+    requestSubmittedTitle: '📤 अनुरोध सबमिट किया गया!',
+    requestSubmittedMsg: 'आपका अनुरोध सफलतापूर्वक मालिक (सुपर एडमिन) को भेज दिया गया है। समीक्षा और स्वीकृति होते ही आपको सूचित किया जाएगा।',
+    planActivatedTitle: '🎉 अनुरोध स्वीकृत और प्लान सक्रिय!',
+    planActivatedMsgPrefix: 'बढ़िया खबर! सुपर एडमिन ने आपका अनुरोध स्वीकार कर लिया है। आपका प्लान',
+    planActivatedMsgSuffix: 'अब पूरी तरह से सक्रिय है!',
+    planActivatedPlanLabel: 'प्लान',
+    planActivatedValidUntilLabel: 'तक वैध',
+    planActivatedMaxItemsLabel: 'अधिकतम आइटम',
     successfulOrders: 'सफल ऑर्डर',
     noCompletedOrdersYet: 'अभी तक कोई पूर्ण ऑर्डर नहीं है',
     subscriptionHealth: 'सब्सक्रिप्शन स्थिति',
@@ -618,12 +710,20 @@ const vTrans = {
     welcome: 'सुस्वागतम्',
     totalCompletedOrders: 'एकूण पूर्ण झालेले ऑर्डर्स',
     totalOverallCompletedDesc: 'आत्तापर्यंत पूर्ण केलेले एकूण ऑर्डर्स',
-    connectedClients: 'जोडलेले ग्राहक',
-    connectedClientsDesc: 'आत्तापर्यंत जोडलेले एकूण ग्राहक',
+    nearbyPinBroadcasts: 'जवळपासचे पिन प्रसारण',
+    nearbyPinBroadcastsDesc: 'पिन कोडमध्ये पाठवलेल्या एकूण ग्राहक ऑर्डर सूचना',
     totalOverallEarnings: 'एकूण कमाई',
     totalEarnedDesc: 'वेबसाइटवरून झालेली एकूण कमाई',
-    totalOrdersReceived: 'एकूण प्राप्त ऑर्डर्स',
-    lifetimeOrderCount: 'लाइफटाइम ऑर्डर संख्या',
+    activeRadarOpportunities: 'सक्रिय रडार संधी',
+    activeRadarOpportunitiesDesc: 'तुमच्या पिन कोडमध्ये आत्ता स्वीकारण्यायोग्य लाइव्ह ऑर्डर्स',
+    requestSubmittedTitle: '📤 विनंती सबमिट झाली!',
+    requestSubmittedMsg: 'तुमची विनंती मालकाला (सुपर ॲडमिन) यशस्वीरित्या पाठवण्यात आली आहे. पुनरावलोकन आणि मंजुरी मिळताच तुम्हाला कळवले जाईल.',
+    planActivatedTitle: '🎉 विनंती मंजूर आणि प्लॅन सक्रिय!',
+    planActivatedMsgPrefix: 'आनंदाची बातमी! सुपर ॲडमिनने तुमची विनंती मंजूर केली आहे. तुमचा प्लॅन',
+    planActivatedMsgSuffix: 'आता पूर्णपणे सक्रिय झाला आहे!',
+    planActivatedPlanLabel: 'प्लॅन',
+    planActivatedValidUntilLabel: 'वैध पर्यंत',
+    planActivatedMaxItemsLabel: 'कमाल आयटम्स',
     successfulOrders: 'यशस्वी ऑर्डर्स',
     noCompletedOrdersYet: 'अद्याप कोणतेही पूर्ण झालेले ऑर्डर्स नाहीत',
     subscriptionHealth: 'सबस्क्रिप्शन आरोग्य',
@@ -909,24 +1009,9 @@ function PlanTimeline({ subscriptions, onTab }: { subscriptions: any[]; onTab?: 
   );
 }
 
-function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Tab) => void }) {
+function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; onTab?: (t: Tab) => void; radarOrders: Order[] }) {
 
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
   const [orders, setOrders] = useState<Order[]>([]);
@@ -935,6 +1020,7 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
   const [suggestionText, setSuggestionText] = useState('');
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showSubmittedModal, setShowSubmittedModal] = useState(false);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const isDateExpired = vendor.subscription_end ? vendor.subscription_end < todayIso : false;
@@ -953,12 +1039,13 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
   };
 
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [pinMatchOrders, setPinMatchOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
         const vId = vendor.id || (vendor as any)._id || '';
-        const [oRes, iRes, bRes] = await Promise.all([
+        const [oRes, iRes, bRes, pRes] = await Promise.all([
           fetch('/api/db', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ table: 'orders', action: 'select', filters: vId ? { vendor_id: vId } : {} })
@@ -970,11 +1057,18 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
           fetch('/api/db', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ table: 'broadcasts', action: 'select', sorts: [{ field: 'created_at', ascending: false }] })
+          }).then(r => r.json()).catch(() => ({ data: [] })),
+          // All client order notifications ever sent in this vendor's PIN code, regardless of
+          // which vendor (if any) ended up claiming them — deliberately not scoped by vendor_id.
+          fetch('/api/db', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: 'orders', action: 'select', filters: { client_zip: vendor.zip_code } })
           }).then(r => r.json()).catch(() => ({ data: [] }))
         ]);
         setOrders(oRes?.data || []);
         setItems(iRes?.data || []);
         setBroadcasts(bRes?.data || []);
+        setPinMatchOrders(pRes?.data || []);
         await loadSuggestions();
       } catch (e) {
         console.error('Error loading vendor dashboard metrics:', e);
@@ -1007,7 +1101,7 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
       });
       setSuggestionText('');
       await loadSuggestions();
-      alert('Q&A / Suggestion submitted to Super Admin successfully!');
+      setShowSubmittedModal(true);
     } catch (e) {
       alert('Failed to submit suggestion.');
     } finally {
@@ -1020,19 +1114,19 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
   // Calculate exact vendor-specific stats (isolated strictly for this logged-in vendor)
   const vendorCompletedOrders = orders.filter(o => o.status === 'delivered');
   const totalVendorEarnings = vendorCompletedOrders.reduce((s, o) => s + (Number(o.price) || 0), 0);
-  
-  // Unique clients connected by this specific vendor through website orders
-  const uniqueClientsCount = new Set(
-    orders
-      .map(o => (o.client_phone || o.client_name || '').trim())
-      .filter(Boolean)
-  ).size;
+
+  // Total client order notifications ever sent in this vendor's PIN code (any status, any vendor)
+  const pinMatchCount = pinMatchOrders.filter(o => o.client_zip === vendor.zip_code).length;
+
+  // Live pending orders in this vendor's PIN right now, ready to be claimed (same feed/definition
+  // that powers the "radar" nav item's live notification dot)
+  const activeRadarCount = radarOrders.filter(o => o.client_zip === vendor.zip_code).length;
 
   const kpis = [
     { label: t.totalCompletedOrders, value: vendorCompletedOrders.length, desc: t.totalOverallCompletedDesc, icon: ShoppingBag, color: 'text-green-600', bg: 'bg-green-500/10' },
-    { label: t.connectedClients, value: uniqueClientsCount, desc: t.connectedClientsDesc, icon: Users, color: 'text-amber-600', bg: 'bg-amber-500/10' },
+    { label: t.nearbyPinBroadcasts, value: pinMatchCount, desc: `${t.nearbyPinBroadcastsDesc} ${vendor.zip_code}`, icon: Navigation, color: 'text-amber-600', bg: 'bg-amber-500/10' },
     { label: t.totalOverallEarnings, value: `₹${totalVendorEarnings.toLocaleString()}`, desc: t.totalEarnedDesc, icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-500/10' },
-    { label: t.totalOrdersReceived, value: orders.length, desc: t.lifetimeOrderCount, icon: ShoppingBag, color: 'text-purple-600', bg: 'bg-purple-500/10' },
+    { label: t.activeRadarOpportunities, value: activeRadarCount, desc: t.activeRadarOpportunitiesDesc, icon: Radar, color: 'text-purple-600', bg: 'bg-purple-500/10' },
   ];
 
   return (
@@ -1050,7 +1144,7 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
             {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
               vendor.active_subscriptions.map((sub: any, i: number) => (
                 <span key={i} className="px-2.5 py-1 rounded-full text-xs font-black bg-[#C5A059] text-[#4A0E17] shadow-xs flex items-center gap-1">
-                  🟢 {sub.category_name || sub.plan_name} ({sub.max_items || 5} items limit)
+                  🟢 {sub.category_name || sub.plan_name} ({sub.max_items ?? 5} items limit)
                 </span>
               ))
             ) : (
@@ -1130,7 +1224,7 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
               <div className="pt-3 border-t border-border/50 space-y-2.5">
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted">Item Slot Usage</p>
                 {vendor.active_subscriptions.map((sub: any, i: number) => {
-                  const maxItems = sub.max_items || 5;
+                  const maxItems = sub.max_items ?? 5;
                   // We don't have real inventory count here; show max as reference
                   const pct = 0; // Will be 0 until vendor fetches real count; progress bar shows capacity
                   const isAtLimit = pct >= 100;
@@ -1265,6 +1359,13 @@ function VendorDashboard({ vendor, onTab }: { vendor: VendorType; onTab?: (t: Ta
           )}
         </div>
       </div>
+
+      <AntigravitySuccessModal
+        open={showSubmittedModal}
+        onClose={() => setShowSubmittedModal(false)}
+        title={t.requestSubmittedTitle}
+        subtitle={t.requestSubmittedMsg}
+      />
     </div>
   );
 }
@@ -1276,26 +1377,12 @@ interface OrderRadarProps {
   radarOrders: Order[];
   onTab: (tab: Tab) => void;
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
+  onOrderClaimed: (payload: { clientName: string; clientPhone: string; itemName: string }) => void;
 }
 
-function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadarProps) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
+function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaimed }: OrderRadarProps) {
+  const [lang] = useSyncedLanguage();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
 
   const t = vTrans[lang];
   const [timers, setTimers] = useState<Record<string, number>>({});
@@ -1360,6 +1447,15 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
       return;
     }
 
+    // radarOrders redacts client_name/client_phone while an order is still 'pending' (see
+    // server.js), so pull the real contact details from the update response, not from `order`.
+    const freshOrder = Array.isArray(d.data) ? d.data[0] : d.data;
+    onOrderClaimed({
+      clientName: freshOrder?.client_name || '',
+      clientPhone: freshOrder?.client_phone || '',
+      itemName: freshOrder?.item_name || order.item_name || ''
+    });
+
     show('Order confirmed and frozen successfully!');
     onTab('kanban'); // Move to Kanban board
   };
@@ -1374,9 +1470,9 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
     if (!orderCategory) return true; // General category
     // Check main active plan category
     if (!activePlan?.master_category_name || activePlan.master_category_name === orderCategory) return true;
-    // Check multi-subscriptions array
+    // Check multi-subscriptions array ('General' is a wildcard, matching VendorMenu's item-grouping convention)
     if (Array.isArray(vendor.active_subscriptions)) {
-      return vendor.active_subscriptions.some((sub: any) => !sub.category_name || sub.category_name === orderCategory);
+      return vendor.active_subscriptions.some((sub: any) => !sub.category_name || sub.category_name === 'General' || sub.category_name === orderCategory);
     }
     return false;
   };
@@ -1624,22 +1720,7 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show }: OrderRadar
 
 // 3. Kanban Active Orders Board
 function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
   const [orders, setOrders] = useState<Order[]>([]);
@@ -1744,14 +1825,22 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                   </div>
                   <div className="flex gap-2">
                     {o.status === 'accepted' ? (
-                      <Button size="sm" className="w-full" onClick={() => transitionOrder(oId, 'preparing')}>
+                      <Button size="sm" className="flex-1" onClick={() => transitionOrder(oId, 'preparing')}>
                         {t.startPrep}
                       </Button>
                     ) : (
-                      <Button size="sm" className="w-full bg-accent" onClick={() => transitionOrder(oId, 'out_for_delivery')}>
+                      <Button size="sm" className="flex-1 bg-accent" onClick={() => transitionOrder(oId, 'out_for_delivery')}>
                         {t.dispatchRider}
                       </Button>
                     )}
+                    <a
+                      href={buildClientWhatsAppLink(o.client_phone || '', buildClientWhatsAppMessage(o.client_name || '', vendor.shop_name, o.item_name || ''))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold text-xs transition-all shadow-xs shrink-0"
+                    >
+                      <MessageCircle size={14} /> WhatsApp Client 💬
+                    </a>
                   </div>
                 </div>
               );
@@ -1782,9 +1871,19 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
                       {o.client_landmark && <p><span className="text-muted font-medium">{(t as any).landmark || 'Landmark'}:</span> {o.client_landmark}</p>}
                     </div>
                   </div>
-                  <Button size="sm" className="w-full bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => transitionOrder(oId, 'delivered')}>
-                    {t.completeHandover}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1 bg-green-600 border-green-600 hover:bg-green-700 text-white" onClick={() => transitionOrder(oId, 'delivered')}>
+                      {t.completeHandover}
+                    </Button>
+                    <a
+                      href={buildClientWhatsAppLink(o.client_phone || '', buildClientWhatsAppMessage(o.client_name || '', vendor.shop_name, o.item_name || ''))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold text-xs transition-all shadow-xs shrink-0"
+                    >
+                      <MessageCircle size={14} /> WhatsApp Client 💬
+                    </a>
+                  </div>
                 </div>
               );
             })}
@@ -1845,29 +1944,15 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
 }
 
 // 4. Upgrade Plan tab
-function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+function UpgradePlan({ vendor }: { vendor: VendorType }) {
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
   const [plans, setPlans] = useState<Plan[]>([]);
   const [addons, setAddons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showSubmittedModal, setShowSubmittedModal] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1898,7 +1983,7 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
       actor: 'Vendor'
     });
 
-    show('Upgrade request submitted to Super Admin');
+    setShowSubmittedModal(true);
     setSubmitting(false);
   };
 
@@ -1980,28 +2065,20 @@ function UpgradePlan({ vendor, show }: { vendor: VendorType; show: (m: string, t
           </div>
         </div>
       )}
+
+      <AntigravitySuccessModal
+        open={showSubmittedModal}
+        onClose={() => setShowSubmittedModal(false)}
+        title={t.requestSubmittedTitle}
+        subtitle={t.requestSubmittedMsg}
+      />
     </div>
   );
 }
 
 // 5. Plan Activation Module Tab (Placed in between Active Orders and Plan's)
 function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; activePlan: Plan | null; onTab: (t: Tab) => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
 
@@ -2241,7 +2318,7 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
 
   const subs: any[] = Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0
     ? vendor.active_subscriptions
-    : [{ category_name: vendor.plan_name || 'General', plan_name: vendor.plan_name || 'Free Tier', max_items: 5, max_clients: 5, subscription_end: vendor.subscription_end, status: vendor.status }];
+    : [{ category_name: vendor.plan_name || 'General', plan_name: vendor.plan_name || 'Free Tier', max_items: 0, max_clients: 0, subscription_end: vendor.subscription_end, status: vendor.status }];
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -2429,7 +2506,7 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
         <EmptyState
           icon={<Package size={24} />}
           title="No Items Allocated Yet"
-          subtitle="Your active plan items will appear here automatically based on your subscription tiers."
+          subtitle="Items appear here based on your subscription's item capacity. If your plan shows 0 items, upgrade to start listing dishes."
         />
       ) : (
         <div className="space-y-8">
@@ -2453,7 +2530,7 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
                       it.category === cat
                     );
               const usedCount = groupItems.length;
-              const pct = maxItems === Infinity ? 0 : Math.min(100, (usedCount / maxItems) * 100);
+              const pct = maxItems === Infinity ? 0 : maxItems === 0 ? 100 : Math.min(100, (usedCount / maxItems) * 100);
               const expired = isPlanExpired(sub);
               const catIcon = getCatIcon(cat);
 

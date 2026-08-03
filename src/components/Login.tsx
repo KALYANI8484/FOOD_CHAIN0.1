@@ -4,8 +4,9 @@ import {
   UserPlus, ChevronLeft, Phone, MapPin, Calendar,
   Hash, Store, Users, Shield, UtensilsCrossed
 } from 'lucide-react';
-import { Spinner, LanguageSelector, getInitialLanguage, type Language } from './ui';
+import { Spinner, LanguageSelector, useSyncedLanguage } from './ui';
 import { AntigravitySuccessModal, CelebratorySubmitButton } from './AntigravitySuccessModal';
+import { supabase, type MasterItem } from '../lib/supabase';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
@@ -151,23 +152,8 @@ export function Login({
   onBack: () => void;
   initialMode?: AuthMode;
 }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [lang] = useSyncedLanguage();
   const t = loginTranslations[lang];
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
 
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [loading, setLoading] = useState(false);
@@ -178,8 +164,20 @@ export function Login({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const [sf, setSf] = useState({ name: '', shop_name: '', category: 'Tiffin', phone: '', dob: '', address: '', pincode: '' });
+  const [sf, setSf] = useState({ name: '', shop_name: '', category: '', phone: '', dob: '', address: '', pincode: '' });
   const patch = (k: keyof typeof sf) => (v: string) => setSf(p => ({ ...p, [k]: v }));
+
+  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('master_inventory').select('*');
+      const items = data || [];
+      setMasterItems(items);
+      if (items.length > 0) {
+        setSf(p => (p.category ? p : { ...p, category: items[0].name }));
+      }
+    })();
+  }, []);
 
   const switchMode = (m: AuthMode) => { setMode(m); setError(''); setSuccess(''); };
 
@@ -220,7 +218,7 @@ export function Login({
         body: JSON.stringify({
           owner_name: sf.name,
           shop_name: sf.shop_name || sf.name,
-          category: sf.category || 'Tiffin',
+          category: sf.category,
           phone: sf.phone,
           dob: cleanDob,
           birthdate: cleanDob,
@@ -235,8 +233,8 @@ export function Login({
         setUsername(sf.phone);
         setPassword(cleanDob);
         setShowAntigravityModal(true);
-        setSuccess('Application submitted! Your account is active with Free Tier.');
-        setSf({ name: '', shop_name: '', category: 'Tiffin', phone: '', dob: '', address: '', pincode: '' });
+        setSuccess('Application approved! Upgrade to a paid plan to start listing items and accepting client orders.');
+        setSf({ name: '', shop_name: '', category: masterItems[0]?.name || '', phone: '', dob: '', address: '', pincode: '' });
       }
     } catch { setError('Network error — please try again'); }
     finally { setLoading(false); }
@@ -370,6 +368,24 @@ export function Login({
                 <Field label={t.fullNameLabel} placeholder={t.fullNamePlaceholder} value={sf.name} onChange={patch('name')} icon={UserPlus} />
                 <Field label="SHOP / KITCHEN NAME" placeholder="e.g. Kolhapur Tiffin Express (optional)" value={sf.shop_name} onChange={patch('shop_name')} icon={Store} />
 
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Primary Dish Category</label>
+                  <div className="relative">
+                    <UtensilsCrossed size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+                    <select
+                      value={sf.category}
+                      onChange={(e) => patch('category')(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-medium outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-100 transition-all appearance-none cursor-pointer"
+                    >
+                      {masterItems.length === 0 && <option value="">No master items available yet</option>}
+                      {masterItems.map((m) => (
+                        <option key={m.id} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1 ml-1">Pick the dish you'll primarily sell — a Super Admin can add more categories to your plan later.</p>
+                </div>
+
                 <Field
                   label={t.phoneLabel}
                   placeholder={t.phonePlaceholder}
@@ -435,7 +451,7 @@ export function Login({
 
               <Field
                 label="Super Admin Email"
-                placeholder="2711vikram@gmail.com"
+                placeholder="admin@example.com"
                 type="email"
                 value={username} onChange={setUsername}
                 icon={Mail}
