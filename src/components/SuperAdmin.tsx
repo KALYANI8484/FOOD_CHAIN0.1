@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Store, Package, CreditCard, FileText, Users,
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
+  Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
@@ -3295,7 +3295,7 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
       return;
     }
     
-    await supabase.from('sub_inventory').insert({
+    const { error } = await supabase.from('sub_inventory').insert({
       master_inventory_id: master.id,
       name: form.name,
       price: Number(form.price),
@@ -3303,6 +3303,10 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
       uom: form.uom || 'pc',
       image_url: form.image_url || null
     });
+    if (error) {
+      show(error.message || 'Failed to create sub-item.', 'error');
+      return;
+    }
 
     show(`Sub-Item ${form.name} created successfully!`);
     setModal(false);
@@ -3313,13 +3317,17 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
   const handleEditSave = async () => {
     if (!editItem) return;
     const targetId = editItem.id || (editItem as any)._id;
-    await supabase.from('sub_inventory').update({
+    const { error } = await supabase.from('sub_inventory').update({
       name: editItem.name,
       price: Number(editItem.price),
       quantity: Number(editItem.quantity),
       uom: editItem.uom || 'pc',
       image_url: editItem.image_url
     }).eq('id', targetId);
+    if (error) {
+      show(error.message || 'Failed to update sub-item.', 'error');
+      return;
+    }
 
     show('Sub-Item updated');
     setEditItem(null);
@@ -3787,9 +3795,10 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
   // Upload form state
   const [form, setForm] = useState({ title: '', version_note: '', keywords: '' });
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfData, setPdfData] = useState<string>('');
   const [uploading, setUploading] = useState(false);
-  const [visibilityRoles, setVisibilityRoles] = useState<string[]>(['vendor']);
+  const defaultRolesForTab = (tab: DocTab): string[] =>
+    tab === 'sop' ? ['sub_admin'] : tab === 'plans' ? ['plans'] : ['vendor'];
+  const [visibilityRoles, setVisibilityRoles] = useState<string[]>(defaultRolesForTab('sop'));
 
   // FAQ form state
   const [faqForm, setFaqForm] = useState({ question: '', answer: '', category: 'general' });
@@ -3817,35 +3826,54 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) { show('File size must be under 15MB', 'error'); return; }
     setPdfFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setPdfData(reader.result as string);
-    reader.readAsDataURL(file);
   };
 
   const handleCreate = async () => {
-    if (!form.title || !pdfData) { show('Title and file are required', 'error'); return; }
+    if (!form.title || !pdfFile) { show('Title and file are required', 'error'); return; }
     if (visibilityRoles.length === 0) { show('Select at least one visibility role', 'error'); return; }
     setUploading(true);
-    const docType = docTab === 'faq' ? 'vendor_guide' : docTab; // files go to sop or vendor_guide
-    await supabase.from('guides').insert({
-      title: form.title,
-      category: docType,
-      doc_type: docType,
-      keywords: form.keywords || '',
-      version_note: form.version_note || '',
-      allowed_roles: visibilityRoles,
-      is_pinned: false,
-      read_count: 0,
-      file_data: pdfData,
-      file_name: pdfFile?.name || 'document'
-    });
-    setUploading(false);
-    show('Document uploaded successfully!');
-    setModal(false);
-    setForm({ title: '', version_note: '', keywords: '' });
-    setPdfFile(null); setPdfData('');
-    setVisibilityRoles(['vendor']);
-    load();
+    try {
+      // Upload the raw file to disk/S3 via the shared upload endpoint instead of
+      // embedding it as base64 in the Mongo document — base64 inflates the file
+      // by ~33%, which can silently blow past MongoDB's 16MB document limit.
+      const uploadForm = new FormData();
+      uploadForm.append('file', pdfFile);
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadForm });
+      const uploadResult = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok || !uploadResult.url) {
+        show(uploadResult.error || 'File upload failed. Please try again.', 'error');
+        return;
+      }
+
+      const docType = docTab === 'faq' ? 'vendor_guide' : docTab; // files go to sop or vendor_guide
+      const { error } = await supabase.from('guides').insert({
+        title: form.title,
+        category: docType,
+        doc_type: docType,
+        keywords: form.keywords || '',
+        version_note: form.version_note || '',
+        allowed_roles: visibilityRoles,
+        is_pinned: false,
+        read_count: 0,
+        file_data: uploadResult.url,
+        file_name: pdfFile.name
+      });
+      if (error) {
+        show(error.message || 'Failed to save document record.', 'error');
+        return;
+      }
+
+      show('Document uploaded successfully!');
+      setModal(false);
+      setForm({ title: '', version_note: '', keywords: '' });
+      setPdfFile(null);
+      setVisibilityRoles(defaultRolesForTab(docTab));
+      load();
+    } catch (err: any) {
+      show(err?.message || 'Upload failed. Please try again.', 'error');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -3972,7 +4000,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
         title="Knowledge Base & Guides"
         subtitle="SOPs, Vendor Guides, and FAQs — manage your operational documentation"
         action={
-          <Button onClick={() => isFileDoc ? setModal(true) : setFaqModal(true)} className="bg-primary text-accent hover:bg-primary-dark">
+          <Button onClick={() => { if (isFileDoc) { setVisibilityRoles(defaultRolesForTab(docTab)); setModal(true); } else { setFaqModal(true); } }} className="bg-primary text-accent hover:bg-primary-dark">
             <FileUp size={16} className="mr-2" />
             {isFileDoc ? 'Upload Document' : 'Add FAQ'}
           </Button>
@@ -4137,7 +4165,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
       )}
 
       {/* === Upload Document Modal === */}
-      <Modal open={modal} onClose={() => setModal(false)} title={`Upload ${docTab === 'sop' ? 'SOP Document' : 'Vendor Guide'}`}>
+      <Modal open={modal} onClose={() => setModal(false)} title={`Upload ${docTab === 'sop' ? 'SOP Document' : docTab === 'plans' ? 'Plan Document' : 'Vendor Guide'}`}>
         <div className="space-y-5">
           <Input label="Document Title" value={form.title} onChange={v => setForm({ ...form, title: v })} required />
           <Input label="Version / Note (optional)" value={form.version_note} onChange={v => setForm({ ...form, version_note: v })} />
@@ -4277,7 +4305,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
             </div>
 
             <div className="rounded-xl border border-border overflow-hidden min-h-[50vh]">
-              {previewGuide.file_data?.startsWith('data:image') ? (
+              {previewGuide.file_data && (previewGuide.file_data.startsWith('data:image') || /\.(png|jpg|jpeg|webp|gif|svg)($|\?)/i.test(previewGuide.file_name || '')) ? (
                 <img src={previewGuide.file_data} alt={previewGuide.title} className="w-full h-auto object-contain" />
               ) : previewGuide.file_data ? (
                 <iframe src={previewGuide.file_data} title={previewGuide.title} className="w-full h-[65vh] rounded-xl border-0" />
