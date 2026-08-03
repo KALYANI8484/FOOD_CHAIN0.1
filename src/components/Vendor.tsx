@@ -339,7 +339,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
               {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
                 vendor.active_subscriptions.map((sub: any, i: number) => (
                   <div key={i} className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-gray-700">{sub.category_name || sub.plan_name || 'General'}</span>
+                    <span className="font-bold text-gray-700">{sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}</span>
                     <span className="text-red-500 font-bold">Expired: {sub.subscription_end || 'N/A'}</span>
                   </div>
                 ))
@@ -1144,7 +1144,7 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
             {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
               vendor.active_subscriptions.map((sub: any, i: number) => (
                 <span key={i} className="px-2.5 py-1 rounded-full text-xs font-black bg-[#C5A059] text-[#4A0E17] shadow-xs flex items-center gap-1">
-                  🟢 {sub.category_name || sub.plan_name} ({sub.max_items ?? 5} items limit)
+                  🟢 {sub.plan_name || sub.category_name} ({sub.max_items ?? 5} items limit)
                 </span>
               ))
             ) : (
@@ -1232,7 +1232,7 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
                   return (
                     <div key={i}>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold text-text truncate">{sub.category_name || sub.plan_name || 'General'}</span>
+                        <span className="text-[10px] font-bold text-text truncate">{sub.plan_name || sub.category_name || 'General'}</span>
                         <span className={`text-[10px] font-extrabold ${isAtLimit ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-green-600'}`}>
                           {maxItems} slots
                         </span>

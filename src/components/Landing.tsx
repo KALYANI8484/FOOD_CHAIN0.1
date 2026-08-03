@@ -1254,6 +1254,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 {[
                   { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373' },
                   { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs },
+                  { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com' },
                   { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com' },
                 ].map(({ href, icon: Icon, label }) => (
                   <li key={label}>
@@ -1292,7 +1293,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               {[
                 { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', Icon: MessageCircle },
                 { href: 'tel:+919175537373', Icon: Phone },
-                { href: 'mailto:vikram271@rediffmail.com', Icon: Mail },
+                { href: 'mailto:2711vikram@gmail.com', Icon: Mail },
               ].map(({ href, Icon }) => (
                 <a key={href} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-[#360910] border border-[#C5A059]/40 flex items-center justify-center transition-colors hover:bg-[#4A0E17]">

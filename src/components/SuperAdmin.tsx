@@ -1172,7 +1172,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
             <p className="text-xs font-black uppercase tracking-wider text-[#4A0E17]">Category Subscription Detail</p>
             <button onClick={() => setPopoverSub(null)} className="text-slate-400 hover:text-slate-700"><X size={14} /></button>
           </div>
-          <p className="text-sm font-extrabold text-slate-900 mb-1">{popoverSub.sub.category_name || popoverSub.sub.plan_name}</p>
+          <p className="text-sm font-extrabold text-slate-900 mb-1">{popoverSub.sub.plan_name || 'Free Tier'}{popoverSub.sub.category_name ? ` (${popoverSub.sub.category_name})` : ''}</p>
           <div className="space-y-1.5 text-xs text-slate-600">
             <div className="flex justify-between"><span>Item Slots Used</span><span className="font-bold text-slate-900">? / {popoverSub.sub.max_items ?? 5}</span></div>
             <div className="flex justify-between"><span>Client Limit</span><span className="font-bold text-slate-900">{popoverSub.sub.max_clients ?? 10}</span></div>
@@ -1342,7 +1342,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                               }}
                               className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#4A0E17] text-[#C5A059] border border-[#C5A059]/30 hover:opacity-80 transition-opacity cursor-pointer"
                             >
-                              🟢 {sub.category_name || sub.plan_name || 'General'}
+                              🟢 {sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}
                             </button>
                           ))
                         ) : (
@@ -1725,7 +1725,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                     <option value="">-- Primary / General Category --</option>
                     {Array.isArray(editVendor.active_subscriptions) && editVendor.active_subscriptions.map((sub: any, idx: number) => (
                       <option key={sub.id || idx} value={sub.id || sub.category_name}>
-                        {sub.category_name || sub.plan_name || `Subscription #${idx + 1}`}
+                        {sub.plan_name || sub.category_name || `Subscription #${idx + 1}`}
                       </option>
                     ))}
                   </select>
