@@ -9,24 +9,9 @@ export function LanguageSelector({
   direction?: 'up' | 'down' | 'auto';
   showLabel?: boolean;
 }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [lang, setLang] = useSyncedLanguage();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: any) => {
@@ -136,14 +121,12 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative w-full ${sizes[size]} bg-[#FAF8F5] text-slate-900 border-t sm:border border-amber-200/80 shadow-2xl rounded-t-3xl sm:rounded-3xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-scale-in`}>
-        {title && (
-          <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10 rounded-t-3xl">
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
-              <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10 rounded-t-3xl">
+          <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
+            <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
+          </button>
+        </div>
         <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
@@ -176,14 +159,12 @@ export function Drawer({
       <div
         className={`absolute top-0 ${side === 'right' ? 'right-0 animate-slide-in-right' : 'left-0 animate-slide-in-left'} h-full w-full max-w-md bg-[#FAF8F5] text-slate-900 border-l border-amber-200 shadow-2xl overflow-y-auto`}
       >
-        {title && (
-          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10">
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
-              <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10">
+          <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
+            <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
+          </button>
+        </div>
         <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
@@ -377,5 +358,30 @@ export const getInitialLanguage = (): Language => {
   if (navLang.startsWith('mr')) return 'mr';
   return 'en';
 };
+
+// Single shared hook for staying in sync with the language picked in LanguageSelector
+// (localStorage + a same-tab 'app_language_change' event, since the native 'storage'
+// event never fires in the tab that made the change). Replaces the same hand-rolled
+// useState+useEffect pair that used to be duplicated in every component that needed it.
+export function useSyncedLanguage(): [Language, (l: Language) => void] {
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    const handleChange = () => {
+      const updated = localStorage.getItem('app_language') as Language;
+      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
+        setLang(updated);
+      }
+    };
+    window.addEventListener('storage', handleChange);
+    window.addEventListener('app_language_change', handleChange);
+    return () => {
+      window.removeEventListener('storage', handleChange);
+      window.removeEventListener('app_language_change', handleChange);
+    };
+  }, []);
+
+  return [lang, setLang];
+}
 
 

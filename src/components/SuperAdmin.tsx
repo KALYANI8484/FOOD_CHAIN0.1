@@ -5,7 +5,7 @@ import {
   Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
 type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins';
@@ -50,22 +50,7 @@ const compressImageFile = (file: File, maxWidth = 1024, quality = 0.8): Promise<
   });
 };
 export function SuperAdmin({ onExit }: { onExit: () => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const navLabels = {
     en: { approvals: 'Team Approvals', vendors: 'Vendor Database', plans: 'Pricing Plans', inventory: 'Master Inventory', guides: 'Guide Documents', sub_admins: 'Sub-Admins', exit: 'Exit Dashboard' },
@@ -73,7 +58,28 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
     mr: { approvals: 'टीम मंजुरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'किंमत प्लॅन्स', inventory: 'मास्टर इन्व्हेंटरी', guides: 'मार्गदर्शक दस्तऐवज', sub_admins: 'सब-ॲडमिन', exit: 'डॅशबोर्डवरून बाहेर पडा' },
   }[lang];
 
-  const [tab, setTab] = useState<Tab>('approvals');
+  const [tab, setTabState] = useState<Tab>('approvals');
+
+  const setTab = (newTab: Tab, isPop = false) => {
+    setTabState(newTab);
+    if (!isPop) {
+      window.history.pushState({ superTab: newTab, appScreen: 'super_admin' }, '', `#super_admin/${newTab}`);
+    }
+  };
+
+  useEffect(() => {
+    window.history.replaceState({ superTab: 'approvals', appScreen: 'super_admin' }, '', '#super_admin/approvals');
+
+    const handleSuperAdminPopState = (e: PopStateEvent) => {
+      if (e.state && e.state.superTab) {
+        setTabState(e.state.superTab);
+      }
+    };
+
+    window.addEventListener('popstate', handleSuperAdminPopState);
+    return () => window.removeEventListener('popstate', handleSuperAdminPopState);
+  }, []);
+
   const { toast, show } = useToast();
 
   const navItems: { id: Tab; label: string; icon: any }[] = [
@@ -98,12 +104,15 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
             <span className="text-[9px] text-muted font-bold uppercase tracking-wider">Super Admin</span>
           </div>
         </div>
-        <button 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-xl bg-surface-2 border border-border text-text cursor-pointer hover:bg-border/30 transition-colors"
-        >
-          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <LanguageSelector direction="down" showLabel={true} />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-xl bg-surface-2 border border-border text-text cursor-pointer hover:bg-border/30 transition-colors"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar */}
@@ -134,7 +143,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
         </nav>
         <div className="p-3 border-t border-border space-y-2">
           <div className="flex justify-center pb-1">
-            <LanguageSelector />
+            <LanguageSelector direction="up" showLabel={true} />
           </div>
           <Button variant="ghost" size="sm" className="w-full" onClick={onExit}>
             {navLabels.exit}
@@ -235,22 +244,7 @@ const saTrans = {
 
 // 1. Dashboard Module Tab
 function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = saTrans[lang];
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -4434,7 +4428,78 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
 }
 
 // 8. Sub-Admin management tab
+const satTrans = {
+  en: {
+    title: 'Sub-Admin Management',
+    subtitle: 'Administer team member accounts and access permissions',
+    createSubAdmin: 'Create Sub-Admin',
+    colName: 'Name',
+    colEmail: 'Email',
+    colPassword: 'Password',
+    colLastActive: 'Last Active',
+    colActions: 'Actions',
+    holdToReveal: 'Hold to reveal',
+    never: 'Never',
+    name: 'Name',
+    emailAddress: 'Email Address',
+    password: 'Password *',
+    passwordPlaceholder: 'Enter or generate password',
+    generate: 'Generate',
+    cancel: 'Cancel',
+    saveCredentials: 'Save Credentials',
+    confirmRemove: (name: string) => `Remove sub-admin ${name}?`,
+    toastCreated: (name: string) => `Sub Admin ${name} created successfully!`,
+    toastRemoved: (name: string) => `Sub Admin ${name} removed`,
+  },
+  hi: {
+    title: 'सब-एडमिन प्रबंधन',
+    subtitle: 'टीम सदस्य खातों और पहुंच अनुमतियों का प्रबंधन करें',
+    createSubAdmin: 'सब-एडमिन बनाएं',
+    colName: 'नाम',
+    colEmail: 'ईमेल',
+    colPassword: 'पासवर्ड',
+    colLastActive: 'अंतिम सक्रिय',
+    colActions: 'कार्रवाई',
+    holdToReveal: 'देखने के लिए दबाए रखें',
+    never: 'कभी नहीं',
+    name: 'नाम',
+    emailAddress: 'ईमेल पता',
+    password: 'पासवर्ड *',
+    passwordPlaceholder: 'पासवर्ड दर्ज करें या जनरेट करें',
+    generate: 'जनरेट करें',
+    cancel: 'रद्द करें',
+    saveCredentials: 'क्रेडेंशियल सहेजें',
+    confirmRemove: (name: string) => `सब-एडमिन ${name} हटाएं?`,
+    toastCreated: (name: string) => `सब एडमिन ${name} सफलतापूर्वक बनाया गया!`,
+    toastRemoved: (name: string) => `सब एडमिन ${name} हटाया गया`,
+  },
+  mr: {
+    title: 'सब-ॲडमिन व्यवस्थापन',
+    subtitle: 'टीम सदस्य खाती आणि प्रवेश परवानग्या व्यवस्थापित करा',
+    createSubAdmin: 'सब-ॲडमिन तयार करा',
+    colName: 'नाव',
+    colEmail: 'ईमेल',
+    colPassword: 'पासवर्ड',
+    colLastActive: 'शेवटचे सक्रिय',
+    colActions: 'कृती',
+    holdToReveal: 'पाहण्यासाठी दाबून ठेवा',
+    never: 'कधीही नाही',
+    name: 'नाव',
+    emailAddress: 'ईमेल पत्ता',
+    password: 'पासवर्ड *',
+    passwordPlaceholder: 'पासवर्ड टाका किंवा तयार करा',
+    generate: 'तयार करा',
+    cancel: 'रद्द करा',
+    saveCredentials: 'क्रेडेन्शियल्स जतन करा',
+    confirmRemove: (name: string) => `सब-ॲडमिन ${name} काढून टाकायचे?`,
+    toastCreated: (name: string) => `सब ॲडमिन ${name} यशस्वीरित्या तयार केले!`,
+    toastRemoved: (name: string) => `सब ॲडमिन ${name} काढले`,
+  },
+};
+
 function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [lang] = useSyncedLanguage();
+  const t = satTrans[lang];
   const [admins, setAdmins] = useState<SubAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
@@ -4473,16 +4538,16 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       actor: 'Super Admin'
     });
 
-    show(`Sub Admin ${form.name} created successfully!`);
+    show(t.toastCreated(form.name));
     setModal(false);
     setForm({ name: '', email: '', password: '' });
     load();
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Remove sub-admin ${name}?`)) {
+    if (confirm(t.confirmRemove(name))) {
       await supabase.from('sub_admins').delete().eq('id', id);
-      show(`Sub Admin ${name} removed`, 'info');
+      show(t.toastRemoved(name), 'info');
       load();
     }
   };
@@ -4491,10 +4556,10 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader 
-        title="Sub-Admin Management" 
-        subtitle="Administer team member accounts and access permissions" 
-        action={<Button onClick={() => setModal(true)}><Plus size={16} /> Create Sub-Admin</Button>}
+      <PageHeader
+        title={t.title}
+        subtitle={t.subtitle}
+        action={<Button onClick={() => setModal(true)}><Plus size={16} /> {t.createSubAdmin}</Button>}
       />
 
       <div className="card overflow-hidden bg-surface border border-border">
@@ -4502,11 +4567,11 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           <table className="w-full text-left text-sm border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Email</th>
-                <th className="px-6 py-4">Password</th>
-                <th className="px-6 py-4">Last Active</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t.colName}</th>
+                <th className="px-6 py-4">{t.colEmail}</th>
+                <th className="px-6 py-4">{t.colPassword}</th>
+                <th className="px-6 py-4">{t.colLastActive}</th>
+                <th className="px-6 py-4 text-right">{t.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -4517,19 +4582,19 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
                   <td className="px-6 py-4 font-mono text-xs">
                     <div className="flex items-center gap-2">
                       <span>{revealedAdminId === a.id ? a.password : '••••••••'}</span>
-                      <button 
+                      <button
                         onMouseDown={() => setRevealedAdminId(a.id)}
                         onMouseUp={() => setRevealedAdminId(null)}
                         onMouseLeave={() => setRevealedAdminId(null)}
                         className="p-1 rounded hover:bg-surface-2 text-muted hover:text-text cursor-pointer"
-                        title="Hold to reveal"
+                        title={t.holdToReveal}
                       >
                         <Eye size={12} />
                       </button>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-xs text-muted">
-                    {a.last_active ? new Date(a.last_active).toLocaleString() : 'Never'}
+                    {a.last_active ? new Date(a.last_active).toLocaleString() : t.never}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => handleDelete(a.id, a.name)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500 hover:bg-border/20 transition-all">
@@ -4544,29 +4609,29 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       </div>
 
       {/* Create Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Create Sub-Admin">
+      <Modal open={modal} onClose={() => setModal(false)} title={t.createSubAdmin}>
         <div className="space-y-4">
-          <Input label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-          <Input label="Email Address" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
-          
+          <Input label={t.name} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <Input label={t.emailAddress} type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
+
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Password *</label>
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">{t.password}</label>
             <div className="flex gap-2">
               <input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
-                placeholder="Enter or generate password"
+                placeholder={t.passwordPlaceholder}
                 className="flex-1 px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
               />
-              <Button variant="outline" onClick={handleGeneratePassword}>Generate</Button>
+              <Button variant="outline" onClick={handleGeneratePassword}>{t.generate}</Button>
             </div>
           </div>
 
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
-            <Button onClick={handleCreate}>Save Credentials</Button>
+            <Button variant="outline" onClick={() => setModal(false)}>{t.cancel}</Button>
+            <Button onClick={handleCreate}>{t.saveCredentials}</Button>
           </div>
         </div>
       </Modal>

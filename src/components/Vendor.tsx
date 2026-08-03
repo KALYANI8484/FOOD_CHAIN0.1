@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, getInitialLanguage, type Language } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { getItemTranslation } from './Landing';
 import { AntigravitySuccessModal } from './AntigravitySuccessModal';
 
@@ -40,23 +40,8 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
 type Tab = 'dashboard' | 'menu' | 'radar' | 'kanban' | 'activation' | 'upgrade';
 
 export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [lang] = useSyncedLanguage();
   const t = vTrans[lang];
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
 
   const [tab, setTabState] = useState<Tab>('dashboard');
 
@@ -68,7 +53,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   };
 
   useEffect(() => {
-    window.history.replaceState({ vendorTab: 'dashboard', appScreen: 'vendor' }, '', '#vendor/dashboard');
+    window.history.replaceState({ vendorTab: 'dashboard', appScreen: 'vendor', cred: vendorPhone }, '', '#vendor/dashboard');
 
     const handleVendorPopState = (e: PopStateEvent) => {
       if (e.state && e.state.vendorTab) {
@@ -1026,22 +1011,7 @@ function PlanTimeline({ subscriptions, onTab }: { subscriptions: any[]; onTab?: 
 
 function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; onTab?: (t: Tab) => void; radarOrders: Order[] }) {
 
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
   const [orders, setOrders] = useState<Order[]>([]);
@@ -1411,23 +1381,8 @@ interface OrderRadarProps {
 }
 
 function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaimed }: OrderRadarProps) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [lang] = useSyncedLanguage();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
 
   const t = vTrans[lang];
   const [timers, setTimers] = useState<Record<string, number>>({});
@@ -1765,22 +1720,7 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaim
 
 // 3. Kanban Active Orders Board
 function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
   const [orders, setOrders] = useState<Order[]>([]);
@@ -2005,22 +1945,7 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
 
 // 4. Upgrade Plan tab
 function UpgradePlan({ vendor }: { vendor: VendorType }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -2153,22 +2078,7 @@ function UpgradePlan({ vendor }: { vendor: VendorType }) {
 
 // 5. Plan Activation Module Tab (Placed in between Active Orders and Plan's)
 function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; activePlan: Plan | null; onTab: (t: Tab) => void }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
+  const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
 

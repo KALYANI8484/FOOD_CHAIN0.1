@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Sparkles, ArrowRight } from 'lucide-react';
+import { Check, Sparkles, ArrowRight, X } from 'lucide-react';
 
 interface AntigravitySuccessModalProps {
   open: boolean;
@@ -119,7 +119,15 @@ export function AntigravitySuccessModal({
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md animate-fade-in w-screen h-screen overflow-y-auto">
       {/* Main Glassmorphic Modal Card */}
       <div className="relative max-w-sm sm:max-w-md w-full rounded-3xl bg-white border border-amber-200/80 p-6 sm:p-8 shadow-2xl text-center overflow-hidden animate-scale-in my-auto">
-        
+
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-xl hover:bg-amber-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer z-10"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+
         {/* Floating Orbital Ring with Glowing Checkmark Icon */}
         <div className="relative mx-auto w-20 h-20 mb-5 flex items-center justify-center">
           <div className="absolute inset-0 rounded-full border-2 border-amber-400/50 animate-ping opacity-30" />

@@ -5,11 +5,9 @@ import {
   ChevronLeft, Hash, User, CheckCircle, Globe,
   Users as UsersIcon, TrendingUp, Star, UserPlus
 } from 'lucide-react';
-import { Spinner, LanguageSelector } from './ui';
+import { Spinner, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 
 type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
-
-export type Language = 'en' | 'hi' | 'mr';
 
 export const translations = {
   en: {
@@ -241,16 +239,6 @@ export const getItemTranslation = (name: string, lang: Language): string => {
   return name;
 };
 
-export const getInitialLanguage = (): Language => {
-  if (typeof window === 'undefined') return 'en';
-  const saved = localStorage.getItem('app_language') as Language;
-  if (saved && (saved === 'en' || saved === 'hi' || saved === 'mr')) return saved;
-  const navLang = (navigator.language || (navigator as any).userLanguage || '').toLowerCase();
-  if (navLang.startsWith('hi')) return 'hi';
-  if (navLang.startsWith('mr')) return 'mr';
-  return 'en';
-};
-
 interface MasterItem  { id: string; name: string; category: string; base_price: number; price: number; image_url: string; description?: string; }
 interface VendorItem  { id: string; item_name: string; price: number; quantity: number; image_url: string; master_item_id: string; vendor_id: string; }
 
@@ -473,7 +461,32 @@ interface OrderModalProps {
 }
 
 function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps) {
-  const [step, setStep] = useState<ModalStep>(1);
+  const [step, setStepState] = useState<ModalStep>(1);
+
+  const setStep = (newStep: ModalStep) => {
+    setStepState(newStep);
+    window.history.pushState({ ...window.history.state, orderStep: newStep }, '');
+  };
+
+  // Back/step history: mount pushes its own entry for step 1 (so one physical
+  // back closes the modal and lands on the underlying page, not further back),
+  // each later setStep() call pushes its own entry so back steps through
+  // 3->2->1 before finally closing the modal.
+  useEffect(() => {
+    window.history.pushState({ ...window.history.state, orderStep: 1 }, '');
+
+    const handleOrderModalPopState = (e: PopStateEvent) => {
+      if (e.state && e.state.orderStep) {
+        setStepState(e.state.orderStep);
+      } else {
+        onClose();
+      }
+    };
+
+    window.addEventListener('popstate', handleOrderModalPopState);
+    return () => window.removeEventListener('popstate', handleOrderModalPopState);
+  }, []);
+
   const [step2Choice, setStep2Choice] = useState<'enquiry' | 'place' | null>(null);
   const [subItems, setSubItems] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
@@ -935,23 +948,8 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [orders, setOrders] = useState<any[]>([]);
   const [showStickyBar, setShowStickyBar] = useState(true);
 
-  const [language, setLanguage] = useState<Language>(getInitialLanguage);
+  const [language] = useSyncedLanguage();
   const t = translations[language];
-
-  const changeLanguage = (lang: Language) => {
-    setLanguage(lang);
-    localStorage.setItem('app_language', lang);
-    window.dispatchEvent(new Event('app_language_change'));
-  };
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = (localStorage.getItem('app_language') as Language) || 'en';
-      setLanguage(updated);
-    };
-    window.addEventListener('app_language_change', handleStorage);
-    return () => window.removeEventListener('app_language_change', handleStorage);
-  }, []);
 
   useScrollReveal();
 
@@ -1072,7 +1070,14 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       {/* ── Vendor Claimed Order Pop-Up Modal ── */}
       {showClaimedModal && activeClientOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border-2 border-green-500 text-center space-y-4 animate-scale-in">
+          <div className="relative bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border-2 border-green-500 text-center space-y-4 animate-scale-in">
+            <button
+              onClick={() => setShowClaimedModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto shadow-inner">
               <CheckCircle size={44} className="text-green-600 animate-bounce" />
             </div>
@@ -1139,7 +1144,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             <span className="font-black text-lg sm:text-xl tracking-tight text-[#C5A059] drop-shadow-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Vikram Ads</span>
           </div>
           <nav className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            <LanguageSelector onChange={(l) => changeLanguage(l)} />
+            <LanguageSelector />
             <button onClick={handleVendorPlanClick} className="text-xs sm:text-sm font-semibold text-[#F7F4EF] hover:text-[#C5A059] transition-colors px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg hover:bg-white/10">{t.plans}</button>
             <button onClick={() => onNavigate('login')} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-[#C5A059] hover:bg-[#D4B36E] active:scale-95 text-[#4A0E17] text-xs sm:text-sm font-extrabold transition-all shadow-md hover:shadow-lg truncate">{t.loginRegister}</button>
           </nav>

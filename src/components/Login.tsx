@@ -4,7 +4,7 @@ import {
   UserPlus, ChevronLeft, Phone, MapPin, Calendar,
   Hash, Store, Users, Shield, UtensilsCrossed
 } from 'lucide-react';
-import { Spinner, LanguageSelector, getInitialLanguage, type Language } from './ui';
+import { Spinner, LanguageSelector, useSyncedLanguage } from './ui';
 import { AntigravitySuccessModal, CelebratorySubmitButton } from './AntigravitySuccessModal';
 import { supabase, type MasterItem } from '../lib/supabase';
 
@@ -152,23 +152,8 @@ export function Login({
   onBack: () => void;
   initialMode?: AuthMode;
 }) {
-  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [lang] = useSyncedLanguage();
   const t = loginTranslations[lang];
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('app_language') as Language;
-      if (updated && (updated === 'en' || updated === 'hi' || updated === 'mr')) {
-        setLang(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('app_language_change', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('app_language_change', handleStorage);
-    };
-  }, []);
 
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [loading, setLoading] = useState(false);
@@ -466,7 +451,7 @@ export function Login({
 
               <Field
                 label="Super Admin Email"
-                placeholder="2711vikram@gmail.com"
+                placeholder="admin@example.com"
                 type="email"
                 value={username} onChange={setUsername}
                 icon={Mail}
