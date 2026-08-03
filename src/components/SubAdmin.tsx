@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import {
   LayoutDashboard, Store, Plus, Users, Clock, CheckCircle2,
   Activity as ActivityIcon, AlertCircle, FileText, Eye, Pencil, Search,
@@ -435,6 +435,19 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
 
   const [categoryFilter, setCategoryFilter] = useState('all');
 
+  // Derive unique categories across all vendor active subscriptions for the filter dropdown
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>();
+    vendors.forEach(v => {
+      if (Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0) {
+        v.active_subscriptions.forEach((s: any) => { if (s.category_name) cats.add(s.category_name); });
+      } else if (v.plan_name) {
+        cats.add(v.plan_name);
+      }
+    });
+    return Array.from(cats).sort();
+  }, [vendors]);
+
   const filtered = vendors.filter((v) => {
     const matchesSearch = v.shop_name.toLowerCase().includes(search.toLowerCase()) || v.owner_name.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
@@ -479,12 +492,9 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
           className="px-4 py-2.5 rounded-xl bg-[#F3F4F6] border border-gray-200 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F1A80A]/40 cursor-pointer"
         >
           <option value="all">All Category Plans</option>
-          <option value="Tiffin">Tiffin Category</option>
-          <option value="Bakery">Bakery Category</option>
-          <option value="Dairy">Dairy Category</option>
-          <option value="Sweets">Sweets Category</option>
-          <option value="Snacks">Snacks Category</option>
-          <option value="General">General Category</option>
+          {availableCategories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
         </select>
         <select
           value={statusFilter}
@@ -688,7 +698,7 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
                         )}
                       </div>
                       <p className="text-xs text-slate-500">
-                        Valid: <strong className="text-slate-800">{sub.subscription_start || 'N/A'}</strong> to <strong className="text-slate-800">{sub.subscription_end || 'N/A'}</strong> | Item Capacity: <strong className="text-amber-800">{sub.max_items || 5} items</strong>
+                        Valid: <strong className="text-slate-800">{sub.subscription_start || 'N/A'}</strong> to <strong className="text-slate-800">{sub.subscription_end || 'N/A'}</strong> | Item Capacity: <strong className="text-amber-800">{sub.max_items ?? 5} items</strong>
                       </p>
                     </div>
                   );

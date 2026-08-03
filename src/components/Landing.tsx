@@ -474,6 +474,7 @@ interface OrderModalProps {
 
 function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps) {
   const [step, setStep] = useState<ModalStep>(1);
+  const [step2Choice, setStep2Choice] = useState<'enquiry' | 'place' | null>(null);
   const [subItems, setSubItems] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
   const [selectedQuantities, setSelectedQuantities] = useState<{ [id: string]: number }>({});
@@ -754,10 +755,39 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Step 2 of 2</p>
                 <h3 className="text-lg font-extrabold text-gray-900 mt-0.5" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Your delivery details
+                  How would you like to proceed?
                 </h3>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a
+                  href={`https://wa.me/919175537373?text=${encodeURIComponent(`Hello Vikram Ads, I have an enquiry regarding ${summaryItemName} (₹${totalPrice}).`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setStep2Choice('enquiry')}
+                  className={`flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 transition-all text-center ${
+                    step2Choice === 'enquiry' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+                  }`}
+                >
+                  <MessageCircle size={22} className="text-green-600" />
+                  <span className="font-bold text-sm text-gray-900">Enquiry Order 💬</span>
+                  <span className="text-[11px] text-gray-500">Chat with us on WhatsApp</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setStep2Choice('place')}
+                  className={`flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 transition-all text-center cursor-pointer ${
+                    step2Choice === 'place' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
+                  }`}
+                >
+                  <ShoppingBag size={22} className="text-amber-600" />
+                  <span className="font-bold text-sm text-gray-900">Place an Order 🛒</span>
+                  <span className="text-[11px] text-gray-500">Enter delivery details</span>
+                </button>
+              </div>
+
+              {step2Choice === 'place' && (
+              <>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Full Name" placeholder="Your name" icon={User} value={form.name} onChange={patch('name')} />
                 <FormField label="Phone" placeholder="10-digit mobile no." icon={Phone} value={form.phone} onChange={(v) => patch('phone')(v.replace(/\D/g, '').slice(0, 10))} type="tel" maxLength={10} />
@@ -790,6 +820,8 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
                 </div>
                 <p className="text-[10px] text-amber-600">⏳ Your wholesale order will be broadcast to nearby approved vendors immediately.</p>
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -828,18 +860,20 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
           {step === 2 && (
             <div className="flex gap-3">
               <button
-                onClick={() => setStep(1)}
+                onClick={() => { setStep(1); setStep2Choice(null); }}
                 className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-200 text-gray-600 hover:border-gray-300 text-sm font-semibold transition-colors"
               >
                 <ChevronLeft size={16} /> Back
               </button>
-              <button
-                disabled={submitting || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
-                onClick={handlePlaceOrder}
-                className="flex-1 h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
-              >
-                {submitting ? <Spinner /> : <><ArrowRight size={16} /> Place Order — ₹{totalPrice}</>}
-              </button>
+              {step2Choice === 'place' && (
+                <button
+                  disabled={submitting || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
+                  onClick={handlePlaceOrder}
+                  className="flex-1 h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
+                >
+                  {submitting ? <Spinner /> : <><ArrowRight size={16} /> Place Order — ₹{totalPrice}</>}
+                </button>
+              )}
             </div>
           )}
           {step === 3 && (
@@ -1034,54 +1068,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
   return (
     <div className="min-h-screen bg-[#F7F4EF] text-[#2B2B2B]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-
-      {/* ── Active Order Live Tracking Floating Widget ── */}
-      {activeClientOrder && (activeClientOrder.status === 'pending' || activeClientOrder.status === 'awaiting_subadmin_approval' || activeClientOrder.status === 'discarded') && (
-        <div className={`fixed bottom-6 left-6 z-40 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border-2 text-gray-900 animate-bounce-slow ${
-          activeClientOrder.status === 'discarded' ? 'border-red-400' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'border-blue-400' : 'border-amber-400'
-        }`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-xl text-white flex items-center justify-center font-bold animate-pulse ${
-                activeClientOrder.status === 'discarded' ? 'bg-red-500' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'bg-blue-500' : 'bg-amber-500'
-              }`}>
-                {activeClientOrder.status === 'discarded' ? '❌' : activeClientOrder.status === 'awaiting_subadmin_approval' ? '⏳' : '📡'}
-              </div>
-              <div>
-                <p className={`font-extrabold text-xs uppercase tracking-wider ${
-                  activeClientOrder.status === 'discarded' ? 'text-red-700' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'text-blue-700' : 'text-amber-700'
-                }`}>
-                  {activeClientOrder.status === 'discarded' 
-                    ? 'Order Discarded by Admin' 
-                    : activeClientOrder.status === 'awaiting_subadmin_approval' 
-                    ? 'Awaiting Sub-Admin Approval' 
-                    : 'Order Active & Broadcasting'}
-                </p>
-                <p className="font-bold text-sm truncate max-w-[200px]">{activeClientOrder.item_name}</p>
-              </div>
-            </div>
-            <button onClick={() => setActiveClientOrder(null)} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-              <X size={14} />
-            </button>
-          </div>
-          <div className="mt-2.5 pt-2 border-t border-gray-100 flex justify-between items-center text-xs">
-            <span className="text-gray-500 font-semibold">OTP Code: <strong className="text-gray-800 text-sm">{activeClientOrder.otp}</strong></span>
-            <span className={`px-2 py-0.5 font-extrabold rounded-md text-[10px] ${
-              activeClientOrder.status === 'discarded' 
-                ? 'bg-red-100 text-red-800' 
-                : activeClientOrder.status === 'awaiting_subadmin_approval' 
-                ? 'bg-blue-100 text-blue-800 animate-pulse' 
-                : 'bg-amber-100 text-amber-800'
-            }`}>
-              {activeClientOrder.status === 'discarded' 
-                ? 'Discarded' 
-                : activeClientOrder.status === 'awaiting_subadmin_approval' 
-                ? 'Sub-Admin Verification' 
-                : 'Broadcasting (9 Hours)'}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* ── Vendor Claimed Order Pop-Up Modal ── */}
       {showClaimedModal && activeClientOrder && (

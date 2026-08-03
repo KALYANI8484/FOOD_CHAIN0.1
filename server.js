@@ -721,8 +721,8 @@ app.post('/api/vendors/signup', async (req, res) => {
       category_name: catName,
       plan_name: 'Free Tier',
       status: 'active',
-      max_items: 5,
-      max_clients: 5,
+      max_items: 0,
+      max_clients: 0,
       subscription_start: todayStr,
       subscription_end: nextYearStr
     };
@@ -924,7 +924,7 @@ app.post('/api/db', async (req, res) => {
           if (!vendorDoc) {
             return res.status(404).json({ error: 'Vendor not found' });
           }
-          if (!vendorDoc.plan_name || vendorDoc.plan_name === 'Free') {
+          if (!vendorDoc.plan_name || vendorDoc.plan_name === 'Free' || vendorDoc.plan_name === 'Free Tier') {
             return res.status(403).json({ error: 'Free plan members are not allowed to confirm orders. Please upgrade your plan.' });
           }
           const todayIso = new Date().toISOString().slice(0, 10);
@@ -936,6 +936,19 @@ app.post('/api/db', async (req, res) => {
           if (vendorDoc.status !== 'approved') {
             return res.status(403).json({ error: 'Your vendor account is not approved or is inactive.' });
           }
+
+          // Resolve the subscription entry matching this order's category (item-name level;
+          // 'General' or a missing category_name acts as a wildcard, same convention as the
+          // client-side hasCategoryAccess check) and block if that entry has 0 client capacity.
+          const orderCategory = orderDoc.master_category_name;
+          const subs = Array.isArray(vendorDoc.active_subscriptions) && vendorDoc.active_subscriptions.length > 0
+            ? vendorDoc.active_subscriptions
+            : [{ max_clients: 0 }];
+          const matchingSub = subs.find(s => !s.category_name || s.category_name === 'General' || s.category_name === orderCategory) || subs[0];
+          if (matchingSub.max_clients === 0) {
+            return res.status(403).json({ error: 'Your current plan does not include order fulfillment for this category. Please upgrade to accept client orders.' });
+          }
+
           delete data.otp_attempt;
         }
 
@@ -1148,7 +1161,7 @@ app.post('/api/init-db', async (req, res) => {
     const planCount = await Plan.countDocuments();
     if (planCount === 0) {
       await Plan.create([
-        { name: 'Free', price: 0, validity_days: 30, max_items: 5, max_clients: 10, status: 'active' },
+        { name: 'Free', price: 0, validity_days: 30, max_items: 0, max_clients: 0, status: 'active' },
         { name: 'Starter', price: 499, validity_days: 30, max_items: 10, max_clients: 30, status: 'active' },
         { name: 'Premium', price: 1499, validity_days: 90, max_items: 30, max_clients: 100, status: 'active' }
       ]);

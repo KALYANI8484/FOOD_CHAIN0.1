@@ -560,8 +560,8 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const getVendorItemLimit = (vendor: Vendor | null) => {
     const plan = getVendorPlan(vendor);
     if (!plan) return 5;
-    if (plan.max_items <= 0 || plan.name?.toLowerCase().includes('premium')) return Infinity;
-    return plan.max_items;
+    if (plan.max_items === -1 || plan.name?.toLowerCase().includes('premium')) return Infinity;
+    return Math.max(0, plan.max_items);
   };
   const getVendorLimitLabel = (vendor: Vendor | null) => {
     const limit = getVendorItemLimit(vendor);
@@ -749,14 +749,14 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
     if (targetSub) {
       if (addon.addon_type === 'inventory_items' || addon.max_items > 0) {
-        targetSub.max_items = (targetSub.max_items || 5) + (addon.max_items || 20);
+        targetSub.max_items = (targetSub.max_items ?? 5) + (addon.max_items ?? 20);
       }
       if (addon.addon_type === 'validity_extension' || addon.validity_days > 0) {
         const currentEnd = targetSub.subscription_end ? new Date(targetSub.subscription_end) : new Date();
         targetSub.subscription_end = new Date(currentEnd.getTime() + addon.validity_days * 86400000).toISOString().slice(0, 10);
       }
       if (addon.addon_type === 'client_extension' || addon.max_clients > 0) {
-        targetSub.max_clients = (targetSub.max_clients || 10) + addon.max_clients;
+        targetSub.max_clients = (targetSub.max_clients ?? 10) + addon.max_clients;
       }
       activeSubs[targetIdx >= 0 ? targetIdx : 0] = targetSub;
     }
@@ -1180,8 +1180,8 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
           </div>
           <p className="text-sm font-extrabold text-slate-900 mb-1">{popoverSub.sub.category_name || popoverSub.sub.plan_name}</p>
           <div className="space-y-1.5 text-xs text-slate-600">
-            <div className="flex justify-between"><span>Item Slots Used</span><span className="font-bold text-slate-900">? / {popoverSub.sub.max_items || 5}</span></div>
-            <div className="flex justify-between"><span>Client Limit</span><span className="font-bold text-slate-900">{popoverSub.sub.max_clients || 10}</span></div>
+            <div className="flex justify-between"><span>Item Slots Used</span><span className="font-bold text-slate-900">? / {popoverSub.sub.max_items ?? 5}</span></div>
+            <div className="flex justify-between"><span>Client Limit</span><span className="font-bold text-slate-900">{popoverSub.sub.max_clients ?? 10}</span></div>
             <div className="flex justify-between"><span>Expires</span><span className="font-bold text-slate-900">{popoverSub.sub.subscription_end || 'N/A'}</span></div>
           </div>
           <div className="flex gap-2 mt-3">
@@ -1536,7 +1536,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                   <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-wider">Total Item Quota</p>
                   <p className="text-sm font-extrabold text-white">
                     {(Array.isArray(editVendor.active_subscriptions) && editVendor.active_subscriptions.length > 0
-                      ? editVendor.active_subscriptions.reduce((sum: number, s: any) => sum + (s.max_items || 5), 0)
+                      ? editVendor.active_subscriptions.reduce((sum: number, s: any) => sum + (s.max_items ?? 5), 0)
                       : 5)} Items
                   </p>
                 </div>
@@ -1602,7 +1602,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                             <label className="text-[11px] font-bold text-slate-700 block mb-1">Max Item Capacity Limit</label>
                             <input
                               type="number"
-                              min="1"
+                              min="0"
                               value={inlineEditLimit}
                               onChange={(e) => setInlineEditLimit(Number(e.target.value))}
                               className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-400"
@@ -1640,7 +1640,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                           )}
                         </div>
                         <p className="text-xs text-slate-500">
-                          Valid: <strong className="text-slate-800">{sub.subscription_start || 'N/A'}</strong> to <strong className="text-slate-800">{sub.subscription_end || 'N/A'}</strong> | Item Capacity: <strong className="text-amber-800">{sub.max_items || 5} items</strong>
+                          Valid: <strong className="text-slate-800">{sub.subscription_start || 'N/A'}</strong> to <strong className="text-slate-800">{sub.subscription_end || 'N/A'}</strong> | Item Capacity: <strong className="text-amber-800">{sub.max_items ?? 5} items</strong>
                         </p>
                       </div>
 
@@ -1651,7 +1651,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                           onClick={() => {
                             setInlineEditSubId(subKey);
                             setInlineEditEnd(sub.subscription_end || today);
-                            setInlineEditLimit(sub.max_items || 5);
+                            setInlineEditLimit(sub.max_items ?? 5);
                           }}
                         >
                           <Pencil size={12} /> Edit
@@ -3502,7 +3502,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   
   const [form, setForm] = useState({
     name: '',
-    category: 'Tiffin',
+    category: '',
     base_price: 100,
     quantity: 10,
     description: '',
@@ -3566,7 +3566,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     if (!form.name) return;
     await supabase.from('master_inventory').insert({
       name: form.name,
-      category: form.category || 'Tiffin',
+      category: form.category,
       base_price: Number(form.base_price) || 0,
       quantity: Number(form.quantity) || 1,
       description: form.description || '',
@@ -3575,7 +3575,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
     show(`Master Item ${form.name} created successfully!`);
     setModal(false);
-    setForm({ name: '', category: 'Tiffin', base_price: 100, quantity: 10, description: '', image_url: '' });
+    setForm({ name: '', category: '', base_price: 100, quantity: 10, description: '', image_url: '' });
     load();
   };
 
@@ -3584,7 +3584,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     const targetId = editItem.id || (editItem as any)._id;
     await supabase.from('master_inventory').update({
       name: editItem.name,
-      category: editItem.category || 'Tiffin',
+      category: editItem.category,
       base_price: Number(editItem.base_price) || 0,
       quantity: Number(editItem.quantity) || 1,
       description: editItem.description || '',
@@ -3605,7 +3605,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     }
   };
 
-  const categories = ['Tiffin', 'Breakfast', 'Lunch/Dinner', 'Thali', 'Vegetables'];
+  const categories = useMemo(() => Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(), [items]);
 
   const filtered = items.filter((i) => {
     const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -3634,7 +3634,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         }
       />
 
-      <div className="flex bg-surface p-4 rounded-2xl border border-border">
+      <div className="flex flex-col sm:flex-row gap-3 bg-surface p-4 rounded-2xl border border-border">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
@@ -3644,6 +3644,16 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm focus:border-accent outline-none"
           />
         </div>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none cursor-pointer"
+        >
+          <option value="all">All Categories</option>
+          {categories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 stagger">
@@ -3681,6 +3691,21 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       <Modal open={modal} onClose={() => setModal(false)} title="Create Master Item">
         <div className="space-y-4">
           <Input label="Item Name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-text block">Category <span className="text-accent">*</span></label>
+            <input
+              type="text"
+              list="master-item-categories"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              placeholder="e.g. Tiffin, Breakfast, Thali..."
+              required
+              className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm"
+            />
+            <datalist id="master-item-categories">
+              {categories.map(cat => <option key={cat} value={cat} />)}
+            </datalist>
+          </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>
@@ -3740,6 +3765,21 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         {editItem && (
           <div className="space-y-4">
             <Input label="Item Name *" value={editItem.name} onChange={(v) => setEditItem({ ...editItem, name: v })} required />
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-text block">Category <span className="text-accent">*</span></label>
+              <input
+                type="text"
+                list="master-item-categories"
+                value={editItem.category || ''}
+                onChange={(e) => setEditItem({ ...editItem, category: e.target.value })}
+                placeholder="e.g. Tiffin, Breakfast, Thali..."
+                required
+                className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all shadow-sm"
+              />
+              <datalist id="master-item-categories">
+                {categories.map(cat => <option key={cat} value={cat} />)}
+              </datalist>
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted uppercase tracking-wider block">Image Asset</label>

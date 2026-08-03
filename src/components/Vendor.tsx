@@ -1174,7 +1174,7 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
             {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
               vendor.active_subscriptions.map((sub: any, i: number) => (
                 <span key={i} className="px-2.5 py-1 rounded-full text-xs font-black bg-[#C5A059] text-[#4A0E17] shadow-xs flex items-center gap-1">
-                  🟢 {sub.category_name || sub.plan_name} ({sub.max_items || 5} items limit)
+                  🟢 {sub.category_name || sub.plan_name} ({sub.max_items ?? 5} items limit)
                 </span>
               ))
             ) : (
@@ -1254,7 +1254,7 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
               <div className="pt-3 border-t border-border/50 space-y-2.5">
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted">Item Slot Usage</p>
                 {vendor.active_subscriptions.map((sub: any, i: number) => {
-                  const maxItems = sub.max_items || 5;
+                  const maxItems = sub.max_items ?? 5;
                   // We don't have real inventory count here; show max as reference
                   const pct = 0; // Will be 0 until vendor fetches real count; progress bar shows capacity
                   const isAtLimit = pct >= 100;
@@ -1515,9 +1515,9 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaim
     if (!orderCategory) return true; // General category
     // Check main active plan category
     if (!activePlan?.master_category_name || activePlan.master_category_name === orderCategory) return true;
-    // Check multi-subscriptions array
+    // Check multi-subscriptions array ('General' is a wildcard, matching VendorMenu's item-grouping convention)
     if (Array.isArray(vendor.active_subscriptions)) {
-      return vendor.active_subscriptions.some((sub: any) => !sub.category_name || sub.category_name === orderCategory);
+      return vendor.active_subscriptions.some((sub: any) => !sub.category_name || sub.category_name === 'General' || sub.category_name === orderCategory);
     }
     return false;
   };
@@ -2408,7 +2408,7 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
 
   const subs: any[] = Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0
     ? vendor.active_subscriptions
-    : [{ category_name: vendor.plan_name || 'General', plan_name: vendor.plan_name || 'Free Tier', max_items: 5, max_clients: 5, subscription_end: vendor.subscription_end, status: vendor.status }];
+    : [{ category_name: vendor.plan_name || 'General', plan_name: vendor.plan_name || 'Free Tier', max_items: 0, max_clients: 0, subscription_end: vendor.subscription_end, status: vendor.status }];
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -2596,7 +2596,7 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
         <EmptyState
           icon={<Package size={24} />}
           title="No Items Allocated Yet"
-          subtitle="Your active plan items will appear here automatically based on your subscription tiers."
+          subtitle="Items appear here based on your subscription's item capacity. If your plan shows 0 items, upgrade to start listing dishes."
         />
       ) : (
         <div className="space-y-8">
@@ -2620,7 +2620,7 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
                       it.category === cat
                     );
               const usedCount = groupItems.length;
-              const pct = maxItems === Infinity ? 0 : Math.min(100, (usedCount / maxItems) * 100);
+              const pct = maxItems === Infinity ? 0 : maxItems === 0 ? 100 : Math.min(100, (usedCount / maxItems) * 100);
               const expired = isPlanExpired(sub);
               const catIcon = getCatIcon(cat);
 
