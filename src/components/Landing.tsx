@@ -3,13 +3,11 @@ import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
   ChevronLeft, Hash, User, CheckCircle, Globe,
-  Package, Users as UsersIcon, TrendingUp, Star, UserPlus
+  Users as UsersIcon, TrendingUp, Star, UserPlus
 } from 'lucide-react';
-import { Spinner, LanguageSelector } from './ui';
+import { Spinner, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 
 type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
-
-export type Language = 'en' | 'hi' | 'mr';
 
 export const translations = {
   en: {
@@ -241,16 +239,6 @@ export const getItemTranslation = (name: string, lang: Language): string => {
   return name;
 };
 
-export const getInitialLanguage = (): Language => {
-  if (typeof window === 'undefined') return 'en';
-  const saved = localStorage.getItem('app_language') as Language;
-  if (saved && (saved === 'en' || saved === 'hi' || saved === 'mr')) return saved;
-  const navLang = (navigator.language || (navigator as any).userLanguage || '').toLowerCase();
-  if (navLang.startsWith('hi')) return 'hi';
-  if (navLang.startsWith('mr')) return 'mr';
-  return 'en';
-};
-
 interface MasterItem  { id: string; name: string; category: string; base_price: number; price: number; image_url: string; description?: string; }
 interface VendorItem  { id: string; item_name: string; price: number; quantity: number; image_url: string; master_item_id: string; vendor_id: string; }
 
@@ -473,7 +461,33 @@ interface OrderModalProps {
 }
 
 function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps) {
-  const [step, setStep] = useState<ModalStep>(1);
+  const [step, setStepState] = useState<ModalStep>(1);
+
+  const setStep = (newStep: ModalStep) => {
+    setStepState(newStep);
+    window.history.pushState({ ...window.history.state, orderStep: newStep }, '');
+  };
+
+  // Back/step history: mount pushes its own entry for step 1 (so one physical
+  // back closes the modal and lands on the underlying page, not further back),
+  // each later setStep() call pushes its own entry so back steps through
+  // 3->2->1 before finally closing the modal.
+  useEffect(() => {
+    window.history.pushState({ ...window.history.state, orderStep: 1 }, '');
+
+    const handleOrderModalPopState = (e: PopStateEvent) => {
+      if (e.state && e.state.orderStep) {
+        setStepState(e.state.orderStep);
+      } else {
+        onClose();
+      }
+    };
+
+    window.addEventListener('popstate', handleOrderModalPopState);
+    return () => window.removeEventListener('popstate', handleOrderModalPopState);
+  }, []);
+
+  const [step2Choice, setStep2Choice] = useState<'enquiry' | 'place' | null>(null);
   const [subItems, setSubItems] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
   const [selectedQuantities, setSelectedQuantities] = useState<{ [id: string]: number }>({});
@@ -754,10 +768,39 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Step 2 of 2</p>
                 <h3 className="text-lg font-extrabold text-gray-900 mt-0.5" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Your delivery details
+                  How would you like to proceed?
                 </h3>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a
+                  href={`https://wa.me/919175537373?text=${encodeURIComponent(`Hello Vikram Ads, I have an enquiry regarding ${summaryItemName} (₹${totalPrice}).`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setStep2Choice('enquiry')}
+                  className={`flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 transition-all text-center ${
+                    step2Choice === 'enquiry' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+                  }`}
+                >
+                  <MessageCircle size={22} className="text-green-600" />
+                  <span className="font-bold text-sm text-gray-900">Enquiry Order 💬</span>
+                  <span className="text-[11px] text-gray-500">Chat with us on WhatsApp</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setStep2Choice('place')}
+                  className={`flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 transition-all text-center cursor-pointer ${
+                    step2Choice === 'place' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
+                  }`}
+                >
+                  <ShoppingBag size={22} className="text-amber-600" />
+                  <span className="font-bold text-sm text-gray-900">Place an Order 🛒</span>
+                  <span className="text-[11px] text-gray-500">Enter delivery details</span>
+                </button>
+              </div>
+
+              {step2Choice === 'place' && (
+              <>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Full Name" placeholder="Your name" icon={User} value={form.name} onChange={patch('name')} />
                 <FormField label="Phone" placeholder="10-digit mobile no." icon={Phone} value={form.phone} onChange={(v) => patch('phone')(v.replace(/\D/g, '').slice(0, 10))} type="tel" maxLength={10} />
@@ -790,6 +833,8 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
                 </div>
                 <p className="text-[10px] text-amber-600">⏳ Your wholesale order will be broadcast to nearby approved vendors immediately.</p>
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -828,18 +873,20 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
           {step === 2 && (
             <div className="flex gap-3">
               <button
-                onClick={() => setStep(1)}
+                onClick={() => { setStep(1); setStep2Choice(null); }}
                 className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-200 text-gray-600 hover:border-gray-300 text-sm font-semibold transition-colors"
               >
                 <ChevronLeft size={16} /> Back
               </button>
-              <button
-                disabled={submitting || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
-                onClick={handlePlaceOrder}
-                className="flex-1 h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
-              >
-                {submitting ? <Spinner /> : <><ArrowRight size={16} /> Place Order — ₹{totalPrice}</>}
-              </button>
+              {step2Choice === 'place' && (
+                <button
+                  disabled={submitting || !form.name || !form.phone || !form.address || !form.zip || !form.landmark}
+                  onClick={handlePlaceOrder}
+                  className="flex-1 h-12 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-200 disabled:opacity-40"
+                >
+                  {submitting ? <Spinner /> : <><ArrowRight size={16} /> Place Order — ₹{totalPrice}</>}
+                </button>
+              )}
             </div>
           )}
           {step === 3 && (
@@ -898,25 +945,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [activeClientOrder, setActiveClientOrder] = useState<any | null>(null);
   const [showClaimedModal, setShowClaimedModal] = useState(false);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [showStickyBar, setShowStickyBar] = useState(true);
 
-  const [language, setLanguage] = useState<Language>(getInitialLanguage);
+  const [language] = useSyncedLanguage();
   const t = translations[language];
-
-  const changeLanguage = (lang: Language) => {
-    setLanguage(lang);
-    localStorage.setItem('app_language', lang);
-    window.dispatchEvent(new Event('app_language_change'));
-  };
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = (localStorage.getItem('app_language') as Language) || 'en';
-      setLanguage(updated);
-    };
-    window.addEventListener('app_language_change', handleStorage);
-    return () => window.removeEventListener('app_language_change', handleStorage);
-  }, []);
 
   useScrollReveal();
 
@@ -975,6 +1008,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
           setTotalOrders(od.data.length + settingsOffset);
           // Privacy-safe ticker: last 10 orders, only category + zip3
           setRecentOrders([...od.data].reverse().slice(0, 10));
+          setOrders(od.data);
         }
         if (vd.data) setTotalVendors(vd.data.length);
         if (gd.data) {
@@ -1014,68 +1048,36 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const filtered = activeCategory === 'All' ? masterItems : masterItems.filter(m => m.category === activeCategory);
   const categoryCount = Array.from(new Set(masterItems.map(m => m.category))).filter(Boolean).length;
 
-  // Seeded "orders today" count for each item (privacy-safe, deterministic)
-  const seedCount = (name: string) => {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-    return 3 + (h % 28);
+  // Real lifetime order counts per dish, keyed by master item name (matches order.master_category_name,
+  // not order.item_name — the latter is a formatted "name (qty uom)" checkout summary string).
+  // "System Denied" orders are excluded: that status means no vendor accepted the order within the
+  // pickup window, so it never represents real fulfilled demand.
+  const realOrderCounts: Record<string, number> = {};
+  for (const o of orders) {
+    if (o.status === 'System Denied' || !o.master_category_name) continue;
+    realOrderCounts[o.master_category_name] = (realOrderCounts[o.master_category_name] || 0) + (Number(o.quantity) || 0);
+  }
+
+  const NEW_ITEM_BASELINE_COUNT = 5;
+  const getOrderedCount = (name: string) => {
+    const real = realOrderCounts[name] || 0;
+    return real > 0 ? { value: real, isBaseline: false } : { value: NEW_ITEM_BASELINE_COUNT, isBaseline: true };
   };
 
   return (
     <div className="min-h-screen bg-[#F7F4EF] text-[#2B2B2B]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
-      {/* ── Active Order Live Tracking Floating Widget ── */}
-      {activeClientOrder && (activeClientOrder.status === 'pending' || activeClientOrder.status === 'awaiting_subadmin_approval' || activeClientOrder.status === 'discarded') && (
-        <div className={`fixed bottom-6 left-6 z-40 max-w-sm bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border-2 text-gray-900 animate-bounce-slow ${
-          activeClientOrder.status === 'discarded' ? 'border-red-400' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'border-blue-400' : 'border-amber-400'
-        }`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-xl text-white flex items-center justify-center font-bold animate-pulse ${
-                activeClientOrder.status === 'discarded' ? 'bg-red-500' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'bg-blue-500' : 'bg-amber-500'
-              }`}>
-                {activeClientOrder.status === 'discarded' ? '❌' : activeClientOrder.status === 'awaiting_subadmin_approval' ? '⏳' : '📡'}
-              </div>
-              <div>
-                <p className={`font-extrabold text-xs uppercase tracking-wider ${
-                  activeClientOrder.status === 'discarded' ? 'text-red-700' : activeClientOrder.status === 'awaiting_subadmin_approval' ? 'text-blue-700' : 'text-amber-700'
-                }`}>
-                  {activeClientOrder.status === 'discarded' 
-                    ? 'Order Discarded by Admin' 
-                    : activeClientOrder.status === 'awaiting_subadmin_approval' 
-                    ? 'Awaiting Sub-Admin Approval' 
-                    : 'Order Active & Broadcasting'}
-                </p>
-                <p className="font-bold text-sm truncate max-w-[200px]">{activeClientOrder.item_name}</p>
-              </div>
-            </div>
-            <button onClick={() => setActiveClientOrder(null)} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-              <X size={14} />
-            </button>
-          </div>
-          <div className="mt-2.5 pt-2 border-t border-gray-100 flex justify-between items-center text-xs">
-            <span className="text-gray-500 font-semibold">OTP Code: <strong className="text-gray-800 text-sm">{activeClientOrder.otp}</strong></span>
-            <span className={`px-2 py-0.5 font-extrabold rounded-md text-[10px] ${
-              activeClientOrder.status === 'discarded' 
-                ? 'bg-red-100 text-red-800' 
-                : activeClientOrder.status === 'awaiting_subadmin_approval' 
-                ? 'bg-blue-100 text-blue-800 animate-pulse' 
-                : 'bg-amber-100 text-amber-800'
-            }`}>
-              {activeClientOrder.status === 'discarded' 
-                ? 'Discarded' 
-                : activeClientOrder.status === 'awaiting_subadmin_approval' 
-                ? 'Sub-Admin Verification' 
-                : 'Broadcasting (9 Hours)'}
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* ── Vendor Claimed Order Pop-Up Modal ── */}
       {showClaimedModal && activeClientOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border-2 border-green-500 text-center space-y-4 animate-scale-in">
+          <div className="relative bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border-2 border-green-500 text-center space-y-4 animate-scale-in">
+            <button
+              onClick={() => setShowClaimedModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto shadow-inner">
               <CheckCircle size={44} className="text-green-600 animate-bounce" />
             </div>
@@ -1142,7 +1144,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             <span className="font-black text-lg sm:text-xl tracking-tight text-[#C5A059] drop-shadow-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Vikram Ads</span>
           </div>
           <nav className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            <LanguageSelector onChange={(l) => changeLanguage(l)} />
+            <LanguageSelector />
             <button onClick={handleVendorPlanClick} className="text-xs sm:text-sm font-semibold text-[#F7F4EF] hover:text-[#C5A059] transition-colors px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg hover:bg-white/10">{t.plans}</button>
             <button onClick={() => onNavigate('login')} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-[#C5A059] hover:bg-[#D4B36E] active:scale-95 text-[#4A0E17] text-xs sm:text-sm font-extrabold transition-all shadow-md hover:shadow-lg truncate">{t.loginRegister}</button>
           </nav>
@@ -1179,15 +1181,9 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             <p className="text-xs font-bold text-[#C5A059] uppercase tracking-widest mb-1.5">{t.liveStats}</p>
             <h2 className="text-2xl md:text-4xl font-extrabold text-[#F7F4EF]" style={{ fontFamily:"'Playfair Display', serif" }}>{t.trustedByCommunity}</h2>
           </div>
-          <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-3xl mx-auto">
+          <div className="relative z-10 grid grid-cols-2 gap-4 md:gap-6 max-w-3xl mx-auto">
             <KpiCard icon={ShoppingBag} label={t.totalOrdersPlaced} value={totalOrders} />
             <KpiCard icon={Store} label={t.vendorsJoined} value={totalVendors} />
-            <div className="text-center bg-white/15 rounded-2xl p-6 backdrop-blur-sm border border-white/20 reveal reveal-delay-3">
-              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mx-auto mb-3"><Star size={24} className="text-white" /></div>
-              <p className="text-5xl font-extrabold" style={{ fontFamily:"'Playfair Display', serif" }}>4.9</p>
-              <p className="text-white/85 text-sm font-semibold mt-1">{t.avgVendorRating || 'Avg Vendor Rating'}</p>
-            </div>
-            <KpiCard icon={Package} label={t.itemCategories || 'Item Categories'} value={masterItems.length} />
           </div>
         </div>
       </section>
@@ -1221,11 +1217,11 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
             {filtered.map((item, i) => {
-              const ordersToday = seedCount(item.name);
+              const { value: orderedCount, isBaseline } = getOrderedCount(item.name);
               return (
                 <div key={item.id} onClick={() => setSelectedMaster(item)} className="inventory-card">
                   <div className="card-img relative">
-                    <span className="orders-badge">{ordersToday} ordered</span>
+                    <span className="orders-badge">{isBaseline ? '+' : ''}{orderedCount} ordered</span>
                     {item.image_url ? <img src={item.image_url} alt={item.name} /> : <div className="w-full h-full bg-amber-50" />}
                   </div>
                   <div className="p-4"><h3 className="font-bold text-gray-900 truncate">{getItemTranslation(item.name, language)}</h3></div>
@@ -1258,7 +1254,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 {[
                   { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373' },
                   { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs },
-                  { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com' },
                   { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com' },
                 ].map(({ href, icon: Icon, label }) => (
                   <li key={label}>
@@ -1297,7 +1292,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               {[
                 { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', Icon: MessageCircle },
                 { href: 'tel:+919175537373', Icon: Phone },
-                { href: 'mailto:2711vikram@gmail.com', Icon: Mail },
+                { href: 'mailto:vikram271@rediffmail.com', Icon: Mail },
               ].map(({ href, Icon }) => (
                 <a key={href} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-[#360910] border border-[#C5A059]/40 flex items-center justify-center transition-colors hover:bg-[#4A0E17]">
