@@ -4,7 +4,7 @@ import {
   Activity as ActivityIcon, AlertCircle, FileText, Eye, Pencil, Search,
   ArrowRight, Package, Trash2, Menu, X, RefreshCw, MessageCircle, MessageSquare
 } from 'lucide-react';
-import { supabase, type Vendor, type Activity, type VendorItem } from '../lib/supabase';
+import { supabase, type Vendor, type Activity, type VendorItem, type Plan } from '../lib/supabase';
 import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
@@ -279,6 +279,7 @@ function SubDashboard({ onTab, adminEmail }: { onTab: (t: Tab) => void; adminEma
 function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'error' | 'info') => void; adminEmail: string }) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [addons, setAddons] = useState<any[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editVendor, setEditVendor] = useState<Vendor | null>(null);
@@ -287,13 +288,15 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedAddon, setSelectedAddon] = useState('');
+  const [assignPlanId, setAssignPlanId] = useState('');
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
 
   const load = async () => {
-    const [{ data: v }, { data: a }, { data: r }] = await Promise.all([
+    const [{ data: v }, { data: a }, { data: p }, { data: r }] = await Promise.all([
       supabase.from('vendors').select('*').order('created_at', { ascending: false }),
       supabase.from('addons').select('*'),
+      supabase.from('subscription_plans').select('*'),
       supabase.from('subadmin_requests').select('*').eq('subadmin_email', adminEmail).order('created_at', { ascending: false })
     ]);
     const normalizedVendors = (v || []).map((item: any) => ({
@@ -302,6 +305,7 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
     }));
     setVendors(normalizedVendors);
     setAddons(a || []);
+    setPlans(p || []);
     setRequests(r || []);
     setLoading(false);
   };
@@ -367,6 +371,39 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
     show('Add-on request submitted to Super Admin for approval', 'success');
     setEditVendor(null);
     setSelectedAddon('');
+    load();
+  };
+
+  const handleAssignCategoryPlan = async () => {
+    if (!editVendor || !assignPlanId) return;
+    const vendorId = editVendor.id || (editVendor as any)._id;
+    const plan = plans.find(p => p.id === assignPlanId);
+    if (!plan) return;
+
+    const payload = JSON.stringify({
+      plan_id: plan.id,
+      plan_name: plan.name,
+      category_name: plan.master_category_name || 'General',
+      max_items: plan.max_items,
+      max_clients: plan.max_clients,
+      validity_days: plan.validity_days
+    });
+    const { error } = await supabase.from('subadmin_requests').insert({
+      subadmin_email: adminEmail,
+      vendor_id: vendorId,
+      vendor_name: editVendor.shop_name,
+      action_type: 'assign_category',
+      payload: payload
+    });
+
+    if (error) {
+      show('Failed to submit category assignment request', 'error');
+      return;
+    }
+
+    show('Category subscription request submitted to Super Admin for approval', 'success');
+    setEditVendor(null);
+    setAssignPlanId('');
     load();
   };
 
@@ -606,13 +643,80 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
       <Modal open={!!editVendor} onClose={() => setEditVendor(null)} title="Modify Vendor Details" size="xl">
         {editVendor && (
           <div className="space-y-6">
-            <VendorForm 
-              initialData={editVendor} 
-              submitLabel="Save Changes" 
-              onSubmit={handleEditSubmit} 
-              onCancel={() => setEditVendor(null)} 
+            <VendorForm
+              initialData={editVendor}
+              submitLabel="Save Changes"
+              onSubmit={handleEditSubmit}
+              onCancel={() => setEditVendor(null)}
             />
-            
+
+            {/* Active Category Subscriptions Portfolio (read-only) */}
+            <div className="p-5 border border-amber-300 bg-[#fffdf9] rounded-2xl space-y-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-extrabold text-amber-950 uppercase tracking-wider flex items-center gap-2">
+                  <Package size={16} className="text-amber-700" /> Active Category Subscriptions Portfolio
+                </h3>
+                <span className="text-xs px-2.5 py-1 rounded-full font-black bg-amber-100 text-amber-900 border border-amber-300">
+                  {Array.isArray(editVendor.active_subscriptions) ? editVendor.active_subscriptions.length : 1} Active Plans
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {(Array.isArray(editVendor.active_subscriptions) && editVendor.active_subscriptions.length > 0 ? editVendor.active_subscriptions : [{
+                  id: 'primary',
+                  plan_name: editVendor.plan_name || 'Basic Plan',
+                  category_name: 'General',
+                  subscription_start: editVendor.subscription_start || new Date().toISOString().slice(0, 10),
+                  subscription_end: editVendor.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+                  max_items: 5,
+                  status: 'active'
+                }]).map((sub: any, idx: number) => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  const isExpired = sub.subscription_end && sub.subscription_end < today;
+                  const daysRemaining = sub.subscription_end ? Math.ceil((new Date(sub.subscription_end).getTime() - Date.now()) / (1000 * 3600 * 24)) : 0;
+                  const subKey = sub.id || sub.category_name || idx;
+
+                  return (
+                    <div key={subKey} className="p-4 rounded-xl bg-white border border-amber-200 shadow-xs space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-sm text-slate-900">{sub.category_name || 'General'}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-extrabold bg-amber-100 text-amber-800 border border-amber-200">{sub.plan_name || 'Plan'}</span>
+                        {isExpired ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-red-100 text-red-700 border border-red-200">🔴 EXPIRED</span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-green-100 text-green-700 border border-green-200">🟢 ACTIVE ({daysRemaining}d left)</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Valid: <strong className="text-slate-800">{sub.subscription_start || 'N/A'}</strong> to <strong className="text-slate-800">{sub.subscription_end || 'N/A'}</strong> | Item Capacity: <strong className="text-amber-800">{sub.max_items || 5} items</strong>
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Assign Additional Category Subscription (request) */}
+            <div className="p-5 border border-amber-300 bg-white rounded-2xl space-y-3 shadow-xs">
+              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Assign Additional Category Subscription</h3>
+              <p className="text-xs text-slate-500">Submit a request to add another active category plan (e.g. Dairy, Bakery, Produce) to this vendor's portfolio.</p>
+              <div className="flex flex-col sm:flex-row gap-3 items-end">
+                <div className="flex-1 w-full">
+                  <select
+                    value={assignPlanId}
+                    onChange={(e) => setAssignPlanId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-slate-800 text-sm focus:border-amber-400 outline-none"
+                  >
+                    <option value="">-- Select a Category Plan to Assign --</option>
+                    {plans.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.master_category_name || 'General'}) — ₹{p.price}</option>
+                    ))}
+                  </select>
+                </div>
+                <Button onClick={handleAssignCategoryPlan} disabled={!assignPlanId}>Request Category Assignment</Button>
+              </div>
+            </div>
+
             <div className="p-5 border border-accent/20 bg-[#f9f1e5] rounded-xl space-y-3 mt-4">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Apply Add-on Package</h3>
               <p className="text-xs text-slate-500">Submit a request to assign an Add-on to extend this vendor's validity and client limits.</p>

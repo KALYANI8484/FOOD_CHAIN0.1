@@ -4,7 +4,7 @@ import {
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
   Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
 } from 'lucide-react';
-import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem } from '../lib/supabase';
+import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, getInitialLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 
@@ -2099,6 +2099,42 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       } else if (req.action_type === 'edit') {
         const payload = JSON.parse(req.payload);
         await supabase.from('vendors').update(payload).eq('id', req.vendor_id);
+      } else if (req.action_type === 'assign_category') {
+        const payload = JSON.parse(req.payload);
+        const { data: v } = await supabase.from('vendors').select('*').eq('id', req.vendor_id).single();
+        if (v) {
+          const existingSubs: VendorSubscription[] = Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0
+            ? [...v.active_subscriptions]
+            : [{
+                id: 'primary',
+                plan_id: v.plan_id || undefined,
+                plan_name: v.plan_name || 'Basic',
+                category_name: 'General',
+                subscription_start: v.subscription_start || new Date().toISOString().slice(0, 10),
+                subscription_end: v.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+                max_items: 5,
+                max_clients: v.total_clients || 10,
+                status: 'active'
+              }];
+
+          const newSub: VendorSubscription = {
+            id: crypto.randomUUID(),
+            plan_id: payload.plan_id,
+            plan_name: payload.plan_name,
+            category_name: payload.category_name,
+            subscription_start: new Date().toISOString().slice(0, 10),
+            subscription_end: new Date(Date.now() + payload.validity_days * 86400000).toISOString().slice(0, 10),
+            max_items: payload.max_items,
+            max_clients: payload.max_clients,
+            status: 'active'
+          };
+          existingSubs.push(newSub);
+
+          await supabase.from('vendors').update({
+            active_subscriptions: existingSubs,
+            plan_name: payload.plan_name
+          }).eq('id', req.vendor_id);
+        }
       }
 
       await supabase.from('subadmin_requests').update({ status: 'approved' }).eq('id', req.id);
@@ -2564,6 +2600,15 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               {selectedSubadminReq.action_type === 'edit' && (
                 <div className="p-3 bg-surface border border-border rounded-lg mt-2 text-sm text-text">
                   <p className="font-bold mb-1">Proposed Vendor Updates:</p>
+                  <pre className="text-xs whitespace-pre-wrap font-mono text-muted">
+                    {JSON.stringify(JSON.parse(selectedSubadminReq.payload), null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {selectedSubadminReq.action_type === 'assign_category' && (
+                <div className="p-3 bg-accent/10 border border-accent/30 rounded-lg mt-2 text-sm text-text">
+                  <p className="font-bold mb-1">Category Subscription to Assign:</p>
                   <pre className="text-xs whitespace-pre-wrap font-mono text-muted">
                     {JSON.stringify(JSON.parse(selectedSubadminReq.payload), null, 2)}
                   </pre>
