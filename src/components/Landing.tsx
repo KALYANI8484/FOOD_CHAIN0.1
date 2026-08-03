@@ -3,7 +3,7 @@ import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
   ChevronLeft, Hash, User, CheckCircle, Globe,
-  Package, Users as UsersIcon, TrendingUp, Star, UserPlus
+  Package, Users as UsersIcon, TrendingUp, Star, UserPlus, Maximize2
 } from 'lucide-react';
 import { Spinner, LanguageSelector } from './ui';
 
@@ -480,6 +480,7 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
   const [selectedItemIds, setSelectedItemIds] = useState<{ [id: string]: boolean }>({});
   const [submitting, setSubmitting] = useState(false);
   const [otp, setOtp] = useState('');
+  const [imageExpanded, setImageExpanded] = useState(false);
 
   const [form, setForm] = useState({ name: '', phone: '', address: '', zip: '', landmark: '' });
   const patch = (k: keyof typeof form) => (v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -615,19 +616,23 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md animate-fade-in">
       <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-scale-in flex flex-col max-h-[92vh]">
 
         {/* Header */}
-        <div className="relative min-h-[170px] sm:min-h-[200px] max-h-[240px] bg-slate-950 flex-shrink-0 flex items-center justify-center overflow-hidden">
+        <div className="relative h-[260px] sm:h-[320px] bg-slate-950 flex-shrink-0 flex items-center justify-center overflow-hidden cursor-pointer group" onClick={() => setImageExpanded(true)}>
           <img
             src={master.image_url || 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg'}
             alt={master.name}
-            className="w-full h-full object-contain max-h-[240px]"
+            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute top-3 right-14 flex items-center gap-1 bg-black/50 backdrop-blur-sm text-white/90 text-[10px] font-bold px-2 py-1 rounded-full pointer-events-none">
+            <Maximize2 size={11} /> Tap to enlarge
+          </div>
           <button
-            onClick={onClose}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors z-10"
           >
             <X size={16} />
@@ -853,6 +858,28 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
         </div>
       </div>
     </div>
+
+    {/* Full-screen poster viewer */}
+    {imageExpanded && (
+      <div
+        className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center animate-fade-in"
+        onClick={() => setImageExpanded(false)}
+      >
+        <button
+          onClick={() => setImageExpanded(false)}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors z-10"
+        >
+          <X size={20} />
+        </button>
+        <img
+          src={master.image_url || 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg'}
+          alt={master.name}
+          className="max-w-full max-h-full w-auto h-auto object-contain animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    )}
+    </>
   );
 }
 
