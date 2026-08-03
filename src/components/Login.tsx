@@ -364,12 +364,18 @@ export function Login({
                 <p className="text-amber-700 text-xs">{t.passwordRule}</p>
               </div>
 
+              {/* Starting plan callout — every signup begins on the 0-item/0-client Free Tier */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm space-y-1">
+                <p className="font-bold text-slate-700 text-xs uppercase tracking-wider">Your Starting Plan: Free Tier</p>
+                <p className="text-slate-500 text-xs">You'll start with 0 listed items and 0 client connections. A Super Admin activates a paid plan for your chosen category so you can list items and start receiving orders.</p>
+              </div>
+
               <div className="space-y-3">
                 <Field label={t.fullNameLabel} placeholder={t.fullNamePlaceholder} value={sf.name} onChange={patch('name')} icon={UserPlus} />
                 <Field label="SHOP / KITCHEN NAME" placeholder="e.g. Kolhapur Tiffin Express (optional)" value={sf.shop_name} onChange={patch('shop_name')} icon={Store} />
 
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Primary Dish Category</label>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Preferred Category (for after activation)</label>
                   <div className="relative">
                     <UtensilsCrossed size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
                     <select
@@ -383,7 +389,7 @@ export function Login({
                       ))}
                     </select>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1 ml-1">Pick the dish you'll primarily sell — a Super Admin can add more categories to your plan later.</p>
+                  <p className="text-[10px] text-gray-400 mt-1 ml-1">This just reserves your category — it goes live once a Super Admin assigns your paid plan.</p>
                 </div>
 
                 <Field
