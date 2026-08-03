@@ -1463,7 +1463,7 @@ function SubGuides() {
               </a>
             </div>
             <div className="rounded-xl border border-border overflow-hidden min-h-[40vh]">
-              {selectedGuide.file_data?.startsWith('data:image') ? (
+              {selectedGuide.file_data && (selectedGuide.file_data.startsWith('data:image') || /\.(png|jpg|jpeg|webp|gif|svg)($|\?)/i.test(selectedGuide.file_name || '')) ? (
                 <img src={selectedGuide.file_data} alt={selectedGuide.title} className="w-full h-auto object-contain" />
               ) : selectedGuide.file_data ? (
                 <iframe src={selectedGuide.file_data} title={selectedGuide.title} className="w-full h-[65vh] border-0" />
