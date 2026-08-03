@@ -71,20 +71,21 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const formatToDdMmYyyy = (value: string) => {
+  // Older vendor records may have been saved as ISO (YYYY-MM-DD) before the
+  // format was standardized to plain DDMMYYYY digits. Reorder those instead
+  // of just stripping separators, otherwise the digits come out scrambled.
+  const toDdMmYyyyDigits = (value: string) => {
     if (!value) return '';
-    const digitsOnly = value.replace(/\D/g, '');
-    if (value.match(/^(\d{4})-(\d{2})-(\d{2})$/)) {
-      const [, year, month, day] = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)!;
+    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
       return `${day}${month}${year}`;
     }
-    return digitsOnly;
-  };
-
-  const normalizeDateInputValue = (value: string) => {
-    if (!value) return '';
     return value.replace(/\D/g, '');
   };
+
+  const formatToDdMmYyyy = toDdMmYyyyDigits;
+  const normalizeDateInputValue = toDdMmYyyyDigits;
 
   const [form, setForm] = useState({
     owner_name: initialData?.owner_name || '',
@@ -146,14 +147,18 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     })();
   }, []);
 
+  const isEditMode = !!initialData;
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.owner_name || !form.phone || !form.shop_name || !form.address || !form.zip_code || !form.birthdate) {
+    if (!form.owner_name || !form.phone || !form.shop_name || !form.address || !form.zip_code || (!isEditMode && !form.birthdate)) {
       alert('All required fields must be completed.');
       return;
     }
 
-    const birthdateForPassword = formatToDdMmYyyy(form.birthdate);
+    // Leaving birthdate blank while editing keeps the vendor's existing
+    // birthdate/password untouched instead of forcing a reset.
+    const birthdateForPassword = form.birthdate ? formatToDdMmYyyy(form.birthdate) : '';
 
     setSubmitting(true);
     try {
@@ -211,8 +216,8 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
           type="text"
           value={form.birthdate}
           onChange={(v) => setForm({ ...form, birthdate: v.replace(/\D/g, '') })}
-          placeholder={t.dobPlaceholder}
-          required
+          placeholder={isEditMode ? 'Leave blank to keep existing' : t.dobPlaceholder}
+          required={!isEditMode}
         />
         <div className="sm:col-span-2">
           <Input

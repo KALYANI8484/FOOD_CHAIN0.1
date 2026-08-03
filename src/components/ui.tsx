@@ -44,7 +44,7 @@ export function LanguageSelector({
     : 'top-full mt-2 right-0';
 
   return (
-    <div className="relative inline-block text-left z-[99999]" ref={menuRef}>
+    <div className="relative inline-block text-left z-20" ref={menuRef}>
       {/* Globe Icon Pill Button */}
       <button
         type="button"
@@ -61,7 +61,7 @@ export function LanguageSelector({
 
       {/* Floating Dropdown Menu */}
       {open && (
-        <div className={`absolute ${menuPosClass} w-48 rounded-2xl bg-white shadow-2xl border border-amber-200 py-2 z-[99999] animate-scale-in min-w-[185px]`}>
+        <div className={`absolute ${menuPosClass} w-48 rounded-2xl bg-white shadow-2xl border border-amber-200 py-2 z-50 animate-scale-in min-w-[185px]`}>
           <div className="px-3.5 py-1.5 border-b border-amber-100 mb-1">
             <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Select Language</p>
           </div>
@@ -118,15 +118,17 @@ export function Modal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative w-full ${sizes[size]} bg-[#FAF8F5] text-slate-900 border-t sm:border border-amber-200/80 shadow-2xl rounded-t-3xl sm:rounded-3xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-scale-in`}>
-        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10 rounded-t-3xl">
-          <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
-            <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
-          </button>
-        </div>
+        {title && (
+          <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10 rounded-t-3xl">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0" aria-label="Close">
+              <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
+            </button>
+          </div>
+        )}
         <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
@@ -154,17 +156,19 @@ export function Drawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 animate-fade-in">
+    <div className="fixed inset-0 z-[10000] animate-fade-in">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
         className={`absolute top-0 ${side === 'right' ? 'right-0 animate-slide-in-right' : 'left-0 animate-slide-in-left'} h-full w-full max-w-md bg-[#FAF8F5] text-slate-900 border-l border-amber-200 shadow-2xl overflow-y-auto`}
       >
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10">
-          <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0">
-            <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
-          </button>
-        </div>
+        {title && (
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-amber-200 bg-[#F4EFE6] sticky top-0 z-10">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate pr-2">{title}</h3>
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-amber-200/50 text-slate-600 hover:text-slate-900 transition-colors group shrink-0" aria-label="Close">
+              <X size={18} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
+            </button>
+          </div>
+        )}
         <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>

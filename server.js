@@ -249,8 +249,8 @@ const masterItemSchema = new mongoose.Schema({
 
 const subInventorySchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
-  vendor_id: { type: String, required: true },
-  item_name: { type: String, required: true },
+  master_inventory_id: { type: String, required: true },
+  name: { type: String, required: true },
   category: { type: String, default: null },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true },
