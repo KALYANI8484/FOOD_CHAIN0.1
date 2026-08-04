@@ -3944,6 +3944,10 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
   const handleCreate = async () => {
     if (!form.title || !pdfFile) { show('Title and file are required', 'error'); return; }
     if (visibilityRoles.length === 0) { show('Select at least one visibility role', 'error'); return; }
+    if (docTab === 'plans' && guides.filter(g => Array.isArray(g.allowed_roles) && g.allowed_roles.includes('plans')).length >= 20) {
+      show("Maximum of 20 documents allowed for Plan's (Landing Ads).", 'error');
+      return;
+    }
     setUploading(true);
     try {
       // Upload the raw file to disk/S3 via the shared upload endpoint instead of
@@ -4074,14 +4078,15 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
 
   if (loading) return <Spinner />;
 
-  // Guides filtered by tab + search
+  // Guides filtered by tab + search. Filters purely on allowed_roles (the "Visible To"
+  // checkboxes) so this admin view always agrees with where a doc is actually visible
+  // to real users (Vendor.tsx/SubAdmin.tsx already filter the same way).
   const filteredGuides = guides
     .filter(g => {
-      const type = g.doc_type || g.category || 'sop';
-      const roles: string[] = Array.isArray(g.allowed_roles) ? g.allowed_roles : [type];
-      if (docTab === 'sop') return type === 'sop' || type === 'sub_admin' || roles.includes('sub_admin');
-      if (docTab === 'plans') return type === 'plans' || roles.includes('plans');
-      return type === 'vendor_guide' || type === 'vendor' || roles.includes('vendor');
+      const roles: string[] = Array.isArray(g.allowed_roles) ? g.allowed_roles : [];
+      if (docTab === 'sop') return roles.includes('sub_admin');
+      if (docTab === 'plans') return roles.includes('plans');
+      return roles.includes('vendor');
     })
     .filter(g => {
       if (!search.trim()) return true;
@@ -4099,21 +4104,29 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
     .sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
 
   const docTabs: { id: DocTab; label: string; icon: any; count: number }[] = [
-    { id: 'sop', label: 'SOPs (Sub-Admin)', icon: Users, count: guides.filter(g => (g.doc_type || g.category) === 'sop' || (g.doc_type || g.category) === 'sub_admin' || (Array.isArray(g.allowed_roles) && g.allowed_roles.includes('sub_admin'))).length },
-    { id: 'vendor_guide', label: 'Vendor Guides', icon: Store, count: guides.filter(g => (g.doc_type || g.category) === 'vendor_guide' || (g.doc_type || g.category) === 'vendor' || (Array.isArray(g.allowed_roles) && g.allowed_roles.includes('vendor'))).length },
-    { id: 'plans', label: "Plan's (Landing Ads)", icon: Sparkles, count: guides.filter(g => (g.doc_type || g.category) === 'plans' || (Array.isArray(g.allowed_roles) && g.allowed_roles.includes('plans'))).length },
+    { id: 'sop', label: 'SOPs (Sub-Admin)', icon: Users, count: guides.filter(g => Array.isArray(g.allowed_roles) && g.allowed_roles.includes('sub_admin')).length },
+    { id: 'vendor_guide', label: 'Vendor Guides', icon: Store, count: guides.filter(g => Array.isArray(g.allowed_roles) && g.allowed_roles.includes('vendor')).length },
+    { id: 'plans', label: "Plan's (Landing Ads)", icon: Sparkles, count: guides.filter(g => Array.isArray(g.allowed_roles) && g.allowed_roles.includes('plans')).length },
     { id: 'faq', label: 'FAQs', icon: MessageSquare, count: faqs.length }
   ];
 
   const isFileDoc = docTab !== 'faq';
+  const plansCount = docTabs.find(dt => dt.id === 'plans')!.count;
+  const plansCapReached = docTab === 'plans' && plansCount >= 20;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Knowledge Base & Guides"
-        subtitle="SOPs, Vendor Guides, and FAQs — manage your operational documentation"
+        subtitle={docTab === 'plans'
+          ? `SOPs, Vendor Guides, and FAQs — manage your operational documentation (${plansCount}/20 Plan's docs)`
+          : 'SOPs, Vendor Guides, and FAQs — manage your operational documentation'}
         action={
-          <Button onClick={() => { if (isFileDoc) { setVisibilityRoles(defaultRolesForTab(docTab)); setModal(true); } else { setFaqModal(true); } }} className="bg-primary text-accent hover:bg-primary-dark">
+          <Button
+            onClick={() => { if (isFileDoc) { setVisibilityRoles(defaultRolesForTab(docTab)); setModal(true); } else { setFaqModal(true); } }}
+            className="bg-primary text-accent hover:bg-primary-dark"
+            disabled={plansCapReached}
+          >
             <FileUp size={16} className="mr-2" />
             {isFileDoc ? 'Upload Document' : 'Add FAQ'}
           </Button>
