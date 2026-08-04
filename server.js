@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
@@ -41,10 +42,45 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Multer storage in memory with 15 MB limit
+// Multer storage in memory with 15 MB limit. fileFilter matches every existing
+// client-side accept= attribute in the app (image/* for logos/QR/item photos,
+// application/pdf + image/jpeg/png for guide documents) — anything outside that was
+// never an intentionally supported upload type.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 } // 15 MB limit
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported file type. Only images and PDFs are allowed.'));
+    }
+  }
+});
+
+// Rate limiters for auth-adjacent endpoints. Thresholds are deliberately generous —
+// they exist to blunt brute-force/spam, not to interfere with normal retries by a
+// real user who mistyped a password.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please try again in a few minutes.' }
+});
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many registration attempts. Please try again later.' }
+});
+const resetPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests. Please try again later.' }
 });
 
 // Disable Mongoose query buffering so disconnected DB immediately returns error instead of 10s timeout
@@ -514,6 +550,22 @@ async function checkPlanLimitOnDelivery(orderId) {
   }
 }
 
+// Returns a copy of an order with client_name/phone/address redacted while it's still
+// 'pending' — mirrors the masking already applied on the REST select path (see
+// /api/db 'select' case for table 'orders') so realtime broadcasts don't leak PII to
+// vendors/clients who haven't claimed the order with its OTP yet. Never mutates the
+// input, since callers also reuse that same object as the HTTP response body for the
+// customer who owns the order (who should still see their own real details).
+function maskPendingOrderPII(order) {
+  if (!order || order.status !== 'pending') return order;
+  return {
+    ...order,
+    client_name: 'Hidden (Provide OTP)',
+    client_phone: 'Hidden (Provide OTP)',
+    client_address: 'Hidden (Provide OTP)'
+  };
+}
+
 // Upload file (AWS S3 with Local Disk Storage Fallback)
 app.post('/api/upload', (req, res, next) => {
   upload.single('file')(req, res, (err) => {
@@ -568,7 +620,13 @@ app.post('/api/upload', (req, res, next) => {
 // Image Proxy & Local File Stream Endpoint
 app.get('/api/uploads/:key', async (req, res) => {
   try {
-    const fileKey = req.params.key;
+    // Real upload keys are always a flat filename (crypto.randomUUID()-sanitizedName,
+    // see /api/upload) — reject anything that resolves outside that via path segments
+    // (e.g. "..%2f..%2fetc%2fpasswd") before it's used to build a filesystem path.
+    const fileKey = path.basename(req.params.key);
+    if (fileKey !== req.params.key) {
+      return res.status(400).send('Invalid file key');
+    }
     const localFilePath = path.join(__dirname, 'public', 'uploads', fileKey);
 
     // Stream from local disk if file exists locally
@@ -594,7 +652,7 @@ app.get('/api/uploads/:key', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
   if (mongoose.connection.readyState !== 1) {
     return res.status(503).json({ error: 'Database is connecting or offline. Please verify your internet connection or MongoDB Atlas IP whitelist.' });
   }
@@ -703,7 +761,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/vendors/signup', async (req, res) => {
+app.post('/api/vendors/signup', signupLimiter, async (req, res) => {
   try {
     const { owner_name, shop_name, category, primary_category, phone, birthdate, dob, address, zip_code } = req.body;
     const rawPhone = (phone || '').toString().trim();
@@ -789,17 +847,41 @@ app.post('/api/db', async (req, res) => {
 
   const { table, action, data, filters, sorts, limit, single } = req.body;
   const Model = models[table];
-  
+
   if (!Model) {
     return res.status(400).json({ error: `Table '${table}' not found` });
   }
 
+  // super_admins holds login credentials and is never read/written by any legitimate
+  // frontend flow through this generic endpoint (login goes through /api/auth/login
+  // instead) — block direct access outright.
+  // NOTE: sub_admins is deliberately NOT blocked here — SuperAdmin.tsx's "Sub-Admins"
+  // tab legitimately lists/creates/deletes sub_admins records (including a "hold to
+  // reveal password" UI) through this same endpoint. Properly securing that table
+  // requires real request authentication (who is the caller?), not a table-level
+  // block, since Super Admins still need full access to it. Tracked as a Phase 1 item.
+  if (table === 'super_admins') {
+    return res.status(403).json({ error: 'Direct access to this table is not permitted.' });
+  }
+
   try {
+    // Reject any filter value shaped like a Mongo operator (e.g. {"$ne": null},
+    // {"$where": "..."}) before it ever reaches queryConditions — the only operator
+    // this endpoint is meant to build itself is the explicit $in below.
+    const hasOperatorInjection = (value) => {
+      if (value === null || typeof value !== 'object') return false;
+      if (Array.isArray(value)) return value.some(hasOperatorInjection);
+      return Object.keys(value).some((k) => k.startsWith('$'));
+    };
+
     // Build query conditions
     const queryConditions = {};
     if (filters && Array.isArray(filters)) {
       for (const filter of filters) {
         let field = filter.field === 'id' ? '_id' : filter.field;
+        if (hasOperatorInjection(filter.value)) {
+          return res.status(400).json({ error: 'Invalid filter value.' });
+        }
         if (filter.op === 'eq') {
           queryConditions[field] = filter.value;
         } else if (filter.op === 'in') {
@@ -809,6 +891,9 @@ app.post('/api/db', async (req, res) => {
     } else if (filters && typeof filters === 'object') {
       for (const [key, val] of Object.entries(filters)) {
         let field = key === 'id' ? '_id' : key;
+        if (hasOperatorInjection(val)) {
+          return res.status(400).json({ error: 'Invalid filter value.' });
+        }
         queryConditions[field] = val;
       }
     }
@@ -876,7 +961,7 @@ app.post('/api/db', async (req, res) => {
 
         // Socket broadcast for new orders
         if (table === 'orders') {
-          io.emit('newOrder', responseData);
+          io.emit('newOrder', maskPendingOrderPII(responseData));
           console.log(`[SMS Notification Mock] Sent to vendors in ZIP ${data.client_zip}: "New Order Generated! OTP: ${data.otp} for ${data.item_name} near ${data.client_landmark || data.client_zip}"`);
           
           // Set 10 minutes timeout timer
@@ -891,7 +976,7 @@ app.post('/api/db', async (req, res) => {
                   action: `Order ${currentOrder.id} timed out and routed to Super Admin`,
                   actor: 'System'
                 });
-                io.emit('orderUpdated', currentOrder.toJSON());
+                io.emit('orderUpdated', maskPendingOrderPII(currentOrder.toJSON()));
               }
             } catch (timeoutErr) {
               console.error('Timeout handler error:', timeoutErr);
@@ -981,9 +1066,9 @@ app.post('/api/db', async (req, res) => {
         // Notify client and vendor of updates
         if (table === 'orders' && updated.length > 0) {
           for (const order of updated) {
-            io.emit('orderUpdated', order);
+            io.emit('orderUpdated', maskPendingOrderPII(order));
             if (order.status === 'pending') {
-              io.emit('newOrder', order);
+              io.emit('newOrder', maskPendingOrderPII(order));
             }
             if (order.status === 'delivered') {
               await checkPlanLimitOnDelivery(order.id);
@@ -1062,7 +1147,11 @@ app.post('/api/db', async (req, res) => {
           }
         }
 
-        const docs = await Model.find(queryConditions);
+        let deleteQuery = Model.find(queryConditions);
+        if (single) {
+          deleteQuery = deleteQuery.limit(1);
+        }
+        const docs = await deleteQuery.exec();
         for (const doc of docs) {
           await doc.deleteOne();
         }
@@ -1087,7 +1176,7 @@ app.post('/api/db', async (req, res) => {
 });
 
 // Super Admin Password Reset Endpoint
-app.post('/api/super-admin/reset-password', async (req, res) => {
+app.post('/api/super-admin/reset-password', resetPasswordLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
 
@@ -1137,24 +1226,33 @@ app.post('/api/super-admin/reset-password', async (req, res) => {
 // Setup and Seed initial data if DB empty
 app.post('/api/init-db', async (req, res) => {
   try {
-    // 0. Seed Super-Admin
+    // 0. Seed Super-Admin (credentials must come from env — never hardcode real
+    // credentials in source, this repo is public)
     const superAdminCount = await SuperAdmin.countDocuments();
     if (superAdminCount === 0) {
-      await SuperAdmin.create({
-        email: '2711vikram@gmail.com',
-        password: 'Tatwavivek@271'
-      });
+      if (!process.env.SEED_SUPER_ADMIN_EMAIL || !process.env.SEED_SUPER_ADMIN_PASSWORD) {
+        console.error('[SEED] Skipped Super Admin seed: SEED_SUPER_ADMIN_EMAIL / SEED_SUPER_ADMIN_PASSWORD not set in env.');
+      } else {
+        await SuperAdmin.create({
+          email: process.env.SEED_SUPER_ADMIN_EMAIL,
+          password: process.env.SEED_SUPER_ADMIN_PASSWORD
+        });
+      }
     }
 
     // 1. Seed Sub-Admins
     const subAdminCount = await SubAdmin.countDocuments();
     if (subAdminCount === 0) {
-      await SubAdmin.create({
-        name: 'Arjun Sen',
-        email: 'arjun@mealmesh.io',
-        password: 'admin123',
-        force_change: false
-      });
+      if (!process.env.SEED_SUB_ADMIN_EMAIL || !process.env.SEED_SUB_ADMIN_PASSWORD) {
+        console.error('[SEED] Skipped Sub Admin seed: SEED_SUB_ADMIN_EMAIL / SEED_SUB_ADMIN_PASSWORD not set in env.');
+      } else {
+        await SubAdmin.create({
+          name: process.env.SEED_SUB_ADMIN_NAME || 'Sub Admin',
+          email: process.env.SEED_SUB_ADMIN_EMAIL,
+          password: process.env.SEED_SUB_ADMIN_PASSWORD,
+          force_change: false
+        });
+      }
     }
 
     // 2. Seed Subscription Plans
