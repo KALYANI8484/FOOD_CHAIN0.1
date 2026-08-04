@@ -254,7 +254,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     return 5;
   };
   const navLabels = {
-    en: { dashboard: 'Dashboard', menu: 'My Plan Items', radar: 'Order Radar', kanban: 'Active Orders', activation: 'Plan Activation', upgrade: "Plan's", exit: 'Exit' },
+    en: { dashboard: 'Dashboard', menu: 'My Plan Items', radar: "Order's", kanban: 'Active Orders', activation: 'Plan Activation', upgrade: "Plan's", exit: 'Exit' },
     hi: { dashboard: 'डैशबोर्ड', menu: 'मेरी योजना आइटम', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लान एक्टिवेशन', upgrade: 'प्लान्स', exit: 'बाहर निकलें' },
     mr: { dashboard: 'डॅशबोर्ड', menu: 'माझ्या प्लॅन आयटम', radar: 'ऑर्डर रडार', kanban: 'सक्रिय ऑर्डर', activation: 'प्लॅन ॲक्टिव्हेशन', upgrade: 'प्लॅन्स', exit: 'बाहेर पडा' },
   }[lang];
@@ -2229,7 +2229,14 @@ function VendorGuidesList() {
           body: JSON.stringify({ table: 'guides', action: 'select' })
         });
         const d = await res.json();
-        setGuides(d.data || []);
+        // Only show guides Super Admin explicitly marked visible to vendors —
+        // mirrors the same allowed_roles filter SubAdmin.tsx already applies for 'sub_admin'.
+        const allGuides = d.data || [];
+        const vendorGuides = allGuides.filter((g: any) => {
+          const roles: string[] = Array.isArray(g.allowed_roles) ? g.allowed_roles : [g.category || ''];
+          return roles.includes('vendor') || roles.includes('all');
+        });
+        setGuides(vendorGuides);
       } catch (err) {
         console.error(err);
       }

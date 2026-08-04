@@ -3,7 +3,7 @@ import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
   ChevronLeft, Hash, User, CheckCircle, Globe,
-  Package, Users as UsersIcon, TrendingUp, Star, UserPlus, Maximize2
+  Package, Users as UsersIcon, TrendingUp, Star, UserPlus, Maximize2, FileText
 } from 'lucide-react';
 import { Spinner, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 
@@ -965,7 +965,9 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [loadingItems, setLoadingItems] = useState(true);
   const [totalOrders, setTotalOrders] = useState<number | null>(null);
   const [totalVendors, setTotalVendors] = useState<number | null>(null);
-  const [vendorPlanFile, setVendorPlanFile] = useState<string | null>(null);
+  const [planDocs, setPlanDocs] = useState<any[]>([]);
+  const [plansViewerOpen, setPlansViewerOpen] = useState(false);
+  const [activePlanDocIndex, setActivePlanDocIndex] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedMaster, setSelectedMaster] = useState<MasterItem | null>(null);
 
@@ -1039,11 +1041,12 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         }
         if (vd.data) setTotalVendors(vd.data.length);
         if (gd.data) {
-          const plans = gd.data.filter((g: any) => g.allowed_roles?.includes('vendor_plan'));
-          if (plans.length > 0) {
-            const latest = plans.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-            setVendorPlanFile(latest.file_data);
-          }
+          const plans = gd.data.filter((g: any) => Array.isArray(g.allowed_roles) && g.allowed_roles.includes('plans'));
+          plans.sort((a: any, b: any) =>
+            (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          setPlanDocs(plans);
         }
       } catch (e) { console.error(e); }
       finally { setLoadingItems(false); }
@@ -1052,24 +1055,22 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
   const handleVendorPlanClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (vendorPlanFile) {
-      try {
-        const arr = vendorPlanFile.split(',');
-        const mime = arr[0].match(/:(.*?);/)?.[1];
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) { u8arr[n] = bstr.charCodeAt(n); }
-        const blob = new Blob([u8arr], { type: mime });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-      } catch (err) {
-        window.open(vendorPlanFile, '_blank');
-      }
-    } else {
-      alert("Vendor plan document is currently unavailable.");
+    if (planDocs.length === 0) {
+      alert("Vendor plan documents are currently unavailable.");
+      return;
     }
+    // Skip the grid entirely when there's nothing to choose between.
+    setActivePlanDocIndex(planDocs.length === 1 ? 0 : null);
+    setPlansViewerOpen(true);
   };
+
+  const closePlansViewer = () => {
+    setPlansViewerOpen(false);
+    setActivePlanDocIndex(null);
+  };
+
+  const isPlanDocImage = (g: any) =>
+    !!g.file_data && (g.file_data.startsWith('data:image') || /\.(png|jpg|jpeg|webp|gif|svg)($|\?)/i.test(g.file_name || ''));
 
   const categories = ['All', ...Array.from(new Set(masterItems.map(m => m.category)))];
   const filtered = activeCategory === 'All' ? masterItems : masterItems.filter(m => m.category === activeCategory);
@@ -1161,6 +1162,76 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
           t={t}
           lang={language}
         />
+      )}
+
+      {/* ── Plan's Documents Viewer (inline, full-screen) ────── */}
+      {plansViewerOpen && (
+        <div className="fixed inset-0 z-[80] bg-black/95 flex flex-col animate-fade-in">
+          <div className="flex items-center justify-between p-4 shrink-0">
+            {activePlanDocIndex !== null && planDocs.length > 1 ? (
+              <button
+                onClick={() => setActivePlanDocIndex(null)}
+                className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                aria-label="Back to all plans"
+              >
+                <ChevronLeft size={20} />
+              </button>
+            ) : <div />}
+            <button
+              onClick={closePlansViewer}
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {activePlanDocIndex === null ? (
+            /* Grid overview — only reachable when there are 2+ documents */
+            <div className="flex-1 overflow-y-auto px-4 pb-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
+                {planDocs.map((g, i) => (
+                  <button
+                    key={g.id || g._id}
+                    onClick={() => setActivePlanDocIndex(i)}
+                    className="rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-[#C5A059]/60 transition-colors text-left cursor-pointer"
+                  >
+                    {isPlanDocImage(g) ? (
+                      <img src={g.file_data} alt={g.title} className="w-full h-32 object-cover" />
+                    ) : (
+                      <div className="w-full h-32 flex items-center justify-center text-white/60 bg-white/5">
+                        <FileText size={28} />
+                      </div>
+                    )}
+                    <p className="text-white text-xs font-bold p-2 truncate">{g.title}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Expanded single document */
+            <div
+              className="flex-1 flex items-center justify-center p-4 overflow-auto"
+              onClick={() => (planDocs.length > 1 ? setActivePlanDocIndex(null) : closePlansViewer())}
+            >
+              {isPlanDocImage(planDocs[activePlanDocIndex]) ? (
+                <img
+                  src={planDocs[activePlanDocIndex].file_data}
+                  alt={planDocs[activePlanDocIndex].title}
+                  className="max-w-full max-h-full w-auto h-auto object-contain animate-scale-in"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <iframe
+                  src={planDocs[activePlanDocIndex].file_data}
+                  title={planDocs[activePlanDocIndex].title}
+                  className="w-full h-full max-w-4xl rounded-xl border-0 bg-white animate-scale-in"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── HEADER ───────────────────────────────── */}
@@ -1281,7 +1352,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 {[
                   { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373' },
                   { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs },
-                  { href: 'mailto:2711vikram@gmail.com', icon: Mail, label: '2711vikram@gmail.com' },
                   { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com' },
                 ].map(({ href, icon: Icon, label }) => (
                   <li key={label}>
@@ -1320,7 +1390,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               {[
                 { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Advertising%2C%20I%20have%20an%20inquiry.', Icon: MessageCircle },
                 { href: 'tel:+919175537373', Icon: Phone },
-                { href: 'mailto:2711vikram@gmail.com', Icon: Mail },
               ].map(({ href, Icon }) => (
                 <a key={href} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-[#360910] border border-[#C5A059]/40 flex items-center justify-center transition-colors hover:bg-[#4A0E17]">
