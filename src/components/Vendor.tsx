@@ -128,6 +128,12 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   const vendorPhoneRef = useRef(vendorPhone);
   vendorPhoneRef.current = vendorPhone;
 
+  // Stable ref so the socket effect below can read current vendor fields
+  // (zip_code, id) without needing `vendor` itself in its dependency array —
+  // see the effect for why that matters.
+  const vendorRef = useRef(vendor);
+  vendorRef.current = vendor;
+
   const refetchVendor = async () => {
     try {
       const qPhone = vendorPhoneRef.current || '';
@@ -169,18 +175,30 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     }
   };
 
-  useEffect(() => {
-    if (!vendor) return;
+  const fetchPendingOrders = async () => {
+    const res = await fetch('/api/db', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table: 'orders', action: 'select', filters: { status: 'pending' } })
+    });
+    const d = await res.json();
+    return (d.data || []) as Order[];
+  };
 
-    // Load initial pending orders
-    (async () => {
-      const res = await fetch('/api/db', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table: 'orders', action: 'select', filters: { status: 'pending' } })
-      });
-      const d = await res.json();
-      setRadarOrders(d.data || []);
-    })();
+  // Keyed on a stable vendor id, not the `vendor` object itself — refetchVendor()
+  // (triggered below by 'planUpdated', which fires for ANY admin's plan edit
+  // anywhere, not just this vendor's) creates a new object reference on every
+  // call. Depending on `vendor` directly used to tear down and reconnect this
+  // socket on every one of those unrelated events, and any 'newOrder' broadcast
+  // that landed during that reconnect gap was silently, permanently lost —
+  // vendors would see orders "vanish" that had actually just never arrived.
+  // vendorRef (declared above) supplies current vendor fields to the handlers
+  // below instead, so they never go stale despite not being in the dep array.
+  const vendorId = vendor?.id || (vendor as any)?._id;
+
+  useEffect(() => {
+    if (!vendorId) return;
+
+    fetchPendingOrders().then(setRadarOrders);
 
     // Establish WebSocket Connection
     const socket = io();
@@ -188,15 +206,28 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 
     socket.on('connect', () => {
       console.log('Vendor socket connected');
+      // Safety net for ANY disconnect (network blip, backgrounded tab, mobile
+      // sleep) — reconcile in anything the server broadcast while we were
+      // offline, since events missed during a disconnect are gone for good
+      // otherwise. Only adds orders we don't already have; never removes any
+      // (an order actively being claimed locally shouldn't be yanked away by
+      // a fetch that's a moment stale).
+      fetchPendingOrders().then((fresh) => {
+        setRadarOrders((prev) => {
+          const known = new Set(prev.map((o) => o.id));
+          const missing = fresh.filter((o) => !known.has(o.id));
+          return missing.length > 0 ? [...missing, ...prev] : prev;
+        });
+      });
     });
 
     socket.on('newOrder', (newOrder: Order) => {
       setRadarOrders((prev) => {
         // Avoid duplicate additions
         if (prev.some((o) => o.id === newOrder.id)) return prev;
-        
+
         // Play Chime alert if order is in vendor's zip code (first 3 digits match)
-        if (newOrder.client_zip?.substring(0, 3) === vendor.zip_code?.substring(0, 3)) {
+        if (newOrder.client_zip?.substring(0, 3) === vendorRef.current?.zip_code?.substring(0, 3)) {
           playPOSChime();
         }
         return [newOrder, ...prev];
@@ -215,7 +246,8 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     });
 
     socket.on('vendorUpdated', (updatedVendor: VendorType) => {
-      if (vendor && ((updatedVendor as any)._id === (vendor as any)._id || updatedVendor.id === vendor.id)) {
+      const current = vendorRef.current;
+      if (current && ((updatedVendor as any)._id === (current as any)._id || updatedVendor.id === current.id)) {
         setVendor(updatedVendor);
         show('🎉 Your subscription plan has been updated by Super Admin!', 'success');
       }
@@ -225,7 +257,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     // specifically when Super Admin approves an upgrade/addon request, so it can safely
     // trigger a celebratory "plan activated" popup instead of just a toast.
     socket.on('upgradeApproved', (payload: any) => {
-      const myId = vendor.id || (vendor as any)._id;
+      const myId = vendorRef.current?.id || (vendorRef.current as any)?._id;
       if (payload && payload.vendor_id === myId) {
         setApprovalPopup({
           planName: payload.plan_name,
@@ -244,7 +276,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
     return () => {
       socket.disconnect();
     };
-  }, [vendor]);
+  }, [vendorId]);
 
   const getVendorItemLimit = (vendor: VendorType | null) => {
     if (!vendor) return 5;
