@@ -453,7 +453,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         </div>
         <div className="px-3.5 py-4 sm:p-8 max-w-7xl mx-auto">
           {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} radarOrders={radarOrders} />}
-          {tab === 'menu' && <VendorMenu vendor={vendor} show={show} />}
+          {tab === 'menu' && <VendorMenu vendor={vendor} />}
           {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} onOrderClaimed={setClaimPopup} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
           {tab === 'activation' && <PlanActivation vendor={vendor} activePlan={activePlan} onTab={setTab} />}
@@ -1509,16 +1509,17 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaim
     return false;
   };
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader 
-        title={t.radarTitle} 
-        subtitle={t.radarSubtitle}
-      />
+  // Same "can this vendor actually accept it" condition already used inline below
+  // (isZipMatch && categoryAllowed && !isFreeOrUnsubscribed) — pulled out once so
+  // the two sections below split on the exact same logic instead of duplicating it.
+  const isOrderAcceptable = (o: Order) => {
+    const isZipMatch = (o.client_zip || '').substring(0, 3) === (vendor.zip_code || '').substring(0, 3);
+    return isZipMatch && hasCategoryAccess(o.master_category_name) && !isFreeOrUnsubscribed;
+  };
+  const acceptableOrders = visibleRadarOrders.filter(isOrderAcceptable);
+  const otherOrders = visibleRadarOrders.filter((o) => !isOrderAcceptable(o));
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        {visibleRadarOrders.map((o) => {
+  const renderOrderCard = (o: Order) => {
           const orderId = o.id || (o as any)._id || '';
           const isZipMatch = (o.client_zip || '').substring(0, 3) === (vendor.zip_code || '').substring(0, 3);
           const isActive = vendor.status === 'approved';
@@ -1682,28 +1683,62 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaim
               </div>
             </div>
           );
-        })}
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title={t.radarTitle}
+        subtitle={t.radarSubtitle}
+      />
+
+      <div className="space-y-8">
+        {/* ── Orders this vendor can accept right now ── */}
+        {acceptableOrders.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-sm font-black text-emerald-700 uppercase tracking-wider flex items-center gap-2">
+              ✅ Orders You Can Accept ({acceptableOrders.length})
+            </h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {acceptableOrders.map(renderOrderCard)}
+            </div>
+          </div>
+        )}
+
+        {/* ── Nearby orders this vendor can't act on yet (out of zone / needs upgrade) ── */}
+        {otherOrders.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-sm font-black text-muted uppercase tracking-wider flex items-center gap-2">
+              🔒 Other Nearby Orders ({otherOrders.length})
+            </h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {otherOrders.map(renderOrderCard)}
+            </div>
+          </div>
+        )}
 
         {visibleRadarOrders.length === 0 && (
-          <div className="col-span-full">
-            <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-amber-500/15 via-orange-500/15 to-amber-500/15 border-2 border-amber-500/40 text-center shadow-xl animate-fade-in my-4 relative overflow-hidden">
-              <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-400/20 blur-2xl pointer-events-none" />
-              <div className="relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white mx-auto flex items-center justify-center mb-4 shadow-lg shadow-amber-500/30 animate-pulse">
-                  <Sparkles size={32} />
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="col-span-full">
+              <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-amber-500/15 via-orange-500/15 to-amber-500/15 border-2 border-amber-500/40 text-center shadow-xl animate-fade-in my-4 relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-400/20 blur-2xl pointer-events-none" />
+                <div className="relative z-10">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white mx-auto flex items-center justify-center mb-4 shadow-lg shadow-amber-500/30 animate-pulse">
+                    <Sparkles size={32} />
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight max-w-2xl mx-auto leading-snug">
+                    Upgrade your plan to connect with clients and unlock exclusive premium features.
+                  </h3>
+                  <p className="text-sm font-bold text-amber-800 mt-3 max-w-lg mx-auto">
+                    Start receiving live order broadcasts directly from nearby clients on your vendor radar.
+                  </p>
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="mt-6 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-black text-sm transition-all shadow-xl shadow-amber-500/30 inline-flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <Sparkles size={18} /> Upgrade Subscription Plan Now
+                  </button>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight max-w-2xl mx-auto leading-snug">
-                  Upgrade your plan to connect with clients and unlock exclusive premium features.
-                </h3>
-                <p className="text-sm font-bold text-amber-800 mt-3 max-w-lg mx-auto">
-                  Start receiving live order broadcasts directly from nearby clients on your vendor radar.
-                </p>
-                <button
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="mt-6 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-black text-sm transition-all shadow-xl shadow-amber-500/30 inline-flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Sparkles size={18} /> Upgrade Subscription Plan Now
-                </button>
               </div>
             </div>
           </div>
@@ -2350,7 +2385,7 @@ function VendorGuidesList() {
 /* ────────────────────────────────────────────────
    My Active Plan Items Tab Component (Enhanced)
 ──────────────────────────────────────────────── */
-function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, type?: any) => void }) {
+function VendorMenu({ vendor }: { vendor: VendorType }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string>('all');
@@ -2371,63 +2406,62 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
     return m === -1 ? Infinity : acc + m;
   }, 0);
 
+  // Shows the Super-Admin-curated sub-inventory items belonging to each category
+  // this vendor is actually subscribed to (via active_subscriptions), capped at
+  // that subscription's max_items — a read-only reflection of what the plan
+  // grants, not a vendor-editable list (there is no per-vendor item/stock state).
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: 'vendor_inventory',
-          action: 'select',
-          filters: { vendor_id: vendor.id || (vendor as any)._id }
-        })
-      });
-      const d = await res.json();
-      let vendorItems = d.data || [];
-
-      // Fallback: load master items grouped by subscription categories
-      if (vendorItems.length === 0) {
-        const masterRes = await fetch('/api/db', {
+      const [masterRes, subInvRes] = await Promise.all([
+        fetch('/api/db', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ table: 'master_inventory', action: 'select' })
-        });
-        const masterData = await masterRes.json();
-        const masters = masterData.data || [];
+        }),
+        fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'sub_inventory', action: 'select' })
+        })
+      ]);
+      const masterData = await masterRes.json();
+      const subInvData = await subInvRes.json();
+      const masters = masterData.data || [];
+      const subInventoryItems = subInvData.data || [];
 
-        vendorItems = [];
-        subs.forEach((sub: any) => {
-          const subLimit = sub.max_items === -1 ? 10 : (sub.max_items ?? 5);
-          const catItems = masters
+      const vendorItems: any[] = [];
+      subs.forEach((sub: any) => {
+        const subLimit = sub.max_items === -1 ? Infinity : (sub.max_items ?? 5);
+        if (subLimit <= 0) return;
+
+        // Which master categories this subscription covers ('General'/blank = all)
+        const catMasterIds = new Set(
+          masters
             .filter((m: any) =>
               !sub.category_name ||
               sub.category_name === 'General' ||
               (m.category || '').toLowerCase() === sub.category_name.toLowerCase()
             )
-            .slice(0, subLimit)
-            .map((m: any) => ({
-              _id: m._id || m.id,
-              id: m.id || m._id,
-              vendor_id: vendor.id || (vendor as any)._id,
-              item_name: m.name,
-              category: sub.category_name || m.category || 'General',
-              plan_category: sub.category_name || 'General',
-              plan_name: sub.plan_name || 'Free Tier',
-              price: m.base_price || 120,
-              image_url: m.image_url,
-              in_stock: true
-            }));
-          vendorItems.push(...catItems);
-        });
-      }
+            .map((m: any) => m.id || m._id)
+        );
 
-      // Tag each item with its plan_category if not already set
-      vendorItems = vendorItems.map((it: any) => ({
-        ...it,
-        plan_category: it.plan_category || it.category || 'General',
-        plan_name: it.plan_name || vendor.plan_name || 'Free Tier'
-      }));
+        const catItems = subInventoryItems
+          .filter((si: any) => catMasterIds.has(si.master_inventory_id))
+          .slice(0, subLimit === Infinity ? undefined : subLimit)
+          .map((si: any) => ({
+            _id: si._id || si.id,
+            id: si.id || si._id,
+            item_name: si.name,
+            category: sub.category_name || 'General',
+            plan_category: sub.category_name || 'General',
+            plan_name: sub.plan_name || 'Free Tier',
+            price: si.price,
+            uom: si.uom || 'pc',
+            image_url: si.image_url
+          }));
+        vendorItems.push(...catItems);
+      });
 
       setItems(vendorItems);
     } catch (err) {
@@ -2438,25 +2472,6 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
   };
 
   useEffect(() => { fetchItems(); }, [vendor]);
-
-  const toggleAvailability = async (item: any) => {
-    const newStock = !(item.in_stock ?? true);
-    setItems(prev => prev.map(i => (i.id === item.id || i._id === item._id ? { ...i, in_stock: newStock } : i)));
-    try {
-      await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: 'vendor_inventory',
-          action: 'upsert',
-          data: { ...item, vendor_id: vendor.id || (vendor as any)._id, in_stock: newStock }
-        })
-      });
-      show(`Item "${item.item_name}" is now ${newStock ? 'IN STOCK 🟢' : 'OUT OF STOCK 🔴'}`, newStock ? 'success' : 'info');
-    } catch {
-      show('Failed to update item availability', 'error');
-    }
-  };
 
   // Items matching the active filter chip
   const filteredItems = activeFilter === 'all'
@@ -2558,7 +2573,7 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
               const cat = sub.category_name || 'General';
               const planName = sub.plan_name || 'Free Tier';
               const maxItems = sub.max_items === -1 ? Infinity : (sub.max_items ?? 5);
-              // Primary: exact category match; fallback: show all filtered items (handles vendor_inventory without plan_category tag)
+              // Primary: exact category match; fallback covers the single-subscription case
               const groupItems = (groups[cat] && groups[cat].length > 0)
                 ? groups[cat]
                 : subs.length === 1
@@ -2625,67 +2640,50 @@ function VendorMenu({ vendor, show }: { vendor: VendorType; show: (msg: string, 
                     <p className="text-xs text-muted italic pl-2">No items in this plan category yet.</p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {groupItems.map((item: any) => {
-                        const inStock = item.in_stock ?? true;
-                        return (
-                          <div
-                            key={item.id || item._id}
-                            className={`relative card p-4 sm:p-5 bg-surface border transition-all duration-200 flex flex-col justify-between space-y-4 ${
-                              expired
-                                ? 'border-zinc-200 opacity-60 pointer-events-none'
-                                : inStock
-                                ? 'border-border hover:border-amber-400/60 shadow-xs'
-                                : 'border-red-200 bg-red-50/20 opacity-80'
-                            }`}
-                          >
-                            {/* 🔒 Expired Plan Overlay */}
-                            {expired && (
-                              <div className="absolute inset-0 z-10 rounded-[inherit] flex flex-col items-center justify-center bg-zinc-100/80 backdrop-blur-[2px] gap-1">
-                                <span className="text-2xl">🔒</span>
-                                <p className="text-[10px] font-extrabold text-zinc-600 text-center px-3">Plan Expired<br/>Renew to re-activate</p>
-                              </div>
-                            )}
+                      {groupItems.map((item: any) => (
+                        <div
+                          key={item.id || item._id}
+                          className={`relative card p-4 sm:p-5 bg-surface border transition-all duration-200 flex flex-col justify-between space-y-4 ${
+                            expired ? 'border-zinc-200 opacity-60 pointer-events-none' : 'border-border hover:border-amber-400/60 shadow-xs'
+                          }`}
+                        >
+                          {/* 🔒 Expired Plan Overlay */}
+                          {expired && (
+                            <div className="absolute inset-0 z-10 rounded-[inherit] flex flex-col items-center justify-center bg-zinc-100/80 backdrop-blur-[2px] gap-1">
+                              <span className="text-2xl">🔒</span>
+                              <p className="text-[10px] font-extrabold text-zinc-600 text-center px-3">Plan Expired<br/>Renew to re-activate</p>
+                            </div>
+                          )}
 
-                            <div className="space-y-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center overflow-hidden shrink-0">
-                                  {item.image_url ? (
-                                    <img src={item.image_url} alt={item.item_name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <span className="text-2xl">🍲</span>
-                                  )}
-                                </div>
-                                <span className={`px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 ${
-                                  inStock ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-800 border border-red-300'
-                                }`}>
-                                  <span className={`w-2 h-2 rounded-full ${inStock ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                                  {inStock ? 'In Stock' : 'Out of Stock'}
-                                </span>
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center overflow-hidden shrink-0">
+                                {item.image_url ? (
+                                  <img src={item.image_url} alt={item.item_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-2xl">🍲</span>
+                                )}
                               </div>
-
-                              <div>
-                                <h3 className="font-extrabold text-base text-text leading-snug">{getItemTranslation(item.item_name, 'en')}</h3>
-                                <p className="text-xs text-muted font-bold mt-0.5">{item.category || 'General'}</p>
-                              </div>
-
-                              <p className="text-lg font-black text-amber-600">₹{item.price}</p>
+                              <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                                {item.uom || 'pc'}
+                              </span>
                             </div>
 
-                            <div className="pt-3 border-t border-border/80">
-                              <button
-                                onClick={() => toggleAvailability(item)}
-                                className={`w-full h-11 px-4 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
-                                  inStock
-                                    ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-300'
-                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                }`}
-                              >
-                                {inStock ? '🔴 Mark Out of Stock' : '🟢 Mark In Stock'}
-                              </button>
+                            <div>
+                              <h3 className="font-extrabold text-base text-text leading-snug">{getItemTranslation(item.item_name, 'en')}</h3>
+                              <p className="text-xs text-muted font-bold mt-0.5">{item.category || 'General'}</p>
                             </div>
+
+                            <p className="text-lg font-black text-amber-600">₹{item.price} <span className="text-xs font-bold text-muted">/ {item.uom || 'pc'}</span></p>
                           </div>
-                        );
-                      })}
+
+                          <div className="pt-3 border-t border-border/80">
+                            <p className="text-center text-[10px] font-bold text-muted uppercase tracking-wider">
+                              Allocated via your {item.plan_category || 'General'} plan
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
