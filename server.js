@@ -1121,10 +1121,6 @@ app.post('/api/db', async (req, res) => {
             }
             if (order.status === 'delivered') {
               await checkPlanLimitOnDelivery(order.id);
-              const orderIdToDel = order._id || order.id;
-              await models.orders.deleteOne({ _id: orderIdToDel });
-              await Activity.deleteMany({ actor: orderIdToDel.toString() });
-              io.emit('orderRemoved', orderIdToDel.toString());
             }
           }
         }
