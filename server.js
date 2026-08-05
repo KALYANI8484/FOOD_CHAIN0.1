@@ -204,6 +204,14 @@ const initDb = async () => {
 
     runExpiryCron();
     setInterval(runExpiryCron, 24 * 60 * 60 * 1000);
+
+    // Safety-net sweep for the 9h order claim window — see sweepExpiredOrders
+    // definition below (declared later in the file, available here via
+    // hoisting/closure since it only ever runs after this async function
+    // resumes post-connect, by which point the whole module has finished
+    // evaluating).
+    sweepExpiredOrders();
+    setInterval(sweepExpiredOrders, 5 * 60 * 1000);
   }
 };
 
@@ -351,7 +359,11 @@ const orderSchema = new mongoose.Schema({
   created_at: { type: String, default: () => new Date().toISOString() },
   accepted_at: { type: String, default: null },
   delivered_at: { type: String, default: null },
-  master_category_name: { type: String, default: null }
+  master_category_name: { type: String, default: null },
+  // Persisted deadline for the pending-order claim window (see ORDER_CLAIM_WINDOW_MS).
+  // Backs the periodic sweep so an expiry isn't lost if the in-memory setTimeout
+  // handle (orderTimers) disappears on a server restart/deploy.
+  expires_at: { type: String, default: null }
 }, schemaOptions);
 
 const guideSchema = new mongoose.Schema({
@@ -492,8 +504,57 @@ const models = {
   clients: ClientProfile
 };
 
-// Order countdown timers tracking
+// How long a pending order stays claimable before being auto-expired to
+// 'System Denied'. Must match the countdown vendors see in Vendor.tsx (search
+// "ORDER_CLAIM_WINDOW" there) — the two drifting apart (10 min actual vs. a
+// 9h display) was a real bug that made orders vanish long before the window
+// vendors were shown had elapsed.
+const ORDER_CLAIM_WINDOW_MS = 9 * 60 * 60 * 1000; // 9 hours
+
+// Order countdown timers tracking (in-memory only — see the periodic sweep
+// below, which is the real source of truth and survives a server restart
+// even if these setTimeout handles are lost).
 const orderTimers = new Map();
+
+// Shared by both the in-memory setTimeout (fast path, fires ~on time when the
+// process has been running continuously) and the periodic sweep (safety net,
+// catches anything the fast path missed e.g. after a restart). Idempotent —
+// only acts if the order is still 'pending'.
+async function expirePendingOrderIfDue(orderId) {
+  try {
+    const currentOrder = await Order.findById(orderId);
+    if (currentOrder && currentOrder.status === 'pending') {
+      currentOrder.status = 'System Denied';
+      await currentOrder.save();
+      io.emit('orderRemoved', currentOrder.id);
+      await Activity.create({
+        action: `Order ${currentOrder.id} timed out and routed to Super Admin`,
+        actor: 'System'
+      });
+      io.emit('orderUpdated', maskPendingOrderPII(currentOrder.toJSON()));
+    }
+  } catch (err) {
+    console.error('Order expiry error:', err);
+  } finally {
+    orderTimers.delete(orderId);
+  }
+}
+
+// Safety-net sweep: catches orders whose in-memory setTimeout was lost to a
+// server restart/deploy (orderTimers is purely in-process and doesn't survive
+// one). Runs often enough that a lost timer only ever causes a few minutes of
+// extra delay, never a permanently-stuck 'pending' order.
+async function sweepExpiredOrders() {
+  try {
+    const nowIso = new Date().toISOString();
+    const due = await Order.find({ status: 'pending', expires_at: { $ne: null, $lte: nowIso } });
+    for (const order of due) {
+      await expirePendingOrderIfDue(order._id);
+    }
+  } catch (err) {
+    console.error('Order expiry sweep error:', err);
+  }
+}
 
 async function deleteS3Object(url) {
   if (!url || typeof url !== 'string') return;
@@ -953,6 +1014,7 @@ app.post('/api/db', async (req, res) => {
         if (table === 'orders') {
           data.otp = Math.floor(1000 + Math.random() * 9000).toString();
           data.distance_km = parseFloat((Math.random() * 4 + 0.2).toFixed(1));
+          data.expires_at = new Date(Date.now() + ORDER_CLAIM_WINDOW_MS).toISOString();
         }
 
         const doc = new Model(data);
@@ -963,25 +1025,12 @@ app.post('/api/db', async (req, res) => {
         if (table === 'orders') {
           io.emit('newOrder', maskPendingOrderPII(responseData));
           console.log(`[SMS Notification Mock] Sent to vendors in ZIP ${data.client_zip}: "New Order Generated! OTP: ${data.otp} for ${data.item_name} near ${data.client_landmark || data.client_zip}"`);
-          
-          // Set 10 minutes timeout timer
-          const timer = setTimeout(async () => {
-            try {
-              const currentOrder = await Order.findById(doc._id);
-              if (currentOrder && currentOrder.status === 'pending') {
-                currentOrder.status = 'System Denied';
-                await currentOrder.save();
-                io.emit('orderRemoved', currentOrder.id);
-                await Activity.create({
-                  action: `Order ${currentOrder.id} timed out and routed to Super Admin`,
-                  actor: 'System'
-                });
-                io.emit('orderUpdated', maskPendingOrderPII(currentOrder.toJSON()));
-              }
-            } catch (timeoutErr) {
-              console.error('Timeout handler error:', timeoutErr);
-            }
-          }, 10 * 60 * 1000);
+
+          // Fast-path expiry timer (see ORDER_CLAIM_WINDOW_MS + the periodic
+          // sweep in initDb, which is the real source of truth and catches
+          // this if the process restarts before it fires).
+          const orderId = doc._id;
+          const timer = setTimeout(() => expirePendingOrderIfDue(orderId), ORDER_CLAIM_WINDOW_MS);
           orderTimers.set(doc.id, timer);
         }
 
@@ -1072,10 +1121,6 @@ app.post('/api/db', async (req, res) => {
             }
             if (order.status === 'delivered') {
               await checkPlanLimitOnDelivery(order.id);
-              const orderIdToDel = order._id || order.id;
-              await models.orders.deleteOne({ _id: orderIdToDel });
-              await Activity.deleteMany({ actor: orderIdToDel.toString() });
-              io.emit('orderRemoved', orderIdToDel.toString());
             }
           }
         }

@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff,
   UserPlus, ChevronLeft, Phone, MapPin, Calendar,
-  Hash, Store, Users, Shield, UtensilsCrossed
+  Hash, Store, Users, Shield
 } from 'lucide-react';
 import { Spinner, LanguageSelector, useSyncedLanguage } from './ui';
 import { AntigravitySuccessModal, CelebratorySubmitButton } from './AntigravitySuccessModal';
-import { supabase, type MasterItem } from '../lib/supabase';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
@@ -164,20 +163,8 @@ export function Login({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const [sf, setSf] = useState({ name: '', shop_name: '', category: '', phone: '', dob: '', address: '', pincode: '' });
+  const [sf, setSf] = useState({ name: '', shop_name: '', phone: '', dob: '', address: '', pincode: '' });
   const patch = (k: keyof typeof sf) => (v: string) => setSf(p => ({ ...p, [k]: v }));
-
-  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('master_inventory').select('*');
-      const items = data || [];
-      setMasterItems(items);
-      if (items.length > 0) {
-        setSf(p => (p.category ? p : { ...p, category: items[0].name }));
-      }
-    })();
-  }, []);
 
   const switchMode = (m: AuthMode) => { setMode(m); setError(''); setSuccess(''); };
 
@@ -218,7 +205,6 @@ export function Login({
         body: JSON.stringify({
           owner_name: sf.name,
           shop_name: sf.shop_name || sf.name,
-          category: sf.category,
           phone: sf.phone,
           dob: cleanDob,
           birthdate: cleanDob,
@@ -234,7 +220,7 @@ export function Login({
         setPassword(cleanDob);
         setShowAntigravityModal(true);
         setSuccess('Application approved! Upgrade to a paid plan to start listing items and accepting client orders.');
-        setSf({ name: '', shop_name: '', category: masterItems[0]?.name || '', phone: '', dob: '', address: '', pincode: '' });
+        setSf({ name: '', shop_name: '', phone: '', dob: '', address: '', pincode: '' });
       }
     } catch { setError('Network error — please try again'); }
     finally { setLoading(false); }
@@ -367,30 +353,12 @@ export function Login({
               {/* Starting plan callout — every signup begins on the 0-item/0-client Free Tier */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm space-y-1">
                 <p className="font-bold text-slate-700 text-xs uppercase tracking-wider">Your Starting Plan: Free Tier</p>
-                <p className="text-slate-500 text-xs">You'll start with 0 listed items and 0 client connections. A Super Admin activates a paid plan for your chosen category so you can list items and start receiving orders.</p>
+                <p className="text-slate-500 text-xs">You'll start with 0 listed items and 0 client connections. A Super Admin activates a paid plan for you so you can list items and start receiving orders.</p>
               </div>
 
               <div className="space-y-3">
                 <Field label={t.fullNameLabel} placeholder={t.fullNamePlaceholder} value={sf.name} onChange={patch('name')} icon={UserPlus} />
                 <Field label="SHOP / KITCHEN NAME" placeholder="e.g. Kolhapur Tiffin Express (optional)" value={sf.shop_name} onChange={patch('shop_name')} icon={Store} />
-
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Preferred Category (for after activation)</label>
-                  <div className="relative">
-                    <UtensilsCrossed size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
-                    <select
-                      value={sf.category}
-                      onChange={(e) => patch('category')(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-medium outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-100 transition-all appearance-none cursor-pointer"
-                    >
-                      {masterItems.length === 0 && <option value="">No master items available yet</option>}
-                      {masterItems.map((m) => (
-                        <option key={m.id} value={m.name}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-1 ml-1">This just reserves your category — it goes live once a Super Admin assigns your paid plan.</p>
-                </div>
 
                 <Field
                   label={t.phoneLabel}
