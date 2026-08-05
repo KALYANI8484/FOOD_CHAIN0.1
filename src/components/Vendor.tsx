@@ -2435,15 +2435,15 @@ function VendorMenu({ vendor }: { vendor: VendorType }) {
         const subLimit = sub.max_items === -1 ? Infinity : (sub.max_items ?? 5);
         if (subLimit <= 0) return;
 
-        // Which master categories this subscription covers ('General'/blank = all)
+        // Which master categories this subscription covers ('General'/blank = all).
+        // sub.category_name holds a master_inventory item's *name* (it's set from
+        // the plan's "Linked Master Category" picker, which lists master item names),
+        // not the master item's own `category` grouping field — match on name.
         const catMasterIds = new Set(
-          masters
-            .filter((m: any) =>
-              !sub.category_name ||
-              sub.category_name === 'General' ||
-              (m.category || '').toLowerCase() === sub.category_name.toLowerCase()
-            )
-            .map((m: any) => m.id || m._id)
+          (!sub.category_name || sub.category_name === 'General'
+            ? masters
+            : masters.filter((m: any) => (m.name || '').trim().toLowerCase() === sub.category_name.trim().toLowerCase())
+          ).map((m: any) => m.id || m._id)
         );
 
         const catItems = subInventoryItems
