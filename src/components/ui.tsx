@@ -296,18 +296,25 @@ export function Select({
   value,
   onChange,
   options,
+  required,
 }: {
   label?: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  required?: boolean;
 }) {
   return (
     <div className="space-y-2">
-      {label && <label className="text-sm font-semibold text-text block">{label}</label>}
+      {label && (
+        <label className="text-sm font-semibold text-text block">
+          {label} {required && <span className="text-accent">*</span>}
+        </label>
+      )}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        required={required}
         className="w-full px-4 py-3 rounded-2xl bg-white/95 border border-border text-text focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all appearance-none cursor-pointer shadow-sm"
       >
         {options.map((o) => (

@@ -15,7 +15,10 @@ import { getVendorTier } from '../lib/vendorPlan';
 // Used by "Assign Additional Category Subscription" and by upgrade-request approval, so
 // approving a request behaves identically to an admin manually assigning that plan.
 const applyPlanToSubscriptions = (existingSubs: VendorSubscription[], plan: Plan): VendorSubscription[] => {
-  const categoryName = plan.master_category_name || 'General';
+  if (!plan.master_category_name) {
+    throw new Error(`Plan "${plan.name}" has no Linked Master Category set. Edit it in Plans and pick a category before assigning it to a vendor.`);
+  }
+  const categoryName = plan.master_category_name;
   const newSub: VendorSubscription = {
     id: crypto.randomUUID(),
     plan_id: plan.id,
@@ -698,14 +701,20 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       ? editVendor.active_subscriptions
       : [];
 
-    const updatedSubs = applyPlanToSubscriptions(existingSubs, planToAssign);
+    let updatedSubs: VendorSubscription[];
+    try {
+      updatedSubs = applyPlanToSubscriptions(existingSubs, planToAssign);
+    } catch (err: any) {
+      show(err.message, 'error');
+      return;
+    }
 
     await supabase.from('vendors').update({
       active_subscriptions: updatedSubs
     }).eq('id', vendorId);
 
     await supabase.from('activity_log').insert({
-      action: `Category subscription ${planToAssign.name} (${planToAssign.master_category_name || 'General'}) assigned to ${editVendor.shop_name}`,
+      action: `Category subscription ${planToAssign.name} (${planToAssign.master_category_name}) assigned to ${editVendor.shop_name}`,
       actor: 'Super Admin'
     });
 
@@ -1988,7 +1997,13 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     // manually assigning that plan (previously this only touched legacy top-level
     // fields, so approved vendors still looked Free everywhere that reads the array).
     const existingSubs: VendorSubscription[] = Array.isArray(vendorDoc?.active_subscriptions) ? vendorDoc.active_subscriptions : [];
-    const updatedSubs = applyPlanToSubscriptions(existingSubs, plan as Plan);
+    let updatedSubs: VendorSubscription[];
+    try {
+      updatedSubs = applyPlanToSubscriptions(existingSubs, plan as Plan);
+    } catch (err: any) {
+      show(err.message, 'error');
+      return;
+    }
 
     await supabase.from('vendors').update({
       active_subscriptions: updatedSubs
@@ -2028,6 +2043,8 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
     try {
       const { data: allPlans } = await supabase.from('subscription_plans').select('*');
+      let approvedCount = 0;
+      const skipped: string[] = [];
 
       for (const u of eligible) {
         const targetPlan = (allPlans || []).find((p: Plan) => p.name === u.requested_plan);
@@ -2035,7 +2052,13 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
         const { data: vendorDoc } = await supabase.from('vendors').select('*').eq('id', u.vendor_id).maybeSingle();
         const existingSubs: VendorSubscription[] = Array.isArray(vendorDoc?.active_subscriptions) ? vendorDoc.active_subscriptions : [];
-        const updatedSubs = applyPlanToSubscriptions(existingSubs, targetPlan);
+        let updatedSubs: VendorSubscription[];
+        try {
+          updatedSubs = applyPlanToSubscriptions(existingSubs, targetPlan);
+        } catch (err: any) {
+          skipped.push(`${u.vendor_name} (${err.message})`);
+          continue;
+        }
 
         await supabase.from('vendors').update({
           active_subscriptions: updatedSubs
@@ -2054,9 +2077,14 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           max_items: targetPlan.max_items,
           max_clients: targetPlan.max_clients
         });
+        approvedCount++;
       }
 
-      show(`Batch approved & activated ${eligible.length} subscription upgrades!`, 'success');
+      if (skipped.length > 0) {
+        show(`Approved ${approvedCount}, skipped ${skipped.length} (unscoped plan): ${skipped.join('; ')}`, 'error');
+      } else {
+        show(`Batch approved & activated ${approvedCount} subscription upgrades!`, 'success');
+      }
       load();
     } catch (err: any) {
       console.error(err);
@@ -2145,7 +2173,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       load();
     } catch (err: any) {
       console.error(err);
-      show('Failed to approve Sub-Admin request', 'error');
+      show(err.message || 'Failed to approve Sub-Admin request', 'error');
     }
   };
 
@@ -2699,13 +2727,17 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
 
   const handleCreate = async () => {
     if (!form.name || form.price < 0) return;
+    if (!form.master_category_name) {
+      show('Please select a Linked Master Category before saving the plan.', 'error');
+      return;
+    }
     await supabase.from('subscription_plans').insert({
       name: form.name,
       price: Number(form.price),
       validity_days: Number(form.validity_days),
       max_items: Number(form.max_items),
       max_clients: Number(form.max_clients),
-      master_category_name: form.master_category_name || null,
+      master_category_name: form.master_category_name,
       badge: form.badge || null,
       features: form.features,
       status: 'active'
@@ -2746,13 +2778,17 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
 
   const handleEditSave = async () => {
     if (!editPlan) return;
+    if (!editPlan.master_category_name) {
+      show('Please select a Linked Master Category before saving the plan.', 'error');
+      return;
+    }
     await supabase.from('subscription_plans').update({
       name: editPlan.name,
       price: Number(editPlan.price),
       validity_days: Number(editPlan.validity_days),
       max_items: Number(editPlan.max_items),
       max_clients: Number(editPlan.max_clients),
-      master_category_name: editPlan.master_category_name || null,
+      master_category_name: editPlan.master_category_name,
       badge: editPlan.badge || null,
       features: editPlan.features || []
     }).eq('id', editPlan.id);
@@ -3211,6 +3247,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
             value={form.master_category_name}
             onChange={(v) => setForm({ ...form, master_category_name: v })}
             options={[{ label: '-- Select Master Category --', value: '' }, ...masterCategories.map(c => ({ label: c, value: c }))]}
+            required
           />
 
           <div className="space-y-2 pt-2">
@@ -3295,6 +3332,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
               value={editPlan.master_category_name || ''}
               onChange={(v) => setEditPlan({ ...editPlan, master_category_name: v })}
               options={[{ label: '-- Select Master Category --', value: '' }, ...masterCategories.map(c => ({ label: c, value: c }))]}
+              required
             />
 
             <div className="space-y-2 pt-2">

@@ -454,10 +454,13 @@ function isSubPaidAndActive(sub) {
   if (sub.subscription_end && sub.subscription_end < todayIso) return false;
   return true;
 }
+// Strict match only — see matching comment in src/lib/vendorPlan.ts (keep in sync).
+// A missing/'General' category_name used to act as a wildcard matching every category;
+// that's what let vendors accept orders for categories they never subscribed to.
 function isVendorCategoryActive(vendor, categoryName) {
   const subs = vendor && Array.isArray(vendor.active_subscriptions) ? vendor.active_subscriptions : [];
   if (subs.length === 0) return false;
-  const matching = subs.find(s => !s.category_name || s.category_name === 'General' || s.category_name === categoryName);
+  const matching = subs.find(s => !!s.category_name && s.category_name === categoryName);
   if (!matching) return false;
   return isSubPaidAndActive(matching);
 }

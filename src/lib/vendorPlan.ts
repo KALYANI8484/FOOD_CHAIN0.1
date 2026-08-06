@@ -35,18 +35,19 @@ export function getVendorPlanLabel(vendor: Pick<Vendor, 'active_subscriptions'> 
   return names.length > 0 ? names.join(', ') : 'Free Tier';
 }
 
-// Does the vendor have a non-expired subscription entry covering this category?
-// 'General' or a missing category_name acts as a wildcard, matching the convention
-// already used across the Portfolio list / item-grouping / order-radar checks.
+// Does the vendor have a non-expired, paid subscription entry covering this exact
+// category? Strict match only — a subscription grants access to the specific category
+// it was assigned for, nothing else. (Previously a missing/'General' category_name was
+// treated as a wildcard matching every category; that silently granted vendors access to
+// categories they never subscribed to whenever a plan's "Linked Master Category" was left
+// unset, which is now rejected at assignment time instead — see applyPlanToSubscriptions.)
 export function isVendorCategoryActive(
   vendor: Pick<Vendor, 'active_subscriptions'> | null | undefined,
   categoryName?: string | null
 ): boolean {
   const subs = vendor?.active_subscriptions;
   if (!Array.isArray(subs) || subs.length === 0) return false;
-  const matching = subs.find(
-    (s) => !s.category_name || s.category_name === 'General' || s.category_name === categoryName
-  );
+  const matching = subs.find((s) => !!s.category_name && s.category_name === categoryName);
   if (!matching) return false;
   return isSubPaidAndActive(matching);
 }

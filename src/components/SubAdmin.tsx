@@ -605,11 +605,15 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
     const vendorId = editVendor.id || (editVendor as any)._id;
     const plan = plans.find(p => p.id === assignPlanId);
     if (!plan) return;
+    if (!plan.master_category_name) {
+      show('This plan has no linked category and cannot be assigned. Ask a Super Admin to set one first.', 'error');
+      return;
+    }
 
     const payload = JSON.stringify({
       plan_id: plan.id,
       plan_name: plan.name,
-      category_name: plan.master_category_name || 'General',
+      category_name: plan.master_category_name,
       max_items: plan.max_items,
       max_clients: plan.max_clients,
       validity_days: plan.validity_days
