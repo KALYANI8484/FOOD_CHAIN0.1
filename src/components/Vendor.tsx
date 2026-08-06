@@ -8,6 +8,7 @@ import {
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, useSyncedLanguage, type Language } from './ui';
+import { getVendorTier, isVendorCategoryActive, getVendorPlanLabel } from '../lib/vendorPlan';
 import { getItemTranslation } from './Landing';
 import { AntigravitySuccessModal } from './AntigravitySuccessModal';
 
@@ -66,7 +67,6 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   }, []);
 
   const [vendor, setVendor] = useState<VendorType | null>(null);
-  const [activePlan, setActivePlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast, show } = useToast();
@@ -112,10 +112,6 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         }
 
         setVendor(targetVendor);
-        if (targetVendor && targetVendor.plan_id) {
-          const { data: pData } = await supabase.from('subscription_plans').select('*').eq('id', targetVendor.plan_id).maybeSingle();
-          setActivePlan(pData);
-        }
       } catch (e) {
         console.error('Failed to load vendor session:', e);
       } finally {
@@ -454,9 +450,9 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         <div className="px-3.5 py-4 sm:p-8 max-w-7xl mx-auto">
           {tab === 'dashboard' && <VendorDashboard vendor={vendor} lang={lang} onTab={setTab} radarOrders={radarOrders} />}
           {tab === 'menu' && <VendorMenu vendor={vendor} />}
-          {tab === 'radar' && <OrderRadar vendor={vendor} activePlan={activePlan} radarOrders={radarOrders} onTab={setTab} show={show} onOrderClaimed={setClaimPopup} />}
+          {tab === 'radar' && <OrderRadar vendor={vendor} radarOrders={radarOrders} onTab={setTab} show={show} onOrderClaimed={setClaimPopup} />}
           {tab === 'kanban' && <VendorKanban vendor={vendor} show={show} />}
-          {tab === 'activation' && <PlanActivation vendor={vendor} activePlan={activePlan} onTab={setTab} />}
+          {tab === 'activation' && <PlanActivation vendor={vendor} onTab={setTab} />}
           {tab === 'upgrade' && <UpgradePlan vendor={vendor} />}
         </div>
       </main>
@@ -1239,7 +1235,7 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted uppercase font-bold">{t.activePlan}</p>
-                <p className="text-xl font-extrabold text-accent">{vendor.plan_name || 'Free'}</p>
+                <p className="text-xl font-extrabold text-accent">{getVendorPlanLabel(vendor)}</p>
               </div>
               <Badge variant={isPlanExpired ? 'error' : vendor.status === 'approved' ? 'success' : vendor.status === 'grace_period' ? 'warning' : 'warning'}>
                 {isPlanExpired || vendor.status === 'expired' ? t.statusExpired : vendor.status === 'grace_period' ? '⚠️ Grace Period' : vendor.status === 'approved' ? t.statusApproved : t.statusPending}
@@ -1405,14 +1401,13 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
 // 2. Order Radar Module Tab
 interface OrderRadarProps {
   vendor: VendorType;
-  activePlan: Plan | null;
   radarOrders: Order[];
   onTab: (tab: Tab) => void;
   show: (m: string, t?: 'success' | 'error' | 'info') => void;
   onOrderClaimed: (payload: { clientName: string; clientPhone: string; itemName: string }) => void;
 }
 
-function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaimed }: OrderRadarProps) {
+function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderRadarProps) {
   const [lang] = useSyncedLanguage();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
@@ -1440,7 +1435,7 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaim
 
   const acceptOrder = async (order: Order, otpAttempt: string) => {
     // Strictly block Free / Unsubscribed or Expired vendors from accepting client orders
-    if (vendor.plan_name === 'Free' || !vendor.plan_name || vendor.status === 'expired' || vendor.status !== 'approved') {
+    if (getVendorTier(vendor) === 'free' || vendor.status === 'expired' || vendor.status !== 'approved') {
       setShowUpgradeModal(true);
       show('Upgrade Subscription Plan Now to accept live client orders.', 'error');
       return;
@@ -1494,19 +1489,15 @@ function OrderRadar({ vendor, activePlan, radarOrders, onTab, show, onOrderClaim
 
   const visibleRadarOrders = radarOrders;
 
-  const isFreeOrUnsubscribed = vendor.plan_name === 'Free' || !vendor.plan_name || vendor.status === 'expired' || vendor.status !== 'approved';
+  const isFreeOrUnsubscribed = getVendorTier(vendor) === 'free' || vendor.status === 'expired' || vendor.status !== 'approved';
 
-  // Helper to check if vendor has active subscription covering the order's category
+  // Helper to check if vendor has active subscription covering the order's category.
+  // active_subscriptions[] is the single source of truth — no more falling back to the
+  // top-level plan_id-derived `activePlan`, which could bypass this check entirely.
   const hasCategoryAccess = (orderCategory?: string | null) => {
-    if (isFreeOrUnsubscribed) return false;
+    if (vendor.status === 'expired' || vendor.status !== 'approved') return false;
     if (!orderCategory) return true; // General category
-    // Check main active plan category
-    if (!activePlan?.master_category_name || activePlan.master_category_name === orderCategory) return true;
-    // Check multi-subscriptions array ('General' is a wildcard, matching VendorMenu's item-grouping convention)
-    if (Array.isArray(vendor.active_subscriptions)) {
-      return vendor.active_subscriptions.some((sub: any) => !sub.category_name || sub.category_name === 'General' || sub.category_name === orderCategory);
-    }
-    return false;
+    return isVendorCategoryActive(vendor, orderCategory);
   };
 
   // Same "can this vendor actually accept it" condition already used inline below
@@ -2062,7 +2053,7 @@ function UpgradePlan({ vendor }: { vendor: VendorType }) {
 
       <div className="grid md:grid-cols-3 gap-6 stagger">
         {plans.map((p) => {
-          const isCurrent = vendor.plan_name === p.name;
+          const isCurrent = Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.some((s) => s.plan_name === p.name);
           return (
             <div key={p.name} className={`card p-6 bg-surface border flex flex-col justify-between hover-lift ${isCurrent ? 'border-accent ring-2 ring-accent/10' : 'border-border'}`}>
               <div>
@@ -2144,7 +2135,7 @@ function UpgradePlan({ vendor }: { vendor: VendorType }) {
 }
 
 // 5. Plan Activation Module Tab (Placed in between Active Orders and Plan's)
-function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; activePlan: Plan | null; onTab: (t: Tab) => void }) {
+function PlanActivation({ vendor, onTab }: { vendor: VendorType; onTab: (t: Tab) => void }) {
   const [lang] = useSyncedLanguage();
 
   const t = vTrans[lang];
@@ -2161,7 +2152,7 @@ function PlanActivation({ vendor, activePlan, onTab }: { vendor: VendorType; act
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h3 className="text-xl font-extrabold text-text">{vendor.plan_name || 'Free Tier'}</h3>
+              <h3 className="text-xl font-extrabold text-text">{getVendorPlanLabel(vendor)}</h3>
               <Badge variant={vendor.status === 'approved' ? 'success' : vendor.status === 'expired' ? 'error' : 'warning'}>
                 {vendor.status === 'approved' ? t.activeSubscription : vendor.status === 'expired' ? t.planExpiredTitle : t.pendingVerification}
               </Badge>
