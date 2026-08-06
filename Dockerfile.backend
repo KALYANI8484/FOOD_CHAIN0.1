@@ -1,0 +1,38 @@
+# ── Backend image: the Express/Socket.IO API server (server.js) only. ──────────────────
+# This image does NOT build or serve the frontend — server.js's static-file/SPA-catchall
+# block is gated behind `NODE_ENV === 'production'`, and this image deliberately never
+# sets that (see the runtime stage below), so it stays a pure API server. The frontend
+# image (Dockerfile.frontend, nginx) serves the built React app and reverse-proxies
+# /api, /uploads and /socket.io to this container. See DEPLOYMENT.md for the full picture.
+
+# ---- deps stage: install only production dependencies -------------------------------
+FROM node:20-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+# --omit=dev skips vite/typescript/tailwind/eslint etc. -- this image never runs a build,
+# so those devDependencies would be dead weight.
+RUN npm ci --omit=dev
+
+# ---- runtime stage ---------------------------------------------------------------------
+FROM node:20-slim
+WORKDIR /app
+
+# Deliberately NOT "production" -- see header comment. Overridden per-environment only if
+# you specifically want this container to also serve dist/, which isn't the intended setup.
+ENV NODE_ENV=backend-only
+ENV PORT=5000
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+COPY server.js ./
+
+# Local-disk fallback for uploads that didn't go to S3/Cloudinary (see server.js) lives
+# here; mount a named volume over it in docker-compose so it survives redeploys.
+RUN mkdir -p /app/public/uploads
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "server.js"]

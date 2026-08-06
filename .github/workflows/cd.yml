@@ -1,0 +1,208 @@
+name: CD — Build, Push & Deploy
+
+# Fires on every push that lands on main -- which is exactly what happens when a PR is
+# merged into main (a merge is itself a push event), so a single push trigger covers
+# both cases in the requirements without deploying on every open PR.
+on:
+  push:
+    branches: [main]
+  # Lets you manually re-run a deploy from the Actions tab without pushing an empty
+  # commit -- e.g. to redeploy after fixing an EC2-side issue.
+  workflow_dispatch:
+
+# If two pushes to main land close together, cancel the older run instead of letting
+# two deploys race each other against the same server.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/food-chain-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/food-chain-frontend
+
+jobs:
+  # ── Detect which service(s) actually changed, so we only build/push/restart what's
+  # necessary. package.json/package-lock.json affect both (this repo shares one
+  # dependency manifest for frontend + backend), so a dependency bump rebuilds both.
+  changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'server.js'
+              - 'Dockerfile.backend'
+              - 'package.json'
+              - 'package-lock.json'
+            frontend:
+              - 'src/**'
+              - 'index.html'
+              - 'vite.config.ts'
+              - 'tailwind.config.js'
+              - 'postcss.config.js'
+              - 'tsconfig*.json'
+              - 'Dockerfile.frontend'
+              - 'nginx.conf'
+              - 'package.json'
+              - 'package-lock.json'
+
+  # ── Build + push only the backend image, only if backend files changed. ──────────────
+  build-backend:
+    name: Build & push backend image
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  # ── Build + push only the frontend image, only if frontend files changed. ────────────
+  build-frontend:
+    name: Build & push frontend image
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  # ── SSH into EC2 and deploy only the service(s) that were rebuilt.
+  #
+  # Backend is 3 load-balanced replicas (matching the host nginx `upstream
+  # backend_servers` block, ports 5000/5001/5002) -- these are updated ONE AT A TIME,
+  # health-checked on their own port before moving to the next, so nginx always has at
+  # least 2 healthy instances to route to during the rollout. Zero-downtime by
+  # construction, not by luck.
+  #
+  # Frontend is a single container behind host nginx on 127.0.0.1:8080 -- one restart,
+  # health-checked directly.
+  #
+  # Any instance that fails its health check gets rolled back to the previous tag
+  # immediately (not left broken while the rest of the rollout continues), and the whole
+  # job fails so it's visible in Actions.
+  deploy:
+    name: Deploy to EC2
+    needs: [changes, build-backend, build-frontend]
+    if: |
+      always() &&
+      (needs.build-backend.result == 'success' || needs.build-frontend.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rolling deploy with per-instance health checks
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DEPLOY_BACKEND: ${{ needs.changes.outputs.backend }}
+          DEPLOY_FRONTEND: ${{ needs.changes.outputs.frontend }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_SSH_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_SSH_PORT || 22 }}
+          envs: IMAGE_TAG,DOCKERHUB_USERNAME,DEPLOY_BACKEND,DEPLOY_FRONTEND
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /home/ubuntu/sid/FOOD_CHAIN0.1/deploy-app
+
+            PREV_TAG="$(cat .last_good_tag 2>/dev/null || echo latest)"
+            export DOCKERHUB_USERNAME
+
+            # health_check <port> -- polls a single container's own port directly
+            # (bypassing nginx), up to 10 times, 3s apart.
+            health_check() {
+              local port="$1"
+              for i in $(seq 1 10); do
+                if curl -fsS "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
+                  return 0
+                fi
+                echo "  health check on :$port attempt $i/10 failed, retrying..."
+                sleep 3
+              done
+              return 1
+            }
+
+            if [ "$DEPLOY_BACKEND" = "true" ]; then
+              echo "== Rolling backend update to $IMAGE_TAG =="
+              for n_port in "backend1:5000" "backend2:5001" "backend3:5002"; do
+                svc="${n_port%%:*}"
+                port="${n_port##*:}"
+                echo "-- Updating $svc (port $port)"
+                IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml pull "$svc"
+                IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml up -d --no-deps "$svc"
+                if ! health_check "$port"; then
+                  echo "$svc failed health check -- rolling it back to $PREV_TAG"
+                  IMAGE_TAG="$PREV_TAG" docker compose -f docker-compose.prod.yml pull "$svc"
+                  IMAGE_TAG="$PREV_TAG" docker compose -f docker-compose.prod.yml up -d --no-deps "$svc"
+                  echo "Rolled back $svc. Failing the workflow -- the rest of the fleet is untouched and still healthy."
+                  exit 1
+                fi
+                echo "-- $svc healthy"
+              done
+            fi
+
+            if [ "$DEPLOY_FRONTEND" = "true" ]; then
+              echo "== Updating frontend =="
+              IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml pull frontend
+              IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml up -d --no-deps frontend
+              sleep 3
+              if ! curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
+                echo "frontend failed health check -- rolling back to $PREV_TAG"
+                IMAGE_TAG="$PREV_TAG" docker compose -f docker-compose.prod.yml pull frontend
+                IMAGE_TAG="$PREV_TAG" docker compose -f docker-compose.prod.yml up -d --no-deps frontend
+                echo "Rolled back frontend."
+                exit 1
+              fi
+              echo "-- frontend healthy"
+            fi
+
+            echo "$IMAGE_TAG" > .last_good_tag
+            docker image prune -f
+            echo "Deploy succeeded -- all updated instances healthy."
