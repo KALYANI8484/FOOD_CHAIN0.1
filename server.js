@@ -70,7 +70,7 @@ const loginLimiter = rateLimit({
 });
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 10,
+  limit: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many registration attempts. Please try again later.' }
