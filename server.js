@@ -441,6 +441,27 @@ const Broadcast = mongoose.model('Broadcast', broadcastSchema, 'broadcasts');
 
 const Addon = mongoose.model('Addon', addonSchema, 'addons');
 
+// Single source of truth for whether a vendor has a paid, non-expired subscription
+// covering a given category. Computed live from `active_subscriptions[]` — mirrors
+// src/lib/vendorPlan.ts (kept in sync manually since this runs as a separate CommonJS
+// process and can't import that module).
+const FREE_PLAN_NAMES = ['Free', 'Free Tier'];
+function isSubPaidAndActive(sub) {
+  if (!sub) return false;
+  if (FREE_PLAN_NAMES.includes(sub.plan_name)) return false;
+  if (!((sub.max_clients ?? 0) > 0)) return false;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (sub.subscription_end && sub.subscription_end < todayIso) return false;
+  return true;
+}
+function isVendorCategoryActive(vendor, categoryName) {
+  const subs = vendor && Array.isArray(vendor.active_subscriptions) ? vendor.active_subscriptions : [];
+  if (subs.length === 0) return false;
+  const matching = subs.find(s => !s.category_name || s.category_name === 'General' || s.category_name === categoryName);
+  if (!matching) return false;
+  return isSubPaidAndActive(matching);
+}
+
 const subadminRequestSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   subadmin_email: { type: String, required: true },
@@ -1058,9 +1079,6 @@ app.post('/api/db', async (req, res) => {
           if (!vendorDoc) {
             return res.status(404).json({ error: 'Vendor not found' });
           }
-          if (!vendorDoc.plan_name || vendorDoc.plan_name === 'Free' || vendorDoc.plan_name === 'Free Tier') {
-            return res.status(403).json({ error: 'Free plan members are not allowed to confirm orders. Please upgrade your plan.' });
-          }
           const todayIso = new Date().toISOString().slice(0, 10);
           if (vendorDoc.subscription_end && vendorDoc.subscription_end < todayIso) {
             vendorDoc.status = 'expired';
@@ -1071,15 +1089,11 @@ app.post('/api/db', async (req, res) => {
             return res.status(403).json({ error: 'Your vendor account is not approved or is inactive.' });
           }
 
-          // Resolve the subscription entry matching this order's category (item-name level;
-          // 'General' or a missing category_name acts as a wildcard, same convention as the
-          // client-side hasCategoryAccess check) and block if that entry has 0 client capacity.
+          // active_subscriptions[] is the single source of truth for plan tier/capacity
+          // (see isVendorCategoryActive above / src/lib/vendorPlan.ts) — block if the vendor
+          // has no active, paid subscription entry covering this order's category.
           const orderCategory = orderDoc.master_category_name;
-          const subs = Array.isArray(vendorDoc.active_subscriptions) && vendorDoc.active_subscriptions.length > 0
-            ? vendorDoc.active_subscriptions
-            : [{ max_clients: 0 }];
-          const matchingSub = subs.find(s => !s.category_name || s.category_name === 'General' || s.category_name === orderCategory) || subs[0];
-          if (matchingSub.max_clients === 0) {
+          if (!isVendorCategoryActive(vendorDoc, orderCategory)) {
             return res.status(403).json({ error: 'Your current plan does not include order fulfillment for this category. Please upgrade to accept client orders.' });
           }
 

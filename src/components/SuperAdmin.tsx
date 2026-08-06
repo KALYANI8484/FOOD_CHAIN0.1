@@ -7,6 +7,34 @@ import {
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
+import { getVendorTier } from '../lib/vendorPlan';
+
+// Upserts a category-scoped subscription entry: if the vendor already has an entry for
+// this plan's category, replace it in place (avoids duplicate Portfolio entries when the
+// same category is assigned/upgraded more than once); otherwise appends a new entry.
+// Used by "Assign Additional Category Subscription" and by upgrade-request approval, so
+// approving a request behaves identically to an admin manually assigning that plan.
+const applyPlanToSubscriptions = (existingSubs: VendorSubscription[], plan: Plan): VendorSubscription[] => {
+  const categoryName = plan.master_category_name || 'General';
+  const newSub: VendorSubscription = {
+    id: crypto.randomUUID(),
+    plan_id: plan.id,
+    plan_name: plan.name,
+    category_name: categoryName,
+    subscription_start: new Date().toISOString().slice(0, 10),
+    subscription_end: new Date(Date.now() + plan.validity_days * 86400000).toISOString().slice(0, 10),
+    max_items: plan.max_items,
+    max_clients: plan.max_clients,
+    status: 'active'
+  };
+  const idx = existingSubs.findIndex((s) => (s.category_name || 'General') === categoryName);
+  if (idx >= 0) {
+    const updated = [...existingSubs];
+    updated[idx] = { ...updated[idx], ...newSub, id: updated[idx].id || newSub.id };
+    return updated;
+  }
+  return [...existingSubs, newSub];
+};
 
 type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins';
 
@@ -313,7 +341,7 @@ function DashboardTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   // Calculating KPIs
   const totalVendors = vendors.length;
   const activeVendors = vendors.filter(x => x.status === 'approved').length;
-  const premiumVendors = vendors.filter(x => x.status === 'approved' && x.plan_name !== 'Free').length;
+  const premiumVendors = vendors.filter(x => x.status === 'approved' && getVendorTier(x) === 'active').length;
   
   // Calculate total monthly revenue from registered vendors subscriptions
   const totalRevenue = vendors.reduce((sum, v) => {
@@ -600,9 +628,8 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   useEffect(() => { load(); }, []);
 
   const handleCreateSubmit = async (formData: any) => {
-    const plan = plans.find((p) => p.id === formData.plan_id);
-    const validityDays = plan?.validity_days || 30;
-
+    // New vendors start Free (no active_subscriptions) until an admin assigns a category
+    // subscription — see "Assign Additional Category Subscription" in the edit modal.
     await supabase.from('vendors').insert({
       owner_name: formData.owner_name,
       phone: formData.phone,
@@ -612,14 +639,10 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       zip_code: formData.zip_code,
       birthdate: formData.birthdate || null,
       password: formData.password || null,
-      plan_id: formData.plan_id || null,
-      plan_name: plan?.name || null,
       logo_url: formData.logo_url || null,
       qr_url: formData.qr_url || null,
       status: 'approved',
       submitted_by: 'Super Admin',
-      subscription_start: new Date().toISOString().slice(0, 10),
-      subscription_end: new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10),
     });
 
     await supabase.from('activity_log').insert({
@@ -635,9 +658,10 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const handleEditSubmit = async (formData: any) => {
     if (!editVendor) return;
     const vendorId = editVendor.id || (editVendor as any)._id;
-    const plan = plans.find((p) => p.id === formData.plan_id);
-    const validityDays = plan?.validity_days || 30;
 
+    // plan_id/plan_name/subscription_start/subscription_end are no longer admin-settable
+    // here — Free vs. Active is computed live from active_subscriptions[] (see the badge
+    // above), which only changes via Assign Category / Add-on / Upgrade-approval.
     await supabase.from('vendors').update({
       owner_name: formData.owner_name,
       phone: formData.phone,
@@ -647,12 +671,8 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       zip_code: formData.zip_code,
       birthdate: formData.birthdate || editVendor.birthdate,
       password: formData.password ? formData.password : editVendor.password,
-      plan_id: formData.plan_id || null,
-      plan_name: plan?.name || null,
       logo_url: formData.logo_url || null,
       qr_url: formData.qr_url || null,
-      subscription_start: editVendor.plan_id !== formData.plan_id ? new Date().toISOString().slice(0, 10) : editVendor.subscription_start,
-      subscription_end: editVendor.plan_id !== formData.plan_id ? new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10) : editVendor.subscription_end,
     }).eq('id', vendorId);
 
     await supabase.from('activity_log').insert({
@@ -674,41 +694,18 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     const planToAssign = plans.find(p => p.id === assignPlanId);
     if (!planToAssign) return;
 
-    const existingSubs: VendorSubscription[] = Array.isArray(editVendor.active_subscriptions) && editVendor.active_subscriptions.length > 0
-      ? [...editVendor.active_subscriptions]
-      : [{
-          id: 'primary',
-          plan_id: editVendor.plan_id || undefined,
-          plan_name: editVendor.plan_name || 'Basic',
-          category_name: 'General',
-          subscription_start: editVendor.subscription_start || new Date().toISOString().slice(0, 10),
-          subscription_end: editVendor.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-          max_items: 5,
-          max_clients: editVendor.total_clients || 10,
-          status: 'active'
-        }];
+    const existingSubs: VendorSubscription[] = Array.isArray(editVendor.active_subscriptions)
+      ? editVendor.active_subscriptions
+      : [];
 
-    const newSub: VendorSubscription = {
-      id: crypto.randomUUID(),
-      plan_id: planToAssign.id,
-      plan_name: planToAssign.name,
-      category_name: planToAssign.master_category_name || 'General',
-      subscription_start: new Date().toISOString().slice(0, 10),
-      subscription_end: new Date(Date.now() + planToAssign.validity_days * 86400000).toISOString().slice(0, 10),
-      max_items: planToAssign.max_items,
-      max_clients: planToAssign.max_clients,
-      status: 'active'
-    };
-
-    existingSubs.push(newSub);
+    const updatedSubs = applyPlanToSubscriptions(existingSubs, planToAssign);
 
     await supabase.from('vendors').update({
-      active_subscriptions: existingSubs,
-      plan_name: planToAssign.name
+      active_subscriptions: updatedSubs
     }).eq('id', vendorId);
 
     await supabase.from('activity_log').insert({
-      action: `Category subscription ${planToAssign.name} (${newSub.category_name}) assigned to ${editVendor.shop_name}`,
+      action: `Category subscription ${planToAssign.name} (${planToAssign.master_category_name || 'General'}) assigned to ${editVendor.shop_name}`,
       actor: 'Super Admin'
     });
 
@@ -1515,8 +1512,14 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
               <div>
                 <h3 className="font-extrabold text-base text-[#C5A059] flex items-center gap-2">
                   <Store size={18} /> {editVendor.shop_name}
+                  <Badge variant={getVendorTier(editVendor) === 'active' ? 'success' : 'warning'}>
+                    {getVendorTier(editVendor) === 'active' ? 'Active' : 'Free'}
+                  </Badge>
                 </h3>
                 <p className="text-xs text-white/80 mt-0.5 font-medium">Owner: {editVendor.owner_name} · 📞 {editVendor.phone}</p>
+                <p className="text-[10px] text-white/60 mt-1">
+                  Plan tier reflects the Portfolio below — assign a category subscription or approve an upgrade request to activate.
+                </p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -1969,18 +1972,26 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
   };
 
   const handleApproveUpgrade = async (u: UpgradeRequest) => {
-    const targetPlan = await supabase.from('subscription_plans').select('*').eq('name', u.requested_plan).maybeSingle();
-    const plan = targetPlan?.data as Plan;
-    const validityDays = plan?.validity_days || 30;
-    const subscriptionEnd = new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10);
+    const [{ data: plan }, { data: vendorDoc }] = await Promise.all([
+      supabase.from('subscription_plans').select('*').eq('name', u.requested_plan).maybeSingle(),
+      supabase.from('vendors').select('*').eq('id', u.vendor_id).maybeSingle()
+    ]);
 
-    // Update vendor subscription plan details
+    if (!plan) {
+      show(`Plan "${u.requested_plan}" no longer exists`, 'error');
+      return;
+    }
+
+    // Upserts into active_subscriptions[] exactly like "Assign Additional Category
+    // Subscription" does — active_subscriptions[] is the single source of truth for
+    // plan tier/capacity, so approving a request must look identical to an admin
+    // manually assigning that plan (previously this only touched legacy top-level
+    // fields, so approved vendors still looked Free everywhere that reads the array).
+    const existingSubs: VendorSubscription[] = Array.isArray(vendorDoc?.active_subscriptions) ? vendorDoc.active_subscriptions : [];
+    const updatedSubs = applyPlanToSubscriptions(existingSubs, plan as Plan);
+
     await supabase.from('vendors').update({
-      plan_id: plan?.id || null,
-      plan_name: u.requested_plan,
-      status: 'approved',
-      subscription_start: new Date().toISOString().slice(0, 10),
-      subscription_end: subscriptionEnd
+      active_subscriptions: updatedSubs
     }).eq('id', u.vendor_id);
 
     // Approve the upgrade request
@@ -1994,12 +2005,13 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       actor: 'Super Admin'
     });
 
+    const newSub = updatedSubs.find((s) => s.plan_id === plan.id);
     await notifyUpgradeApproved({
       vendor_id: u.vendor_id,
       plan_name: u.requested_plan,
-      subscription_end: subscriptionEnd,
-      max_items: plan?.max_items,
-      max_clients: plan?.max_clients
+      subscription_end: newSub?.subscription_end || '',
+      max_items: plan.max_items,
+      max_clients: plan.max_clients
     });
 
     show(`Upgrade request for ${u.vendor_name} approved!`);
@@ -2015,17 +2027,18 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     }
 
     try {
+      const { data: allPlans } = await supabase.from('subscription_plans').select('*');
+
       for (const u of eligible) {
-        const targetPlan = plans.find(p => p.name === u.requested_plan);
-        const validityDays = targetPlan?.validity_days || 30;
-        const subscriptionEnd = new Date(Date.now() + validityDays * 86400000).toISOString().slice(0, 10);
+        const targetPlan = (allPlans || []).find((p: Plan) => p.name === u.requested_plan);
+        if (!targetPlan) continue;
+
+        const { data: vendorDoc } = await supabase.from('vendors').select('*').eq('id', u.vendor_id).maybeSingle();
+        const existingSubs: VendorSubscription[] = Array.isArray(vendorDoc?.active_subscriptions) ? vendorDoc.active_subscriptions : [];
+        const updatedSubs = applyPlanToSubscriptions(existingSubs, targetPlan);
 
         await supabase.from('vendors').update({
-          plan_id: targetPlan?.id || null,
-          plan_name: u.requested_plan,
-          status: 'approved',
-          subscription_start: new Date().toISOString().slice(0, 10),
-          subscription_end: subscriptionEnd
+          active_subscriptions: updatedSubs
         }).eq('id', u.vendor_id);
 
         await supabase.from('upgrade_requests').update({
@@ -2033,12 +2046,13 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           payment_status: 'Verified'
         }).eq('id', u.id);
 
+        const newSub = updatedSubs.find((s) => s.plan_id === targetPlan.id);
         await notifyUpgradeApproved({
           vendor_id: u.vendor_id,
           plan_name: u.requested_plan,
-          subscription_end: subscriptionEnd,
-          max_items: targetPlan?.max_items,
-          max_clients: targetPlan?.max_clients
+          subscription_end: newSub?.subscription_end || '',
+          max_items: targetPlan.max_items,
+          max_clients: targetPlan.max_clients
         });
       }
 
@@ -2097,36 +2111,24 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         const payload = JSON.parse(req.payload);
         const { data: v } = await supabase.from('vendors').select('*').eq('id', req.vendor_id).single();
         if (v) {
-          const existingSubs: VendorSubscription[] = Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0
-            ? [...v.active_subscriptions]
-            : [{
-                id: 'primary',
-                plan_id: v.plan_id || undefined,
-                plan_name: v.plan_name || 'Basic',
-                category_name: 'General',
-                subscription_start: v.subscription_start || new Date().toISOString().slice(0, 10),
-                subscription_end: v.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-                max_items: 5,
-                max_clients: v.total_clients || 10,
-                status: 'active'
-              }];
-
-          const newSub: VendorSubscription = {
-            id: crypto.randomUUID(),
-            plan_id: payload.plan_id,
-            plan_name: payload.plan_name,
-            category_name: payload.category_name,
-            subscription_start: new Date().toISOString().slice(0, 10),
-            subscription_end: new Date(Date.now() + payload.validity_days * 86400000).toISOString().slice(0, 10),
+          const existingSubs: VendorSubscription[] = Array.isArray(v.active_subscriptions) ? v.active_subscriptions : [];
+          // Same upsert-by-category logic as "Assign Additional Category Subscription" —
+          // active_subscriptions[] is the single source of truth for plan tier/capacity.
+          const planLike = {
+            id: payload.plan_id,
+            name: payload.plan_name,
+            master_category_name: payload.category_name,
+            validity_days: payload.validity_days,
             max_items: payload.max_items,
             max_clients: payload.max_clients,
-            status: 'active'
-          };
-          existingSubs.push(newSub);
+            price: 0,
+            status: 'active',
+            created_at: ''
+          } as Plan;
+          const updatedSubs = applyPlanToSubscriptions(existingSubs, planLike);
 
           await supabase.from('vendors').update({
-            active_subscriptions: existingSubs,
-            plan_name: payload.plan_name
+            active_subscriptions: updatedSubs
           }).eq('id', req.vendor_id);
         }
       }
@@ -2686,13 +2688,14 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
 
   useEffect(() => { load(); loadAtRisk(); }, []);
 
-  // Calculate MRR and subscriber counts per plan
+  // Calculate MRR and subscriber counts per plan — active_subscriptions[] is the single
+  // source of truth for which plan(s) a vendor actually holds.
   const getSubscribedVendorCount = (plan: Plan) => {
-    return vendorsList.filter(v => v.plan_id === plan.id || v.plan_name === plan.name).length;
+    return vendorsList.filter(v => Array.isArray(v.active_subscriptions) && v.active_subscriptions.some((s) => s.plan_id === plan.id || s.plan_name === plan.name)).length;
   };
 
   const totalMRR = plans.reduce((acc, p) => acc + (p.price * getSubscribedVendorCount(p)), 0);
-  const totalSubscribers = vendorsList.filter(v => v.plan_name && v.plan_name !== 'Free').length;
+  const totalSubscribers = vendorsList.filter(v => getVendorTier(v) === 'active').length;
 
   const handleCreate = async () => {
     if (!form.name || form.price < 0) return;

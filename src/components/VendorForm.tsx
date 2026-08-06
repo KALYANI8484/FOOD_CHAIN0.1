@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase, type Plan } from '../lib/supabase';
-import { Input, Select, Button, Spinner, useSyncedLanguage, type Language } from './ui';
+import { Input, Button, useSyncedLanguage } from './ui';
 
 interface VendorFormProps {
   initialData?: any;
@@ -67,8 +66,6 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
   const [lang] = useSyncedLanguage();
 
   const t = vfTrans[lang];
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Older vendor records may have been saved as ISO (YYYY-MM-DD) before the
@@ -97,7 +94,6 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
     birthdate: normalizeDateInputValue(initialData?.birthdate || ''),
     password: '',
     confirm_password: '',
-    plan_id: initialData?.plan_id || '',
     logo_url: initialData?.logo_url || '',
     qr_url: initialData?.qr_url || '',
   });
@@ -114,38 +110,11 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
         birthdate: normalizeDateInputValue(initialData.birthdate || ''),
         password: '',
         confirm_password: '',
-        plan_id: initialData.plan_id || '',
         logo_url: initialData.logo_url || '',
         qr_url: initialData.qr_url || '',
       });
     }
   }, [initialData]);
-
-  const selectedPlan = plans.find((p) => p.id === form.plan_id);
-  const today = new Date();
-  const startDate = today.toISOString().slice(0, 10);
-  const endDate = selectedPlan
-    ? new Date(today.getTime() + selectedPlan.validity_days * 86400000).toISOString().slice(0, 10)
-    : '';
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await supabase.from('subscription_plans').select('*');
-        const allPlans = data || [];
-        const activePlans = allPlans.filter(p => !p.status || p.status === 'active');
-        const finalPlans = activePlans.length > 0 ? activePlans : allPlans;
-        setPlans(finalPlans);
-        if (finalPlans.length > 0 && !form.plan_id) {
-          setForm((f) => ({ ...f, plan_id: finalPlans[0].id }));
-        }
-      } catch (err) {
-        console.error("Error loading plans in VendorForm:", err);
-      } finally {
-        setLoadingPlans(false);
-      }
-    })();
-  }, []);
 
   const isEditMode = !!initialData;
 
@@ -174,7 +143,6 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
         password: birthdateForPassword,
         logo_url: form.logo_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=Logo',
         qr_url: form.qr_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=QR',
-        plan_name: selectedPlan?.name || null,
       });
     } finally {
       setSubmitting(false);
@@ -233,45 +201,7 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
           onChange={(v) => setForm({ ...form, zip_code: v })}
           required
         />
-        <Select
-          label={t.subPlan}
-          value={form.plan_id}
-          onChange={(v) => setForm({ ...form, plan_id: v })}
-          options={loadingPlans 
-            ? [{ value: form.plan_id || '', label: 'Loading subscription plans...' }]
-            : plans.map((p) => ({ value: p.id, label: `${p.name} — ₹${p.price}` }))
-          }
-        />
       </div>
-
-      {selectedPlan && (
-        <div className="grid gap-4 rounded-3xl border border-amber-200 bg-[#f9f1e5] p-4 text-slate-900">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Plan Limits Summary</p>
-              <p className="mt-1 text-sm text-slate-700">
-                {t.validity}: <span className="font-bold text-slate-900">{selectedPlan.validity_days} {t.days}</span> · 
-                Max Items: <span className="font-bold text-slate-900">{selectedPlan.max_items}</span> · 
-                Max Clients: <span className="font-bold text-slate-900">{selectedPlan.max_clients} {t.clients}</span>
-              </p>
-            </div>
-            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
-              {selectedPlan.name} Tier
-            </span>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white p-4 border border-amber-200">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500">Start Date</p>
-              <p className="mt-1 font-semibold text-slate-900">{startDate}</p>
-            </div>
-            <div className="rounded-2xl bg-white p-4 border border-amber-200">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500">End Date</p>
-              <p className="mt-1 font-semibold text-slate-900">{endDate}</p>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex gap-3 justify-end pt-4 border-t border-border">
         {onCancel && (
