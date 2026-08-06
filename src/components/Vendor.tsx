@@ -8,7 +8,7 @@ import {
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, useSyncedLanguage, type Language } from './ui';
-import { getVendorTier, isVendorCategoryActive, getVendorPlanLabel } from '../lib/vendorPlan';
+import { getVendorTier, isVendorCategoryActive, getVendorPlanLabel, FREE_PLAN_NAMES } from '../lib/vendorPlan';
 import { getItemTranslation } from './Landing';
 import { AntigravitySuccessModal } from './AntigravitySuccessModal';
 
@@ -2052,7 +2052,7 @@ function UpgradePlan({ vendor }: { vendor: VendorType }) {
       <PageHeader title={t.upgradeTitle} subtitle={t.upgradeSubtitle} />
 
       <div className="grid md:grid-cols-3 gap-6 stagger">
-        {plans.map((p) => {
+        {plans.filter((p) => !FREE_PLAN_NAMES.includes(p.name)).map((p) => {
           const isCurrent = Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.some((s) => s.plan_name === p.name);
           return (
             <div key={p.name} className={`card p-6 bg-surface border flex flex-col justify-between hover-lift ${isCurrent ? 'border-accent ring-2 ring-accent/10' : 'border-border'}`}>

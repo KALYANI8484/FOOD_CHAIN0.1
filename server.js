@@ -122,6 +122,33 @@ const initDb = async () => {
       console.error('Vendor plan auto-migration notice:', err.message);
     }
 
+    // Canonical Free Tier plan: whichever admin-configured plan is meant to be the
+    // free tier must actually carry ₹0 / 0 items / 0 clients, so it stays the single
+    // source of truth that /api/vendors/signup and the legacy migration below read
+    // from (previously each hardcoded its own separate, drifting free-tier numbers).
+    let freeTierPlan = null;
+    try {
+      freeTierPlan = await Plan.findOne({ name: { $regex: /^free/i } });
+      if (freeTierPlan) {
+        freeTierPlan.name = 'Free Tier';
+        freeTierPlan.price = 0;
+        freeTierPlan.max_items = 0;
+        freeTierPlan.max_clients = 0;
+        await freeTierPlan.save();
+      } else {
+        freeTierPlan = await Plan.create({
+          name: 'Free Tier',
+          price: 0,
+          validity_days: 365,
+          max_items: 0,
+          max_clients: 0,
+          status: 'active'
+        });
+      }
+    } catch (err) {
+      console.error('Free Tier plan normalization notice:', err.message);
+    }
+
     try {
       // Legacy Vendors Auto-Repair Migration: seed missing active_subscriptions
       const legacyVendors = await Vendor.find({
@@ -132,14 +159,16 @@ const initDb = async () => {
         ]
       });
       for (const lv of legacyVendors) {
+        const isFreeLegacyVendor = !lv.plan_name || /^free/i.test(lv.plan_name);
         const defaultSub = {
           id: crypto.randomUUID(),
-          plan_name: lv.plan_name || 'Free Tier',
+          plan_id: isFreeLegacyVendor ? (freeTierPlan?._id || null) : null,
+          plan_name: lv.plan_name || freeTierPlan?.name || 'Free Tier',
           category_name: 'General',
           subscription_start: lv.subscription_start || new Date().toISOString().slice(0, 10),
           subscription_end: lv.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-          max_items: 5,
-          max_clients: lv.total_clients || 10,
+          max_items: isFreeLegacyVendor ? (freeTierPlan?.max_items ?? 0) : 5,
+          max_clients: isFreeLegacyVendor ? (freeTierPlan?.max_clients ?? 0) : (lv.total_clients || 10),
           status: lv.status === 'expired' ? 'expired' : 'active'
         };
         await Vendor.updateOne({ _id: lv._id }, { $set: { active_subscriptions: [defaultSub] } });
@@ -854,17 +883,22 @@ app.post('/api/vendors/signup', signupLimiter, async (req, res) => {
     const catName = (category || primary_category || 'General').trim();
 
     const todayStr = new Date().toISOString().slice(0, 10);
-    const nextYearStr = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
 
+    // Free Tier is a real subscription_plans record (kept canonical by the
+    // startup normalization in initDb) — read its actual limits/validity here
+    // instead of hardcoding numbers that can drift from what Pricing Plans shows.
+    const freePlan = await Plan.findOne({ name: 'Free Tier' });
+    const freeValidityDays = freePlan?.validity_days ?? 365;
     const defaultSub = {
       id: crypto.randomUUID(),
       category_name: catName,
-      plan_name: 'Free Tier',
+      plan_id: freePlan?._id || null,
+      plan_name: freePlan?.name || 'Free Tier',
       status: 'active',
-      max_items: 0,
-      max_clients: 0,
+      max_items: freePlan?.max_items ?? 0,
+      max_clients: freePlan?.max_clients ?? 0,
       subscription_start: todayStr,
-      subscription_end: nextYearStr
+      subscription_end: new Date(Date.now() + freeValidityDays * 86400000).toISOString().slice(0, 10)
     };
 
     // Check if vendor with phone already exists
@@ -1318,7 +1352,7 @@ app.post('/api/init-db', async (req, res) => {
     const planCount = await Plan.countDocuments();
     if (planCount === 0) {
       await Plan.create([
-        { name: 'Free', price: 0, validity_days: 30, max_items: 0, max_clients: 0, status: 'active' },
+        { name: 'Free Tier', price: 0, validity_days: 365, max_items: 0, max_clients: 0, status: 'active' },
         { name: 'Starter', price: 499, validity_days: 30, max_items: 10, max_clients: 30, status: 'active' },
         { name: 'Premium', price: 1499, validity_days: 90, max_items: 30, max_clients: 100, status: 'active' }
       ]);

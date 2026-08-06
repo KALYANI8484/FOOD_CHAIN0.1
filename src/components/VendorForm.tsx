@@ -141,8 +141,8 @@ export function VendorForm({ initialData, submitLabel, onSubmit, onCancel }: Ven
         zip_code: form.zip_code.trim(),
         birthdate: birthdateForPassword,
         password: birthdateForPassword,
-        logo_url: form.logo_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=Logo',
-        qr_url: form.qr_url || 'https://placehold.co/200x200/F0F0F0/5A5A5A?text=QR',
+        logo_url: form.logo_url,
+        qr_url: form.qr_url,
       });
     } finally {
       setSubmitting(false);
