@@ -6,6 +6,7 @@ import {
   Download
 } from 'lucide-react';
 import { supabase, type Vendor, type Activity, type VendorItem, type Plan } from '../lib/supabase';
+import { getVendorPlanLabel } from '../lib/vendorPlan';
 import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 import { exportCSV } from './SuperAdmin';
@@ -796,7 +797,7 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
                     </td>
                     <td className="px-6 py-4 font-semibold text-[#111827]">{v.zip_code}</td>
                     <td className="px-6 py-4">
-                      <Badge variant="accent">{v.plan_name || t.free}</Badge>
+                      <Badge variant="accent">{getVendorPlanLabel(v)}</Badge>
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}>
@@ -1011,7 +1012,7 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
                 <Badge variant={viewVendor.status === 'approved' ? 'success' : viewVendor.status === 'rejected' ? 'error' : 'warning'}>
                   {viewVendor.status.replace(/_/g, ' ')}
                 </Badge>
-                <Badge variant="accent">{viewVendor.plan_name || t.free}</Badge>
+                <Badge variant="accent">{getVendorPlanLabel(viewVendor)}</Badge>
               </div>
             </div>
 
