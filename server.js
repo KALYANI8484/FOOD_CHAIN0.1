@@ -1452,6 +1452,18 @@ app.get('/api/vendors/at-risk', async (req, res) => {
   }
 });
 
+// Health check for container orchestration / load balancers / the deploy pipeline.
+// Reports 200 only when Mongo is actually connected (readyState 1) — a container that's
+// up but can't reach the database should fail its health check, not pass one.
+app.get('/health', (req, res) => {
+  const dbConnected = mongoose.connection.readyState === 1;
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'ok' : 'degraded',
+    db: dbConnected ? 'connected' : 'disconnected',
+    uptime_seconds: Math.round(process.uptime()),
+  });
+});
+
 // Serve frontend static assets if in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static('dist'));
