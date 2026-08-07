@@ -16,6 +16,7 @@ function isSubPaidAndActive(sub: VendorSubscription): boolean {
   if (!sub) return false;
   if (FREE_PLAN_NAMES.includes(sub.plan_name)) return false;
   if (!((sub.max_clients ?? 0) > 0)) return false;
+  if (sub.status === 'expired') return false;
   if (sub.subscription_end && sub.subscription_end < todayIso()) return false;
   return true;
 }

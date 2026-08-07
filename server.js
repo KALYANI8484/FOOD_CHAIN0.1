@@ -196,6 +196,31 @@ const initDb = async () => {
           console.log(`[CRON] Renewal reminder sent: ${v.shop_name} (${daysLeft}d)`);
         }
 
+        // 4. Client-limit sweep: catch category subscriptions that are already over their
+        // max_clients cap but never had a new order-accept attempt trip the check in the
+        // 'orders' update handler (e.g. the cap was reached, then no further orders came
+        // in). Re-evaluates every tick so an over-limit vendor self-heals to 'expired'
+        // without needing a new accept to trigger it.
+        const overLimitCandidates = await Vendor.find({ 'active_subscriptions.max_clients': { $gt: 0 } });
+        for (const v of overLimitCandidates) {
+          let changed = false;
+          for (const s of (v.active_subscriptions || [])) {
+            if ((s.max_clients ?? 0) > 0 && s.status !== 'expired') {
+              const count = await getCategoryOrderCount(v._id, s.category_name);
+              if (count >= s.max_clients) {
+                s.status = 'expired';
+                changed = true;
+                console.log(`[CRON] Client limit sweep: ${v.shop_name} / ${s.category_name} expired (${count}/${s.max_clients})`);
+              }
+            }
+          }
+          if (changed) {
+            v.markModified('active_subscriptions');
+            await v.save();
+            io.emit('vendorUpdated', { id: v.id, active_subscriptions: v.active_subscriptions });
+          }
+        }
+
         console.log('[CRON] Expiry sweep complete.');
       } catch (err) {
         console.error('[CRON] Expiry cron error:', err.message);
@@ -450,6 +475,7 @@ function isSubPaidAndActive(sub) {
   if (!sub) return false;
   if (FREE_PLAN_NAMES.includes(sub.plan_name)) return false;
   if (!((sub.max_clients ?? 0) > 0)) return false;
+  if (sub.status === 'expired') return false;
   const todayIso = new Date().toISOString().slice(0, 10);
   if (sub.subscription_end && sub.subscription_end < todayIso) return false;
   return true;

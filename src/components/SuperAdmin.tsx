@@ -7,7 +7,7 @@ import {
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
-import { getVendorTier } from '../lib/vendorPlan';
+import { getVendorTier, isVendorCategoryActive } from '../lib/vendorPlan';
 
 // Upserts a category-scoped subscription entry: if the vendor already has an entry for
 // this plan's category, replace it in place (avoids duplicate Portfolio entries when the
@@ -758,6 +758,12 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       if (addon.addon_type === 'client_extension' || addon.max_clients > 0) {
         targetSub.max_clients = (targetSub.max_clients ?? 10) + addon.max_clients;
       }
+      // Applying an add-on is an explicit intent to unblock this subscription — clear a
+      // stale 'expired' flag so isSubPaidAndActive re-evaluates against the raised limit/
+      // date instead of staying locked out. If the add-on didn't actually fix the reason
+      // it expired (e.g. wrong add-on type applied), the next accept attempt or cron sweep
+      // will simply re-expire it.
+      targetSub.status = 'active';
       activeSubs[targetIdx >= 0 ? targetIdx : 0] = targetSub;
     }
 
@@ -817,7 +823,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
     const updatedSubs = existingSubs.map(s => {
       if (s.id === subId || s.category_name === subId) {
-        return { ...s, subscription_end: newEndDate, max_items: Number(newMaxItems) };
+        return { ...s, subscription_end: newEndDate, max_items: Number(newMaxItems), status: 'active' };
       }
       return s;
     });
@@ -1032,16 +1038,52 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     }));
   };
 
-  // Memoized expiry cache: days remaining per vendor id
+  // Memoized expiry cache: days remaining per vendor id, reflecting the worst-off category
+  // subscription. active_subscriptions[] is the source of truth (see vendorPlan.ts) — a
+  // subscription can be status:'expired' (e.g. its client limit was reached) while its date
+  // is still far off, so status overrides the date the same way urgency() does in Vendor.tsx.
+  // Vendors with no active_subscriptions yet fall back to the legacy top-level date.
   const expiryCache = useMemo(() => {
     const cache: Record<string, number> = {};
     const now = Date.now();
     vendors.forEach(v => {
-      const endDate = v.subscription_end ? new Date(v.subscription_end).getTime() : 0;
-      cache[v.id] = Math.ceil((endDate - now) / 86400000);
+      const subs = Array.isArray(v.active_subscriptions) ? v.active_subscriptions : [];
+      if (subs.length > 0) {
+        const daysLeftPerSub = subs.map((s: any) => {
+          if (s.status === 'expired') return -1;
+          const end = s.subscription_end ? new Date(s.subscription_end).getTime() : 0;
+          return Math.ceil((end - now) / 86400000);
+        });
+        cache[v.id] = Math.min(...daysLeftPerSub);
+      } else {
+        const endDate = v.subscription_end ? new Date(v.subscription_end).getTime() : 0;
+        cache[v.id] = Math.ceil((endDate - now) / 86400000);
+      }
     });
     return cache;
   }, [vendors]);
+
+  // Vendors whose account is still 'approved' but every category subscription they hold
+  // has expired (by status or date) read as effectively 'expired' for the Status filter/
+  // badge — e.g. KPBTF's account stays 'approved' (per-category expiry design, see
+  // isSubPaidAndActive) but with its one subscription expired it has nothing left to sell,
+  // so showing "Live" there is misleading. A vendor with SOME categories still active is
+  // deliberately left as 'approved' — they can still take orders in that category.
+  const fullyExpiredVendorIds = useMemo(() => {
+    const now = Date.now();
+    const ids = new Set<string>();
+    vendors.forEach(v => {
+      const subs = Array.isArray(v.active_subscriptions) ? v.active_subscriptions : [];
+      if (subs.length === 0) return;
+      const allExpired = subs.every((s: any) =>
+        s.status === 'expired' || (s.subscription_end && new Date(s.subscription_end).getTime() < now)
+      );
+      if (allExpired) ids.add(v.id);
+    });
+    return ids;
+  }, [vendors]);
+
+  const getEffectiveStatus = (v: Vendor) => fullyExpiredVendorIds.has(v.id) ? 'expired' : v.status;
 
   // Derive unique categories across all vendor active subscriptions for the filter dropdown
   const availableCategories = useMemo(() => {
@@ -1061,7 +1103,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     const matchSearch = v.shop_name.toLowerCase().includes(q) ||
       v.owner_name.toLowerCase().includes(q) ||
       (v.phone || '').includes(search);
-    const matchFilter = filter === 'all' || v.status === filter;
+    const matchFilter = filter === 'all' || getEffectiveStatus(v) === filter;
 
     const matchCategory = filterCategory === 'all' || (
       Array.isArray(v.active_subscriptions) && v.active_subscriptions.some((s: any) =>
@@ -1079,7 +1121,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       (v.zip_code || '').substring(0, 3) === filterZip.trim().substring(0, 3);
 
     return matchSearch && matchFilter && matchCategory && matchHealth && matchZip;
-  }), [vendors, search, filter, filterCategory, filterHealth, filterZip, expiryCache]);
+  }), [vendors, search, filter, filterCategory, filterHealth, filterZip, expiryCache, fullyExpiredVendorIds]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedVendors = useMemo(() => {
@@ -1105,7 +1147,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       activeSubs = activeSubs.map(s => {
         if (batchCategory === 'all' || s.category_name === batchCategory || s.plan_name === batchCategory) {
           const currentEnd = s.subscription_end ? new Date(s.subscription_end) : new Date();
-          return { ...s, subscription_end: new Date(currentEnd.getTime() + batchDays * 86400000).toISOString().slice(0, 10) };
+          return { ...s, subscription_end: new Date(currentEnd.getTime() + batchDays * 86400000).toISOString().slice(0, 10), status: 'active' };
         }
         return s;
       });
@@ -1338,19 +1380,22 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0 ? (
-                          v.active_subscriptions.map((sub: any, idx: number) => (
-                            <button
-                              key={idx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                setPopoverSub(prev => prev?.sub === sub ? null : { sub, anchorRect: rect });
-                              }}
-                              className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#4A0E17] text-[#C5A059] border border-[#C5A059]/30 hover:opacity-80 transition-opacity cursor-pointer"
-                            >
-                              🟢 {sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}
-                            </button>
-                          ))
+                          v.active_subscriptions.map((sub: any, idx: number) => {
+                            const active = isVendorCategoryActive(v, sub.category_name);
+                            return (
+                              <button
+                                key={idx}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                  setPopoverSub(prev => prev?.sub === sub ? null : { sub, anchorRect: rect });
+                                }}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition-opacity cursor-pointer hover:opacity-80 ${active ? 'bg-[#4A0E17] text-[#C5A059] border-[#C5A059]/30' : 'bg-zinc-200 text-zinc-600 border-zinc-300'}`}
+                              >
+                                {active ? '🟢' : '⬜'} {sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}{!active && ' · Expired'}
+                              </button>
+                            );
+                          })
                         ) : (
                           <Badge variant="accent">{v.plan_name || 'Free'}</Badge>
                         )}
@@ -1366,9 +1411,14 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}>
-                        {v.status === 'approved' ? 'Live' : v.status === 'expired' ? 'Expired' : v.status === 'rejected' ? 'Rejected' : 'Review'}
-                      </Badge>
+                      {(() => {
+                        const effStatus = getEffectiveStatus(v);
+                        return (
+                          <Badge variant={effStatus === 'approved' ? 'success' : effStatus === 'rejected' ? 'error' : effStatus === 'expired' ? 'error' : 'warning'}>
+                            {effStatus === 'approved' ? 'Live' : effStatus === 'expired' ? 'Expired' : effStatus === 'rejected' ? 'Rejected' : 'Review'}
+                          </Badge>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">

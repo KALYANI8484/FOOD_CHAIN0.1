@@ -915,7 +915,10 @@ function PlanTimeline({ subscriptions, onTab }: { subscriptions: any[]; onTab?: 
   }
   const todayPct = Math.min(100, Math.max(0, ((today.getTime() - globalStart) / totalRange) * 100));
 
-  const urgency = (daysLeft: number) => {
+  const urgency = (daysLeft: number, statusExpired?: boolean) => {
+    // A category can expire from hitting its client limit while its date is still far off
+    // (see getCategoryOrderCount / server.js order-accept handler) — status overrides dates.
+    if (statusExpired) return { color: 'bg-zinc-400', text: 'text-zinc-500', badge: 'bg-zinc-100 text-zinc-600 border-zinc-300', label: 'Expired', icon: '⬜' };
     if (daysLeft <= 0) return { color: 'bg-zinc-400', text: 'text-zinc-500', badge: 'bg-zinc-100 text-zinc-600 border-zinc-300', label: 'Expired', icon: '⬜' };
     if (daysLeft <= 7) return { color: 'bg-red-500', text: 'text-red-600', badge: 'bg-red-100 text-red-700 border-red-300', label: `${daysLeft}d left 🔴`, icon: '🔴' };
     if (daysLeft <= 30) return { color: 'bg-amber-400', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700 border-amber-300', label: `${daysLeft}d left ⚠️`, icon: '⚠️' };
@@ -984,7 +987,7 @@ function PlanTimeline({ subscriptions, onTab }: { subscriptions: any[]; onTab?: 
               const start = sub.subscription_start ? new Date(sub.subscription_start).getTime() : globalStart;
               const end = sub.subscription_end ? new Date(sub.subscription_end).getTime() : globalEnd;
               const daysLeft = Math.ceil((end - today.getTime()) / 86400000);
-              const u = urgency(daysLeft);
+              const u = urgency(daysLeft, sub.status === 'expired');
 
               const barLeft = Math.max(0, ((start - globalStart) / totalRange) * 100);
               const barWidth = Math.min(100 - barLeft, ((end - start) / totalRange) * 100);
@@ -1180,11 +1183,14 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
           <p className="text-[10px] font-black uppercase tracking-wider text-amber-200/80 mb-1">Active Subscriptions Portfolio</p>
           <div className="flex flex-wrap items-center gap-1.5">
             {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
-              vendor.active_subscriptions.map((sub: any, i: number) => (
-                <span key={i} className="px-2.5 py-1 rounded-full text-xs font-black bg-[#C5A059] text-[#4A0E17] shadow-xs flex items-center gap-1">
-                  🟢 {sub.plan_name || sub.category_name} ({sub.max_items ?? 5} items limit)
-                </span>
-              ))
+              vendor.active_subscriptions.map((sub: any, i: number) => {
+                const active = isVendorCategoryActive(vendor, sub.category_name);
+                return (
+                  <span key={i} className={`px-2.5 py-1 rounded-full text-xs font-black shadow-xs flex items-center gap-1 ${active ? 'bg-[#C5A059] text-[#4A0E17]' : 'bg-zinc-300 text-zinc-700'}`}>
+                    {active ? '🟢' : '⬜'} {sub.plan_name || sub.category_name} ({sub.max_items ?? 5} items limit){!active && ' · Expired'}
+                  </span>
+                );
+              })
             ) : (
               <span className="px-2.5 py-1 rounded-full text-xs font-black bg-[#C5A059] text-[#4A0E17]">
                 🟢 {vendor.plan_name || 'Basic Plan'}
