@@ -4,7 +4,7 @@ import {
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
   Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
 } from 'lucide-react';
-import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription } from '../lib/supabase';
+import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription, type AppliedAddon } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 import { getVendorTier, isVendorCategoryActive } from '../lib/vendorPlan';
@@ -764,6 +764,22 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       // it expired (e.g. wrong add-on type applied), the next accept attempt or cron sweep
       // will simply re-expire it.
       targetSub.status = 'active';
+      // Record this application as a permanent history entry — never removed, even
+      // once superseded — so "which add-ons have ever been applied here" is answerable
+      // from the data instead of only being visible as an already-merged number.
+      const appliedRecord: AppliedAddon = {
+        id: crypto.randomUUID(),
+        addon_id: addon.id,
+        addon_name: addon.name,
+        addon_type: addon.addon_type,
+        bonus_max_clients: addon.addon_type === 'client_extension' ? addon.max_clients : undefined,
+        bonus_max_items: addon.addon_type === 'inventory_items' ? addon.max_items : undefined,
+        applied_at: new Date().toISOString().slice(0, 10),
+        expires_at: addon.addon_type === 'validity_extension' ? null : new Date(Date.now() + addon.validity_days * 86400000).toISOString().slice(0, 10),
+        applied_by: 'Super Admin',
+        status: 'active'
+      };
+      targetSub.applied_addons = [...(targetSub.applied_addons || []), appliedRecord];
       activeSubs[targetIdx >= 0 ? targetIdx : 0] = targetSub;
     }
 
@@ -1226,6 +1242,21 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
             <div className="flex justify-between"><span>Client Limit</span><span className="font-bold text-slate-900">{popoverSub.sub.max_clients ?? 10}</span></div>
             <div className="flex justify-between"><span>Expires</span><span className="font-bold text-slate-900">{popoverSub.sub.subscription_end || 'N/A'}</span></div>
           </div>
+          {Array.isArray(popoverSub.sub.applied_addons) && popoverSub.sub.applied_addons.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-200">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Add-on History</p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {popoverSub.sub.applied_addons.map((a: any, ai: number) => (
+                  <div key={ai} className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-700 font-semibold truncate">{a.addon_name}</span>
+                    <span className={`ml-2 shrink-0 font-bold ${a.status === 'expired' ? 'text-zinc-400' : 'text-emerald-600'}`}>
+                      {a.status === 'expired' ? 'Expired' : 'Active'} · {a.applied_at}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 mt-3">
             <button className="flex-1 text-xs font-bold py-1.5 rounded-xl bg-[#4A0E17] text-[#C5A059] hover:opacity-90 transition-opacity" onClick={() => setPopoverSub(null)}>Extend Validity</button>
             <button className="flex-1 text-xs font-bold py-1.5 rounded-xl bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors" onClick={() => setPopoverSub(null)}>Add Items</button>
@@ -1382,6 +1413,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                         {Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0 ? (
                           v.active_subscriptions.map((sub: any, idx: number) => {
                             const active = isVendorCategoryActive(v, sub.category_name);
+                            const addonCount = Array.isArray(sub.applied_addons) ? sub.applied_addons.length : 0;
                             return (
                               <button
                                 key={idx}
@@ -1390,9 +1422,10 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                                   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                                   setPopoverSub(prev => prev?.sub === sub ? null : { sub, anchorRect: rect });
                                 }}
+                                title={addonCount > 0 ? `${addonCount} add-on(s) applied — click for history` : undefined}
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition-opacity cursor-pointer hover:opacity-80 ${active ? 'bg-[#4A0E17] text-[#C5A059] border-[#C5A059]/30' : 'bg-zinc-200 text-zinc-600 border-zinc-300'}`}
                               >
-                                {active ? '🟢' : '⬜'} {sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}{!active && ' · Expired'}
+                                {active ? '🟢' : '⬜'} {sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}{!active && ' · Expired'}{addonCount > 0 && ` · +${addonCount} add-on${addonCount > 1 ? 's' : ''}`}
                               </button>
                             );
                           })

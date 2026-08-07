@@ -1185,9 +1185,21 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
             {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 ? (
               vendor.active_subscriptions.map((sub: any, i: number) => {
                 const active = isVendorCategoryActive(vendor, sub.category_name);
+                const appliedAddons = Array.isArray(sub.applied_addons) ? sub.applied_addons : [];
                 return (
-                  <span key={i} className={`px-2.5 py-1 rounded-full text-xs font-black shadow-xs flex items-center gap-1 ${active ? 'bg-[#C5A059] text-[#4A0E17]' : 'bg-zinc-300 text-zinc-700'}`}>
-                    {active ? '🟢' : '⬜'} {sub.plan_name || sub.category_name} ({sub.max_items ?? 5} items limit){!active && ' · Expired'}
+                  <span key={i} className="flex items-center gap-1 flex-wrap">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-black shadow-xs flex items-center gap-1 ${active ? 'bg-[#C5A059] text-[#4A0E17]' : 'bg-zinc-300 text-zinc-700'}`}>
+                      {active ? '🟢' : '⬜'} {sub.plan_name || sub.category_name} ({sub.max_items ?? 5} items limit){!active && ' · Expired'}
+                    </span>
+                    {appliedAddons.map((a: any, ai: number) => (
+                      <span
+                        key={ai}
+                        title={`Applied ${a.applied_at}${a.expires_at ? ` · Expires ${a.expires_at}` : ''}`}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${a.status === 'expired' ? 'bg-zinc-200 text-zinc-500 border-zinc-400' : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'}`}
+                      >
+                        + {a.addon_name}{a.status === 'expired' ? ' (Expired)' : ''}
+                      </span>
+                    ))}
                   </span>
                 );
               })
