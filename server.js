@@ -465,6 +465,19 @@ function isVendorCategoryActive(vendor, categoryName) {
   return isSubPaidAndActive(matching);
 }
 
+// Counts every order this vendor has accepted (or progressed further) for a given
+// category — the live figure `active_subscriptions[].max_clients` is enforced against.
+// Repeat orders from the same client count again (max_clients behaves as a per-category
+// accepted-order cap, not a distinct-customer cap — confirmed product decision).
+const CONNECTED_ORDER_STATUSES = ['accepted', 'preparing', 'out_for_delivery', 'delivered'];
+async function getCategoryOrderCount(vendorId, categoryName) {
+  return Order.countDocuments({
+    vendor_id: vendorId,
+    master_category_name: categoryName,
+    status: { $in: CONNECTED_ORDER_STATUSES }
+  });
+}
+
 const subadminRequestSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   subadmin_email: { type: String, required: true },
@@ -599,39 +612,26 @@ async function deleteS3Object(url) {
   }
 }
 
-// Helper to check plan expiry on order delivery
+// Keeps the legacy `vendor.total_clients` display counter in sync on delivery.
+// Actual limit enforcement now happens preventatively at order-accept time (see
+// getCategoryOrderCount / the client-limit check in the 'orders' update handler) —
+// this no longer flips vendor/subscription status, it's purely a dashboard figure.
 async function checkPlanLimitOnDelivery(orderId) {
   try {
     const orderDoc = await Order.findById(orderId);
     if (orderDoc && orderDoc.vendor_id && orderDoc.status === 'delivered') {
       const vendorDoc = await Vendor.findById(orderDoc.vendor_id);
-      if (vendorDoc && vendorDoc.plan_id) {
-        // Count unique successful clients
+      if (vendorDoc) {
         const uniqueClients = await Order.distinct('client_name', {
           vendor_id: vendorDoc._id,
           status: 'delivered'
         });
-        const clientCount = uniqueClients.length;
-        
-        vendorDoc.total_clients = clientCount;
-        
-        const planDoc = await Plan.findById(vendorDoc.plan_id);
-        if (planDoc && planDoc.max_clients > 0) {
-          const totalLimit = planDoc.max_clients + (vendorDoc.addon_max_clients || 0);
-          if (clientCount >= totalLimit) {
-            vendorDoc.status = 'expired';
-            await Activity.create({
-              action: `Vendor ${vendorDoc.shop_name} plan expired (Max clients limit of ${totalLimit} reached)`,
-              actor: 'System'
-            });
-            io.emit('vendorUpdated', { id: vendorDoc.id, status: 'expired' });
-          }
-        }
+        vendorDoc.total_clients = uniqueClients.length;
         await vendorDoc.save();
       }
     }
   } catch (err) {
-    console.error('Error checking plan limit:', err);
+    console.error('Error updating total_clients:', err);
   }
 }
 
@@ -1098,6 +1098,23 @@ app.post('/api/db', async (req, res) => {
           const orderCategory = orderDoc.master_category_name;
           if (!isVendorCategoryActive(vendorDoc, orderCategory)) {
             return res.status(403).json({ error: 'Your current plan does not include order fulfillment for this category. Please upgrade to accept client orders.' });
+          }
+
+          // Dynamic client-limit expiry: the moment the category's max_clients cap is
+          // reached, expire that specific active_subscriptions[] entry immediately —
+          // don't wait for a cron sweep or a delivery event.
+          const matchingSub = (vendorDoc.active_subscriptions || [])
+            .find(s => s.category_name === orderCategory);
+          const categoryLimit = matchingSub?.max_clients ?? 0;
+          if (matchingSub && categoryLimit > 0) {
+            const currentCount = await getCategoryOrderCount(vendorDoc._id, orderCategory);
+            if (currentCount >= categoryLimit) {
+              matchingSub.status = 'expired';
+              vendorDoc.markModified('active_subscriptions');
+              await vendorDoc.save();
+              io.emit('vendorUpdated', { id: vendorDoc.id, active_subscriptions: vendorDoc.active_subscriptions });
+              return res.status(403).json({ error: `Client limit reached for this category (${categoryLimit}). This plan has expired — please upgrade or add a client extension.` });
+            }
           }
 
           delete data.otp_attempt;

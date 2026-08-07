@@ -12,6 +12,16 @@ import { getVendorTier, isVendorCategoryActive, getVendorPlanLabel } from '../li
 import { getItemTranslation } from './Landing';
 import { AntigravitySuccessModal } from './AntigravitySuccessModal';
 
+// Mirrors CONNECTED_ORDER_STATUSES / getCategoryOrderCount in server.js — orders past
+// 'pending' count toward a category subscription's max_clients cap.
+const CONNECTED_ORDER_STATUSES = ['accepted', 'preparing', 'out_for_delivery', 'delivered'];
+const getCategoryOrderCount = (orders: Order[], vendorId: string, categoryName?: string | null) =>
+  orders.filter(o =>
+    o.vendor_id === vendorId &&
+    o.master_category_name === categoryName &&
+    CONNECTED_ORDER_STATUSES.includes(o.status)
+  ).length;
+
 // Shared WhatsApp/call link builders for vendor-to-client contact (claim popup + Kanban cards)
 function buildClientWhatsAppMessage(clientName: string, shopName: string, itemName: string, extra?: string) {
   const base = `Hello ${clientName}, this is ${shopName} regarding your order for ${itemName}.`;
@@ -1242,38 +1252,53 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
               </Badge>
             </div>
             
-            <div className="text-xs text-muted space-y-1 pt-3 border-t border-border/50">
-              <div className="flex justify-between"><span>{t.clientsLimitCount}</span><span className="font-semibold text-text">{vendor.total_clients} {t.clientsUnit}</span></div>
-              <div className="flex justify-between"><span>{t.daysRemaining}</span><span className="font-semibold text-text">{t.until}: {vendor.subscription_end || '—'}</span></div>
-            </div>
+            {(() => {
+              const activeSubs: any[] = Array.isArray(vendor.active_subscriptions) ? vendor.active_subscriptions : [];
+              const nearest = activeSubs
+                .filter(s => s.subscription_end)
+                .map(s => ({ sub: s, daysLeft: Math.ceil((new Date(s.subscription_end).getTime() - Date.now()) / 86400000) }))
+                .sort((a, b) => a.daysLeft - b.daysLeft)[0];
+              return (
+                <div className="text-xs text-muted space-y-1 pt-3 border-t border-border/50">
+                  <div className="flex justify-between">
+                    <span>{t.daysRemaining}</span>
+                    <span className="font-semibold text-text">
+                      {nearest ? (nearest.daysLeft > 0 ? `${nearest.daysLeft}d left` : 'Expired') : '—'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* Item Limit Progress Bars per Active Subscription */}
+            {/* Client / Item Slot Usage per Active Subscription */}
             {Array.isArray(vendor.active_subscriptions) && vendor.active_subscriptions.length > 0 && (
               <div className="pt-3 border-t border-border/50 space-y-2.5">
-                <p className="text-[10px] font-black uppercase tracking-wider text-muted">Item Slot Usage</p>
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted">{t.clientsLimitCount} & Item Slot Usage</p>
                 {vendor.active_subscriptions.map((sub: any, i: number) => {
+                  const vId = vendor.id || (vendor as any)._id || '';
                   const maxItems = sub.max_items ?? 5;
-                  // We don't have real inventory count here; show max as reference
-                  const pct = 0; // Will be 0 until vendor fetches real count; progress bar shows capacity
-                  const isAtLimit = pct >= 100;
-                  const isWarning = pct >= 80;
+                  const maxClients = sub.max_clients ?? 0;
+                  const clientCount = getCategoryOrderCount(orders, vId, sub.category_name);
+                  const isAtLimit = maxClients > 0 && clientCount >= maxClients;
+                  const isWarning = maxClients > 0 && clientCount >= maxClients * 0.8;
+                  const pct = maxClients > 0 ? Math.min(100, (clientCount / maxClients) * 100) : 0;
                   return (
                     <div key={i}>
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-bold text-text truncate">{sub.plan_name || sub.category_name || 'General'}</span>
                         <span className={`text-[10px] font-extrabold ${isAtLimit ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-green-600'}`}>
-                          {maxItems} slots
+                          {maxClients > 0 ? `${clientCount}/${maxClients} ${t.clientsUnit}` : `${maxItems} slots`}
                         </span>
                       </div>
-                      <div className="w-full h-2 rounded-full bg-surface-2 border border-border overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${isAtLimit ? 'bg-red-500' : isWarning ? 'bg-amber-400' : 'bg-green-500'}`}
-                          style={{ width: `${Math.min(pct, 100)}%` }}
-                        />
-                      </div>
-                      {sub.subscription_end && (
-                        <p className="text-[9px] text-muted mt-0.5">Expires: {sub.subscription_end}</p>
+                      {maxClients > 0 && (
+                        <div className="w-full h-2 rounded-full bg-surface-2 border border-border overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${isAtLimit ? 'bg-red-500' : isWarning ? 'bg-amber-400' : 'bg-green-500'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
                       )}
+                      <p className="text-[9px] text-muted mt-0.5">{maxItems} item slots{sub.subscription_end ? ` · Expires: ${sub.subscription_end}` : ''}</p>
                     </div>
                   );
                 })}
