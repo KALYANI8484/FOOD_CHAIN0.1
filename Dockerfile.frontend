@@ -1,0 +1,25 @@
+# ── Frontend image: static Vite/React build, served by nginx. ──────────────────────────
+# Builds `dist/` and ships only that + nginx into the final image -- node_modules and
+# source never make it into the runtime image, so this stays small regardless of how
+# large the dependency tree is.
+
+# ---- build stage -------------------------------------------------------------------
+FROM node:20-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+# Full install (incl. devDependencies) -- vite/typescript/tailwind are needed to build.
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# ---- runtime stage ------------------------------------------------------------------
+FROM nginx:1.27-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

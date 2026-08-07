@@ -1,0 +1,52 @@
+# Production compose file for the EC2 host (/opt/food-chain/app -- see DEPLOYMENT.md),
+# alongside a real `.env` (never committed -- see .env.example).
+#
+# Matches your existing host nginx setup exactly:
+#   - Three backend replicas bound to 127.0.0.1:5000/5001/5002, i.e. exactly the ports
+#     your nginx `upstream backend_servers` block already load-balances across. Nothing
+#     about that upstream block needs to change.
+#   - One frontend container bound to 127.0.0.1:8080 only (not published publicly) --
+#     host nginx proxies `location /` to it instead of reading dist/ off disk. See
+#     deploy/host-nginx.conf.example for the small diff to your real config.
+#
+# The deploy pipeline never runs `docker compose build` on the server -- images are built
+# and pushed to Docker Hub by GitHub Actions; this file only pulls and runs them, which is
+# what makes "restart only the changed service, with zero backend downtime" possible (see
+# the `deploy` job in .github/workflows/cd.yml for the rolling-restart logic).
+
+services:
+  backend1:
+    image: ${DOCKERHUB_USERNAME}/food-chain-backend:${IMAGE_TAG:-latest}
+    container_name: food-chain-backend-1
+    restart: unless-stopped
+    env_file: [.env]
+    environment: [PORT=5000]
+    ports: ["127.0.0.1:5000:5000"]
+    volumes: [uploads:/app/public/uploads]
+
+  backend2:
+    image: ${DOCKERHUB_USERNAME}/food-chain-backend:${IMAGE_TAG:-latest}
+    container_name: food-chain-backend-2
+    restart: unless-stopped
+    env_file: [.env]
+    environment: [PORT=5000]
+    ports: ["127.0.0.1:5001:5000"]
+    volumes: [uploads:/app/public/uploads]
+
+  backend3:
+    image: ${DOCKERHUB_USERNAME}/food-chain-backend:${IMAGE_TAG:-latest}
+    container_name: food-chain-backend-3
+    restart: unless-stopped
+    env_file: [.env]
+    environment: [PORT=5000]
+    ports: ["127.0.0.1:5002:5000"]
+    volumes: [uploads:/app/public/uploads]
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/food-chain-frontend:${IMAGE_TAG:-latest}
+    container_name: food-chain-frontend
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:80"]
+
+volumes:
+  uploads:

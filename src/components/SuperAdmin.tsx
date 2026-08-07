@@ -581,12 +581,17 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
   const [deleteInputName, setDeleteInputName] = useState('');
 
-  const getVendorPlan = (vendor: Vendor | null) => vendor ? plans.find((p) => p.id === vendor.plan_id) : undefined;
+  // Reads the limit straight off the vendor's active_subscriptions[] entries (the
+  // single source of truth — see src/lib/vendorPlan.ts) rather than the legacy
+  // vendor.plan_id field, which is never populated by signup or vendor creation.
   const getVendorItemLimit = (vendor: Vendor | null) => {
-    const plan = getVendorPlan(vendor);
-    if (!plan) return 5;
-    if (plan.max_items === -1 || plan.name?.toLowerCase().includes('premium')) return Infinity;
-    return Math.max(0, plan.max_items);
+    const subs = vendor?.active_subscriptions;
+    if (!Array.isArray(subs) || subs.length === 0) return 5;
+    const limits = subs.map((s: any) => {
+      if (s.max_items === -1 || (s.plan_name || '').toLowerCase().includes('premium')) return Infinity;
+      return Math.max(0, s.max_items ?? 0);
+    });
+    return limits.some((l) => l === Infinity) ? Infinity : Math.max(...limits);
   };
   const getVendorLimitLabel = (vendor: Vendor | null) => {
     const limit = getVendorItemLimit(vendor);
@@ -602,8 +607,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
   const [imgUploadingId, setImgUploadingId] = useState<string | null>(null);
 
-  const currentPlan = viewVendor ? plans.find((p) => p.id === viewVendor.plan_id) : undefined;
-  const inventoryLimit = currentPlan?.max_items ?? 5;
+  const inventoryLimit = getVendorItemLimit(viewVendor);
 
   const load = async () => {
     try {
@@ -1430,7 +1434,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                             );
                           })
                         ) : (
-                          <Badge variant="accent">{v.plan_name || 'Free'}</Badge>
+                          <Badge variant="accent">{getVendorPlanLabel(v)}</Badge>
                         )}
                       </div>
                     </td>
@@ -1889,7 +1893,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="rounded-2xl bg-white p-5 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center hover:border-amber-200 transition-colors">
                 <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Subscription</p>
-                <p className="font-extrabold text-slate-900 text-lg">{viewVendor.plan_name || 'Free'}</p>
+                <p className="font-extrabold text-slate-900 text-lg">{getVendorPlanLabel(viewVendor)}</p>
               </div>
               <div className="rounded-2xl bg-white p-5 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center hover:border-amber-200 transition-colors">
                 <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Clients</p>
@@ -3204,7 +3208,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
                                 <p className="text-[10px] text-gray-500">{v.owner_name} · {v.phone}</p>
                               </td>
                               <td className="px-5 py-3">
-                                <span className="text-xs font-bold text-gray-700">{v.plan_name || 'Free'}</span>
+                                <span className="text-xs font-bold text-gray-700">{getVendorPlanLabel(v)}</span>
                               </td>
                               <td className="px-5 py-3">
                                 <p className="text-xs font-bold text-gray-900">{v.subscription_end || 'N/A'}</p>
