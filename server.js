@@ -225,6 +225,31 @@ const initDb = async () => {
           console.log(`[CRON] Renewal reminder sent: ${v.shop_name} (${daysLeft}d)`);
         }
 
+        // 4. Client-limit sweep: catch category subscriptions that are already over their
+        // max_clients cap but never had a new order-accept attempt trip the check in the
+        // 'orders' update handler (e.g. the cap was reached, then no further orders came
+        // in). Re-evaluates every tick so an over-limit vendor self-heals to 'expired'
+        // without needing a new accept to trigger it.
+        const overLimitCandidates = await Vendor.find({ 'active_subscriptions.max_clients': { $gt: 0 } });
+        for (const v of overLimitCandidates) {
+          let changed = false;
+          for (const s of (v.active_subscriptions || [])) {
+            if ((s.max_clients ?? 0) > 0 && s.status !== 'expired') {
+              const count = await getCategoryOrderCount(v._id, s.category_name);
+              if (count >= s.max_clients) {
+                s.status = 'expired';
+                changed = true;
+                console.log(`[CRON] Client limit sweep: ${v.shop_name} / ${s.category_name} expired (${count}/${s.max_clients})`);
+              }
+            }
+          }
+          if (changed) {
+            v.markModified('active_subscriptions');
+            await v.save();
+            io.emit('vendorUpdated', { id: v.id, active_subscriptions: v.active_subscriptions });
+          }
+        }
+
         console.log('[CRON] Expiry sweep complete.');
       } catch (err) {
         console.error('[CRON] Expiry cron error:', err.message);
@@ -479,16 +504,33 @@ function isSubPaidAndActive(sub) {
   if (!sub) return false;
   if (FREE_PLAN_NAMES.includes(sub.plan_name)) return false;
   if (!((sub.max_clients ?? 0) > 0)) return false;
+  if (sub.status === 'expired') return false;
   const todayIso = new Date().toISOString().slice(0, 10);
   if (sub.subscription_end && sub.subscription_end < todayIso) return false;
   return true;
 }
+// Strict match only — see matching comment in src/lib/vendorPlan.ts (keep in sync).
+// A missing/'General' category_name used to act as a wildcard matching every category;
+// that's what let vendors accept orders for categories they never subscribed to.
 function isVendorCategoryActive(vendor, categoryName) {
   const subs = vendor && Array.isArray(vendor.active_subscriptions) ? vendor.active_subscriptions : [];
   if (subs.length === 0) return false;
-  const matching = subs.find(s => !s.category_name || s.category_name === 'General' || s.category_name === categoryName);
+  const matching = subs.find(s => !!s.category_name && s.category_name === categoryName);
   if (!matching) return false;
   return isSubPaidAndActive(matching);
+}
+
+// Counts every order this vendor has accepted (or progressed further) for a given
+// category — the live figure `active_subscriptions[].max_clients` is enforced against.
+// Repeat orders from the same client count again (max_clients behaves as a per-category
+// accepted-order cap, not a distinct-customer cap — confirmed product decision).
+const CONNECTED_ORDER_STATUSES = ['accepted', 'preparing', 'out_for_delivery', 'delivered'];
+async function getCategoryOrderCount(vendorId, categoryName) {
+  return Order.countDocuments({
+    vendor_id: vendorId,
+    master_category_name: categoryName,
+    status: { $in: CONNECTED_ORDER_STATUSES }
+  });
 }
 
 const subadminRequestSchema = new mongoose.Schema({
@@ -625,39 +667,26 @@ async function deleteS3Object(url) {
   }
 }
 
-// Helper to check plan expiry on order delivery
+// Keeps the legacy `vendor.total_clients` display counter in sync on delivery.
+// Actual limit enforcement now happens preventatively at order-accept time (see
+// getCategoryOrderCount / the client-limit check in the 'orders' update handler) —
+// this no longer flips vendor/subscription status, it's purely a dashboard figure.
 async function checkPlanLimitOnDelivery(orderId) {
   try {
     const orderDoc = await Order.findById(orderId);
     if (orderDoc && orderDoc.vendor_id && orderDoc.status === 'delivered') {
       const vendorDoc = await Vendor.findById(orderDoc.vendor_id);
-      if (vendorDoc && vendorDoc.plan_id) {
-        // Count unique successful clients
+      if (vendorDoc) {
         const uniqueClients = await Order.distinct('client_name', {
           vendor_id: vendorDoc._id,
           status: 'delivered'
         });
-        const clientCount = uniqueClients.length;
-        
-        vendorDoc.total_clients = clientCount;
-        
-        const planDoc = await Plan.findById(vendorDoc.plan_id);
-        if (planDoc && planDoc.max_clients > 0) {
-          const totalLimit = planDoc.max_clients + (vendorDoc.addon_max_clients || 0);
-          if (clientCount >= totalLimit) {
-            vendorDoc.status = 'expired';
-            await Activity.create({
-              action: `Vendor ${vendorDoc.shop_name} plan expired (Max clients limit of ${totalLimit} reached)`,
-              actor: 'System'
-            });
-            io.emit('vendorUpdated', { id: vendorDoc.id, status: 'expired' });
-          }
-        }
+        vendorDoc.total_clients = uniqueClients.length;
         await vendorDoc.save();
       }
     }
   } catch (err) {
-    console.error('Error checking plan limit:', err);
+    console.error('Error updating total_clients:', err);
   }
 }
 
@@ -1129,6 +1158,23 @@ app.post('/api/db', async (req, res) => {
           const orderCategory = orderDoc.master_category_name;
           if (!isVendorCategoryActive(vendorDoc, orderCategory)) {
             return res.status(403).json({ error: 'Your current plan does not include order fulfillment for this category. Please upgrade to accept client orders.' });
+          }
+
+          // Dynamic client-limit expiry: the moment the category's max_clients cap is
+          // reached, expire that specific active_subscriptions[] entry immediately —
+          // don't wait for a cron sweep or a delivery event.
+          const matchingSub = (vendorDoc.active_subscriptions || [])
+            .find(s => s.category_name === orderCategory);
+          const categoryLimit = matchingSub?.max_clients ?? 0;
+          if (matchingSub && categoryLimit > 0) {
+            const currentCount = await getCategoryOrderCount(vendorDoc._id, orderCategory);
+            if (currentCount >= categoryLimit) {
+              matchingSub.status = 'expired';
+              vendorDoc.markModified('active_subscriptions');
+              await vendorDoc.save();
+              io.emit('vendorUpdated', { id: vendorDoc.id, active_subscriptions: vendorDoc.active_subscriptions });
+              return res.status(403).json({ error: `Client limit reached for this category (${categoryLimit}). This plan has expired — please upgrade or add a client extension.` });
+            }
           }
 
           delete data.otp_attempt;

@@ -1,6 +1,22 @@
 // Custom MongoDB-backed mock Supabase Client for VIKRAM ADVERTISING
 // This replicates the supabase-js query builder syntax to avoid breaking existing frontend code.
 
+// A single add-on application against one category subscription — kept as a running
+// history (never deleted, even once expired) so admins/vendors can see everything
+// that's ever been applied, not just what's currently active.
+export type AppliedAddon = {
+  id: string;
+  addon_id: string;
+  addon_name: string;
+  addon_type: string;
+  bonus_max_clients?: number;
+  bonus_max_items?: number;
+  applied_at: string;
+  expires_at: string | null;
+  applied_by: string;
+  status: string;
+};
+
 export type VendorSubscription = {
   id?: string;
   plan_id?: string;
@@ -11,6 +27,7 @@ export type VendorSubscription = {
   max_items?: number;
   max_clients?: number;
   status?: string;
+  applied_addons?: AppliedAddon[];
 };
 
 export type Plan = {

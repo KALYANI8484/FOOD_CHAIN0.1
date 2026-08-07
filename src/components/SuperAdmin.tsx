@@ -4,10 +4,10 @@ import {
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
   Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
 } from 'lucide-react';
-import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription } from '../lib/supabase';
+import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription, type AppliedAddon } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
 import { VendorForm } from './VendorForm';
-import { getVendorTier, getVendorPlanLabel } from '../lib/vendorPlan';
+import { getVendorTier, isVendorCategoryActive } from '../lib/vendorPlan';
 
 // Upserts a category-scoped subscription entry: if the vendor already has an entry for
 // this plan's category, replace it in place (avoids duplicate Portfolio entries when the
@@ -15,7 +15,10 @@ import { getVendorTier, getVendorPlanLabel } from '../lib/vendorPlan';
 // Used by "Assign Additional Category Subscription" and by upgrade-request approval, so
 // approving a request behaves identically to an admin manually assigning that plan.
 const applyPlanToSubscriptions = (existingSubs: VendorSubscription[], plan: Plan): VendorSubscription[] => {
-  const categoryName = plan.master_category_name || 'General';
+  if (!plan.master_category_name) {
+    throw new Error(`Plan "${plan.name}" has no Linked Master Category set. Edit it in Plans and pick a category before assigning it to a vendor.`);
+  }
+  const categoryName = plan.master_category_name;
   const newSub: VendorSubscription = {
     id: crypto.randomUUID(),
     plan_id: plan.id,
@@ -702,14 +705,20 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       ? editVendor.active_subscriptions
       : [];
 
-    const updatedSubs = applyPlanToSubscriptions(existingSubs, planToAssign);
+    let updatedSubs: VendorSubscription[];
+    try {
+      updatedSubs = applyPlanToSubscriptions(existingSubs, planToAssign);
+    } catch (err: any) {
+      show(err.message, 'error');
+      return;
+    }
 
     await supabase.from('vendors').update({
       active_subscriptions: updatedSubs
     }).eq('id', vendorId);
 
     await supabase.from('activity_log').insert({
-      action: `Category subscription ${planToAssign.name} (${planToAssign.master_category_name || 'General'}) assigned to ${editVendor.shop_name}`,
+      action: `Category subscription ${planToAssign.name} (${planToAssign.master_category_name}) assigned to ${editVendor.shop_name}`,
       actor: 'Super Admin'
     });
 
@@ -753,6 +762,28 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       if (addon.addon_type === 'client_extension' || addon.max_clients > 0) {
         targetSub.max_clients = (targetSub.max_clients ?? 10) + addon.max_clients;
       }
+      // Applying an add-on is an explicit intent to unblock this subscription — clear a
+      // stale 'expired' flag so isSubPaidAndActive re-evaluates against the raised limit/
+      // date instead of staying locked out. If the add-on didn't actually fix the reason
+      // it expired (e.g. wrong add-on type applied), the next accept attempt or cron sweep
+      // will simply re-expire it.
+      targetSub.status = 'active';
+      // Record this application as a permanent history entry — never removed, even
+      // once superseded — so "which add-ons have ever been applied here" is answerable
+      // from the data instead of only being visible as an already-merged number.
+      const appliedRecord: AppliedAddon = {
+        id: crypto.randomUUID(),
+        addon_id: addon.id,
+        addon_name: addon.name,
+        addon_type: addon.addon_type,
+        bonus_max_clients: addon.addon_type === 'client_extension' ? addon.max_clients : undefined,
+        bonus_max_items: addon.addon_type === 'inventory_items' ? addon.max_items : undefined,
+        applied_at: new Date().toISOString().slice(0, 10),
+        expires_at: addon.addon_type === 'validity_extension' ? null : new Date(Date.now() + addon.validity_days * 86400000).toISOString().slice(0, 10),
+        applied_by: 'Super Admin',
+        status: 'active'
+      };
+      targetSub.applied_addons = [...(targetSub.applied_addons || []), appliedRecord];
       activeSubs[targetIdx >= 0 ? targetIdx : 0] = targetSub;
     }
 
@@ -812,7 +843,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
 
     const updatedSubs = existingSubs.map(s => {
       if (s.id === subId || s.category_name === subId) {
-        return { ...s, subscription_end: newEndDate, max_items: Number(newMaxItems) };
+        return { ...s, subscription_end: newEndDate, max_items: Number(newMaxItems), status: 'active' };
       }
       return s;
     });
@@ -1027,16 +1058,52 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     }));
   };
 
-  // Memoized expiry cache: days remaining per vendor id
+  // Memoized expiry cache: days remaining per vendor id, reflecting the worst-off category
+  // subscription. active_subscriptions[] is the source of truth (see vendorPlan.ts) — a
+  // subscription can be status:'expired' (e.g. its client limit was reached) while its date
+  // is still far off, so status overrides the date the same way urgency() does in Vendor.tsx.
+  // Vendors with no active_subscriptions yet fall back to the legacy top-level date.
   const expiryCache = useMemo(() => {
     const cache: Record<string, number> = {};
     const now = Date.now();
     vendors.forEach(v => {
-      const endDate = v.subscription_end ? new Date(v.subscription_end).getTime() : 0;
-      cache[v.id] = Math.ceil((endDate - now) / 86400000);
+      const subs = Array.isArray(v.active_subscriptions) ? v.active_subscriptions : [];
+      if (subs.length > 0) {
+        const daysLeftPerSub = subs.map((s: any) => {
+          if (s.status === 'expired') return -1;
+          const end = s.subscription_end ? new Date(s.subscription_end).getTime() : 0;
+          return Math.ceil((end - now) / 86400000);
+        });
+        cache[v.id] = Math.min(...daysLeftPerSub);
+      } else {
+        const endDate = v.subscription_end ? new Date(v.subscription_end).getTime() : 0;
+        cache[v.id] = Math.ceil((endDate - now) / 86400000);
+      }
     });
     return cache;
   }, [vendors]);
+
+  // Vendors whose account is still 'approved' but every category subscription they hold
+  // has expired (by status or date) read as effectively 'expired' for the Status filter/
+  // badge — e.g. KPBTF's account stays 'approved' (per-category expiry design, see
+  // isSubPaidAndActive) but with its one subscription expired it has nothing left to sell,
+  // so showing "Live" there is misleading. A vendor with SOME categories still active is
+  // deliberately left as 'approved' — they can still take orders in that category.
+  const fullyExpiredVendorIds = useMemo(() => {
+    const now = Date.now();
+    const ids = new Set<string>();
+    vendors.forEach(v => {
+      const subs = Array.isArray(v.active_subscriptions) ? v.active_subscriptions : [];
+      if (subs.length === 0) return;
+      const allExpired = subs.every((s: any) =>
+        s.status === 'expired' || (s.subscription_end && new Date(s.subscription_end).getTime() < now)
+      );
+      if (allExpired) ids.add(v.id);
+    });
+    return ids;
+  }, [vendors]);
+
+  const getEffectiveStatus = (v: Vendor) => fullyExpiredVendorIds.has(v.id) ? 'expired' : v.status;
 
   // Derive unique categories across all vendor active subscriptions for the filter dropdown
   const availableCategories = useMemo(() => {
@@ -1056,7 +1123,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
     const matchSearch = v.shop_name.toLowerCase().includes(q) ||
       v.owner_name.toLowerCase().includes(q) ||
       (v.phone || '').includes(search);
-    const matchFilter = filter === 'all' || v.status === filter;
+    const matchFilter = filter === 'all' || getEffectiveStatus(v) === filter;
 
     const matchCategory = filterCategory === 'all' || (
       Array.isArray(v.active_subscriptions) && v.active_subscriptions.some((s: any) =>
@@ -1074,7 +1141,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       (v.zip_code || '').substring(0, 3) === filterZip.trim().substring(0, 3);
 
     return matchSearch && matchFilter && matchCategory && matchHealth && matchZip;
-  }), [vendors, search, filter, filterCategory, filterHealth, filterZip, expiryCache]);
+  }), [vendors, search, filter, filterCategory, filterHealth, filterZip, expiryCache, fullyExpiredVendorIds]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedVendors = useMemo(() => {
@@ -1100,7 +1167,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
       activeSubs = activeSubs.map(s => {
         if (batchCategory === 'all' || s.category_name === batchCategory || s.plan_name === batchCategory) {
           const currentEnd = s.subscription_end ? new Date(s.subscription_end) : new Date();
-          return { ...s, subscription_end: new Date(currentEnd.getTime() + batchDays * 86400000).toISOString().slice(0, 10) };
+          return { ...s, subscription_end: new Date(currentEnd.getTime() + batchDays * 86400000).toISOString().slice(0, 10), status: 'active' };
         }
         return s;
       });
@@ -1179,6 +1246,21 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
             <div className="flex justify-between"><span>Client Limit</span><span className="font-bold text-slate-900">{popoverSub.sub.max_clients ?? 10}</span></div>
             <div className="flex justify-between"><span>Expires</span><span className="font-bold text-slate-900">{popoverSub.sub.subscription_end || 'N/A'}</span></div>
           </div>
+          {Array.isArray(popoverSub.sub.applied_addons) && popoverSub.sub.applied_addons.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-200">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Add-on History</p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {popoverSub.sub.applied_addons.map((a: any, ai: number) => (
+                  <div key={ai} className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-700 font-semibold truncate">{a.addon_name}</span>
+                    <span className={`ml-2 shrink-0 font-bold ${a.status === 'expired' ? 'text-zinc-400' : 'text-emerald-600'}`}>
+                      {a.status === 'expired' ? 'Expired' : 'Active'} · {a.applied_at}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 mt-3">
             <button className="flex-1 text-xs font-bold py-1.5 rounded-xl bg-[#4A0E17] text-[#C5A059] hover:opacity-90 transition-opacity" onClick={() => setPopoverSub(null)}>Extend Validity</button>
             <button className="flex-1 text-xs font-bold py-1.5 rounded-xl bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors" onClick={() => setPopoverSub(null)}>Add Items</button>
@@ -1333,19 +1415,24 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0 ? (
-                          v.active_subscriptions.map((sub: any, idx: number) => (
-                            <button
-                              key={idx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                setPopoverSub(prev => prev?.sub === sub ? null : { sub, anchorRect: rect });
-                              }}
-                              className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#4A0E17] text-[#C5A059] border border-[#C5A059]/30 hover:opacity-80 transition-opacity cursor-pointer"
-                            >
-                              🟢 {sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}
-                            </button>
-                          ))
+                          v.active_subscriptions.map((sub: any, idx: number) => {
+                            const active = isVendorCategoryActive(v, sub.category_name);
+                            const addonCount = Array.isArray(sub.applied_addons) ? sub.applied_addons.length : 0;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                  setPopoverSub(prev => prev?.sub === sub ? null : { sub, anchorRect: rect });
+                                }}
+                                title={addonCount > 0 ? `${addonCount} add-on(s) applied — click for history` : undefined}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition-opacity cursor-pointer hover:opacity-80 ${active ? 'bg-[#4A0E17] text-[#C5A059] border-[#C5A059]/30' : 'bg-zinc-200 text-zinc-600 border-zinc-300'}`}
+                              >
+                                {active ? '🟢' : '⬜'} {sub.plan_name || 'Free Tier'}{sub.category_name ? ` (${sub.category_name})` : ''}{!active && ' · Expired'}{addonCount > 0 && ` · +${addonCount} add-on${addonCount > 1 ? 's' : ''}`}
+                              </button>
+                            );
+                          })
                         ) : (
                           <Badge variant="accent">{getVendorPlanLabel(v)}</Badge>
                         )}
@@ -1361,9 +1448,14 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}>
-                        {v.status === 'approved' ? 'Live' : v.status === 'expired' ? 'Expired' : v.status === 'rejected' ? 'Rejected' : 'Review'}
-                      </Badge>
+                      {(() => {
+                        const effStatus = getEffectiveStatus(v);
+                        return (
+                          <Badge variant={effStatus === 'approved' ? 'success' : effStatus === 'rejected' ? 'error' : effStatus === 'expired' ? 'error' : 'warning'}>
+                            {effStatus === 'approved' ? 'Live' : effStatus === 'expired' ? 'Expired' : effStatus === 'rejected' ? 'Rejected' : 'Review'}
+                          </Badge>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -1992,7 +2084,13 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
     // manually assigning that plan (previously this only touched legacy top-level
     // fields, so approved vendors still looked Free everywhere that reads the array).
     const existingSubs: VendorSubscription[] = Array.isArray(vendorDoc?.active_subscriptions) ? vendorDoc.active_subscriptions : [];
-    const updatedSubs = applyPlanToSubscriptions(existingSubs, plan as Plan);
+    let updatedSubs: VendorSubscription[];
+    try {
+      updatedSubs = applyPlanToSubscriptions(existingSubs, plan as Plan);
+    } catch (err: any) {
+      show(err.message, 'error');
+      return;
+    }
 
     await supabase.from('vendors').update({
       active_subscriptions: updatedSubs
@@ -2032,6 +2130,8 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
     try {
       const { data: allPlans } = await supabase.from('subscription_plans').select('*');
+      let approvedCount = 0;
+      const skipped: string[] = [];
 
       for (const u of eligible) {
         const targetPlan = (allPlans || []).find((p: Plan) => p.name === u.requested_plan);
@@ -2039,7 +2139,13 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
         const { data: vendorDoc } = await supabase.from('vendors').select('*').eq('id', u.vendor_id).maybeSingle();
         const existingSubs: VendorSubscription[] = Array.isArray(vendorDoc?.active_subscriptions) ? vendorDoc.active_subscriptions : [];
-        const updatedSubs = applyPlanToSubscriptions(existingSubs, targetPlan);
+        let updatedSubs: VendorSubscription[];
+        try {
+          updatedSubs = applyPlanToSubscriptions(existingSubs, targetPlan);
+        } catch (err: any) {
+          skipped.push(`${u.vendor_name} (${err.message})`);
+          continue;
+        }
 
         await supabase.from('vendors').update({
           active_subscriptions: updatedSubs
@@ -2058,9 +2164,14 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           max_items: targetPlan.max_items,
           max_clients: targetPlan.max_clients
         });
+        approvedCount++;
       }
 
-      show(`Batch approved & activated ${eligible.length} subscription upgrades!`, 'success');
+      if (skipped.length > 0) {
+        show(`Approved ${approvedCount}, skipped ${skipped.length} (unscoped plan): ${skipped.join('; ')}`, 'error');
+      } else {
+        show(`Batch approved & activated ${approvedCount} subscription upgrades!`, 'success');
+      }
       load();
     } catch (err: any) {
       console.error(err);
@@ -2149,7 +2260,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       load();
     } catch (err: any) {
       console.error(err);
-      show('Failed to approve Sub-Admin request', 'error');
+      show(err.message || 'Failed to approve Sub-Admin request', 'error');
     }
   };
 
@@ -2703,13 +2814,17 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
 
   const handleCreate = async () => {
     if (!form.name || form.price < 0) return;
+    if (!form.master_category_name) {
+      show('Please select a Linked Master Category before saving the plan.', 'error');
+      return;
+    }
     await supabase.from('subscription_plans').insert({
       name: form.name,
       price: Number(form.price),
       validity_days: Number(form.validity_days),
       max_items: Number(form.max_items),
       max_clients: Number(form.max_clients),
-      master_category_name: form.master_category_name || null,
+      master_category_name: form.master_category_name,
       badge: form.badge || null,
       features: form.features,
       status: 'active'
@@ -2750,13 +2865,17 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
 
   const handleEditSave = async () => {
     if (!editPlan) return;
+    if (!editPlan.master_category_name) {
+      show('Please select a Linked Master Category before saving the plan.', 'error');
+      return;
+    }
     await supabase.from('subscription_plans').update({
       name: editPlan.name,
       price: Number(editPlan.price),
       validity_days: Number(editPlan.validity_days),
       max_items: Number(editPlan.max_items),
       max_clients: Number(editPlan.max_clients),
-      master_category_name: editPlan.master_category_name || null,
+      master_category_name: editPlan.master_category_name,
       badge: editPlan.badge || null,
       features: editPlan.features || []
     }).eq('id', editPlan.id);
@@ -3215,6 +3334,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
             value={form.master_category_name}
             onChange={(v) => setForm({ ...form, master_category_name: v })}
             options={[{ label: '-- Select Master Category --', value: '' }, ...masterCategories.map(c => ({ label: c, value: c }))]}
+            required
           />
 
           <div className="space-y-2 pt-2">
@@ -3299,6 +3419,7 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
               value={editPlan.master_category_name || ''}
               onChange={(v) => setEditPlan({ ...editPlan, master_category_name: v })}
               options={[{ label: '-- Select Master Category --', value: '' }, ...masterCategories.map(c => ({ label: c, value: c }))]}
+              required
             />
 
             <div className="space-y-2 pt-2">
