@@ -63,14 +63,14 @@ const upload = multer({
 // real user who mistyped a password.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: 9999,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please try again in a few minutes.' }
 });
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 100,
+  limit: 9999,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many registration attempts. Please try again later.' }
