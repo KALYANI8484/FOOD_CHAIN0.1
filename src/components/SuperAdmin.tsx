@@ -5,7 +5,7 @@ import {
   Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
 } from 'lucide-react';
 import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription, type AppliedAddon } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, onImgError, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 import { getVendorTier, isVendorCategoryActive } from '../lib/vendorPlan';
 
@@ -128,7 +128,13 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
     <div className="flex h-screen bg-bg text-text overflow-hidden relative">
       {/* Mobile Header Bar & Hamburger Button */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-surface border-b border-border flex items-center justify-between px-4 shadow-sm">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={onExit}>
+        <div
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={onExit}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExit(); } }}
+        >
           <img src="/logo.png" alt="Logo" className="h-7 w-auto object-contain" />
           <div>
             <span className="font-extrabold text-sm tracking-tight text-text block leading-none">VIKRAM ADS</span>
@@ -148,7 +154,13 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
 
       {/* Sidebar */}
       <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
+        <div
+          className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group"
+          onClick={onExit}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExit(); } }}
+        >
           <img src="/logo.png" alt="Logo" className="h-9 w-auto object-contain shrink-0" />
           <div className="min-w-0">
             <p className="font-extrabold text-base tracking-tight text-black">VIKRAM ADS</p>
@@ -1397,7 +1409,7 @@ function VendorsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'inf
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {v.logo_url ? (
-                          <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-amber-200" />
+                          <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-amber-200" onError={onImgError} />
                         ) : (
                           <div className="w-10 h-10 rounded-xl bg-[#f1e2cd] flex items-center justify-center border border-amber-200"><Store size={16} className="text-slate-600" /></div>
                         )}
@@ -2096,9 +2108,12 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       active_subscriptions: updatedSubs
     }).eq('id', u.vendor_id);
 
-    // Approve the upgrade request
+    // Approve the upgrade request — capitalized to match every consumer of this field
+    // (isApproved check, pendingUpgradesCount badge, handleBatchApproveUpgrades' own
+    // 'Approved' write below), so a single-click approval actually shows as done instead
+    // of leaving the request looking perpetually pending.
     await supabase.from('upgrade_requests').update({
-      status: 'approved',
+      status: 'Approved',
       payment_status: 'Verified'
     }).eq('id', u.id);
 
@@ -2208,12 +2223,67 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       } else if (req.action_type === 'add-on') {
         const payload = JSON.parse(req.payload);
         const { data: v } = await supabase.from('vendors').select('*').eq('id', req.vendor_id).single();
+        // addon_type / max_items aren't in the request payload (see SubAdmin.tsx's add-on
+        // request payload) — fetch them fresh so we know which field(s) this add-on
+        // actually bumps. validity_days/max_clients below still come from the payload
+        // snapshot taken at request time, same as the legacy fields already did.
+        const { data: addon } = await supabase.from('addons').select('*').eq('id', payload.addon_id).maybeSingle();
         if (v) {
+          let activeSubs: VendorSubscription[] = Array.isArray(v.active_subscriptions) && v.active_subscriptions.length > 0
+            ? [...v.active_subscriptions]
+            : [{
+                id: 'primary',
+                plan_id: v.plan_id || undefined,
+                plan_name: v.plan_name || 'Basic',
+                category_name: 'General',
+                subscription_start: v.subscription_start || new Date().toISOString().slice(0, 10),
+                subscription_end: v.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+                max_items: 5,
+                max_clients: v.total_clients || 10,
+                status: 'active'
+              }];
+
+          // Mirrors handleApplyAddon's logic above — active_subscriptions[] is the single
+          // source of truth for plan capacity/validity, so approving a sub-admin's add-on
+          // request must raise it the same way a Super Admin applying an add-on directly
+          // does. Previously this branch only touched the legacy top-level fields below,
+          // so an approved add-on never actually raised the vendor's real category
+          // capacity/validity that order-acceptance is gated on.
+          const targetSub = activeSubs[0];
+          if (targetSub) {
+            if (addon?.addon_type === 'inventory_items' || (addon?.max_items ?? 0) > 0) {
+              targetSub.max_items = (targetSub.max_items ?? 5) + (addon?.max_items ?? 0);
+            }
+            if (addon?.addon_type === 'validity_extension' || payload.validity_days > 0) {
+              const currentEnd = targetSub.subscription_end ? new Date(targetSub.subscription_end) : new Date();
+              targetSub.subscription_end = new Date(currentEnd.getTime() + payload.validity_days * 86400000).toISOString().slice(0, 10);
+            }
+            if (addon?.addon_type === 'client_extension' || payload.max_clients > 0) {
+              targetSub.max_clients = (targetSub.max_clients ?? 10) + payload.max_clients;
+            }
+            targetSub.status = 'active';
+            const appliedRecord: AppliedAddon = {
+              id: crypto.randomUUID(),
+              addon_id: payload.addon_id,
+              addon_name: payload.addon_name,
+              addon_type: addon?.addon_type ?? 'unknown',
+              bonus_max_clients: addon?.addon_type === 'client_extension' ? payload.max_clients : undefined,
+              bonus_max_items: addon?.addon_type === 'inventory_items' ? addon?.max_items : undefined,
+              applied_at: new Date().toISOString().slice(0, 10),
+              expires_at: addon?.addon_type === 'validity_extension' ? null : new Date(Date.now() + payload.validity_days * 86400000).toISOString().slice(0, 10),
+              applied_by: 'Super Admin',
+              status: 'active'
+            };
+            targetSub.applied_addons = [...(targetSub.applied_addons || []), appliedRecord];
+            activeSubs[0] = targetSub;
+          }
+
           const currentEnd = v.subscription_end ? new Date(v.subscription_end) : new Date();
           const newEnd = new Date(currentEnd.getTime() + payload.validity_days * 86400000).toISOString().slice(0, 10);
           const newAddonMax = (v.addon_max_clients || 0) + payload.max_clients;
 
           await supabase.from('vendors').update({
+            active_subscriptions: activeSubs,
             subscription_end: newEnd,
             addon_max_clients: newAddonMax,
             addon_name: payload.addon_name
@@ -2480,7 +2550,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
                               Resolve
                             </Button>
                           )}
-                          <button onClick={() => handleDeleteSuggestion(sId)} className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer">
+                          <button onClick={() => handleDeleteSuggestion(sId)} className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer" aria-label="Delete suggestion">
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -2605,7 +2675,7 @@ function ApprovalsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
         {selectedVendor && (
           <div className="space-y-6">
             <div className="text-center pb-6 border-b border-border">
-              {selectedVendor.logo_url && <img src={selectedVendor.logo_url} alt="" className="w-16 h-16 rounded-xl object-cover mx-auto mb-3" />}
+              {selectedVendor.logo_url && <img src={selectedVendor.logo_url} alt="" className="w-16 h-16 rounded-xl object-cover mx-auto mb-3" onError={onImgError} />}
               <h3 className="font-extrabold text-lg text-text">{selectedVendor.shop_name}</h3>
               <p className="text-xs text-muted mt-1">Submitted by: <span className="font-bold text-accent">{selectedVendor.submitted_by || 'Sub-Admin'}</span></p>
             </div>
@@ -3309,7 +3379,14 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
       </Modal>
 
       {/* Add Plan Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Add Pricing Plan">
+      <Modal
+        open={modal}
+        onClose={() => {
+          setModal(false);
+          setForm({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10, master_category_name: '', badge: '', features: ['priority'] });
+        }}
+        title="Add Pricing Plan"
+      >
         <div className="space-y-4">
           <Input label="Plan Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           <Input label="Price (₹)" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} required />
@@ -3358,7 +3435,10 @@ function PlansTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info'
           </div>
 
           <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => {
+              setModal(false);
+              setForm({ name: '', price: 0, validity_days: 30, max_items: 5, max_clients: 10, master_category_name: '', badge: '', features: ['priority'] });
+            }}>Cancel</Button>
             <Button onClick={handleCreate}>Save Plan</Button>
           </div>
         </div>
@@ -3570,8 +3650,8 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
             <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
               <span className="text-accent font-extrabold text-base">₹{item.price} / {item.uom || 'pc'}</span>
               <div className="flex gap-2">
-                <button onClick={() => setEditItem(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-text"><Edit2 size={14} /></button>
-                <button onClick={() => handleDelete(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-red-500"><Trash2 size={14} /></button>
+                <button onClick={() => setEditItem(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-text" aria-label="Edit sub-item"><Edit2 size={14} /></button>
+                <button onClick={() => handleDelete(item)} className="p-1.5 rounded bg-surface-2 text-muted hover:text-red-500" aria-label="Delete sub-item"><Trash2 size={14} /></button>
               </div>
             </div>
           </div>
@@ -3580,7 +3660,14 @@ function SubInventoryView({ master, show, onClose }: { master: MasterItem, show:
 
       {items.length === 0 && <EmptyState icon={<Package size={28} />} title="No sub-items found" />}
 
-      <Modal open={modal} onClose={() => setModal(false)} title="Create Sub-Item">
+      <Modal
+        open={modal}
+        onClose={() => {
+          setModal(false);
+          setForm({ name: '', price: 0, quantity: 25, uom: 'pc', image_url: '' });
+        }}
+        title="Create Sub-Item"
+      >
         <div className="space-y-4">
           <Input label="Item Name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           <div className="grid grid-cols-2 gap-4">
@@ -3788,10 +3875,17 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 stagger">
         {filtered.map((item) => (
-          <div key={item.id} onClick={() => setSelectedMaster(item)} className="card overflow-hidden bg-surface border border-border flex flex-col justify-between hover-lift group cursor-pointer">
+          <div
+            key={item.id}
+            onClick={() => setSelectedMaster(item)}
+            className="card overflow-hidden bg-surface border border-border flex flex-col justify-between hover-lift group cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedMaster(item); } }}
+          >
             <div className="relative aspect-[4/3] overflow-hidden">
               {item.image_url ? (
-                <img src={item.image_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                <img src={item.image_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={onImgError} />
               ) : (
                 <div className="w-full h-full bg-surface-2 flex items-center justify-center"><Package size={24} className="text-muted" /></div>
               )}
@@ -3818,7 +3912,14 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       {filtered.length === 0 && <EmptyState icon={<Package size={28} />} title="No master items found" />}
 
       {/* Add Master Item Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Create Master Item">
+      <Modal
+        open={modal}
+        onClose={() => {
+          setModal(false);
+          setForm({ name: '', category: '', base_price: 100, quantity: 10, description: '', image_url: '' });
+        }}
+        title="Create Master Item"
+      >
         <div className="space-y-4">
           <Input label="Item Name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           <div className="space-y-2">
@@ -3842,7 +3943,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
             <div className="relative border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-surface-2/20 hover:bg-surface-2/40 transition-colors">
               {form.image_url ? (
                 <div className="text-center">
-                  <img src={form.image_url} alt="" className="w-16 h-16 rounded object-cover mx-auto" />
+                  <img src={form.image_url} alt="" className="w-16 h-16 rounded object-cover mx-auto" onError={onImgError} />
                   <p className="text-[10px] text-green-500 font-semibold mt-1">Image Loaded</p>
                 </div>
               ) : (
@@ -3884,7 +3985,10 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           </div>
 
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => {
+              setModal(false);
+              setForm({ name: '', category: '', base_price: 100, quantity: 10, description: '', image_url: '' });
+            }}>Cancel</Button>
             <Button onClick={handleCreate}>Save Master Item</Button>
           </div>
         </div>
@@ -3916,7 +4020,7 @@ function InventoryTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
               <div className="relative border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-surface-2/20 hover:bg-surface-2/40 transition-colors">
                 {editItem.image_url ? (
                   <div className="text-center">
-                    <img src={editItem.image_url} alt="" className="w-16 h-16 rounded object-cover mx-auto" />
+                    <img src={editItem.image_url} alt="" className="w-16 h-16 rounded object-cover mx-auto" onError={onImgError} />
                     <p className="text-[10px] text-green-500 font-semibold mt-1">Image Loaded</p>
                   </div>
                 ) : (
@@ -4325,7 +4429,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
                           >
                             <Check size={13} className={g.is_pinned ? 'text-accent' : ''} />
                           </button>
-                          <button onClick={() => handleDelete(g.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted hover:text-red-500 transition-colors">
+                          <button onClick={() => handleDelete(g.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted hover:text-red-500 transition-colors" aria-label="Delete guide">
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -4403,7 +4507,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
                         <Button size="sm" variant="outline" onClick={() => handleOpenFaq(faq)} className="text-xs">
                           <Eye size={12} className="mr-1" /> Read
                         </Button>
-                        <button onClick={() => handleDeleteFaq(faqId)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted hover:text-red-500 transition-colors">
+                        <button onClick={() => handleDeleteFaq(faqId)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted hover:text-red-500 transition-colors" aria-label="Delete FAQ">
                           <Trash2 size={13} />
                         </button>
                       </div>
@@ -4560,7 +4664,7 @@ function GuidesTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info
 
             <div className="rounded-xl border border-border overflow-hidden min-h-[50vh]">
               {previewGuide.file_data && (previewGuide.file_data.startsWith('data:image') || /\.(png|jpg|jpeg|webp|gif|svg)($|\?)/i.test(previewGuide.file_name || '')) ? (
-                <img src={previewGuide.file_data} alt={previewGuide.title} className="w-full h-auto object-contain" />
+                <img src={previewGuide.file_data} alt={previewGuide.title} className="w-full h-auto object-contain" onError={onImgError} />
               ) : previewGuide.file_data ? (
                 <iframe src={previewGuide.file_data} title={previewGuide.title} className="w-full h-[65vh] rounded-xl border-0" />
               ) : (
@@ -4766,7 +4870,7 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
                     {a.last_active ? new Date(a.last_active).toLocaleString() : t.never}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleDelete(a.id, a.name)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500 hover:bg-border/20 transition-all">
+                    <button onClick={() => handleDelete(a.id, a.name)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500 hover:bg-border/20 transition-all" aria-label="Delete sub-admin">
                       <Trash2 size={14} />
                     </button>
                   </td>
@@ -4778,7 +4882,14 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
       </div>
 
       {/* Create Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title={t.createSubAdmin}>
+      <Modal
+        open={modal}
+        onClose={() => {
+          setModal(false);
+          setForm({ name: '', email: '', password: '' });
+        }}
+        title={t.createSubAdmin}
+      >
         <div className="space-y-4">
           <Input label={t.name} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           <Input label={t.emailAddress} type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
@@ -4799,7 +4910,10 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
           </div>
 
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => setModal(false)}>{t.cancel}</Button>
+            <Button variant="outline" onClick={() => {
+              setModal(false);
+              setForm({ name: '', email: '', password: '' });
+            }}>{t.cancel}</Button>
             <Button onClick={handleCreate}>{t.saveCredentials}</Button>
           </div>
         </div>

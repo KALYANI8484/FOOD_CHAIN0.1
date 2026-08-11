@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
-  ShoppingBag, Store, X, Lock, MapPin, ChevronRight,
+  ShoppingBag, Store, X, MapPin, ChevronRight,
   ChevronLeft, Hash, User, CheckCircle, Globe,
   Package, Users as UsersIcon, TrendingUp, Star, UserPlus, Maximize2, FileText
 } from 'lucide-react';
-import { Spinner, LanguageSelector, useSyncedLanguage, type Language } from './ui';
+import { Spinner, LanguageSelector, useSyncedLanguage, onImgError, type Language } from './ui';
 
-type Role = 'landing' | 'login' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
+type Role = 'landing' | 'login' | 'signup' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
 export const translations = {
   en: {
@@ -586,6 +586,14 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
       alert('All fields are required');
       return;
     }
+    if (!/^\d{10}$/.test(form.phone.replace(/\D/g, ''))) {
+      alert('Phone number must be exactly 10 digits.');
+      return;
+    }
+    if (!/^\d{6}$/.test(form.zip)) {
+      alert('PIN code must be exactly 6 digits.');
+      return;
+    }
     setSubmitting(true);
     const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -640,6 +648,7 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
             src={master.image_url || 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg'}
             alt={master.name}
             className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+            onError={onImgError}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
           <div className="absolute top-3 right-14 flex items-center gap-1 bg-black/50 backdrop-blur-sm text-white/90 text-[10px] font-bold px-2 py-1 rounded-full pointer-events-none">
@@ -717,7 +726,14 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
                             : 'border-gray-100 hover:border-amber-200 bg-white'
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => toggleItemSelection(itemId)}>
+                        <div
+                          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                          onClick={() => toggleItemSelection(itemId)}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isSelected}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleItemSelection(itemId); } }}
+                        >
                           <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                             isSelected ? 'border-amber-500 bg-amber-500' : 'border-gray-300 bg-white'
                           }`}>
@@ -923,6 +939,7 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
           alt={master.name}
           className="max-w-full max-h-full w-auto h-auto object-contain animate-scale-in"
           onClick={(e) => e.stopPropagation()}
+          onError={onImgError}
         />
       </div>
     )}
@@ -1197,7 +1214,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                     className="rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-[#C5A059]/60 transition-colors text-left cursor-pointer"
                   >
                     {isPlanDocImage(g) ? (
-                      <img src={g.file_data} alt={g.title} className="w-full h-32 object-cover" />
+                      <img src={g.file_data} alt={g.title} className="w-full h-32 object-cover" onError={onImgError} />
                     ) : (
                       <div className="w-full h-32 flex items-center justify-center text-white/60 bg-white/5">
                         <FileText size={28} />
@@ -1220,6 +1237,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                   alt={planDocs[activePlanDocIndex].title}
                   className="max-w-full max-h-full w-auto h-auto object-contain animate-scale-in"
                   onClick={(e) => e.stopPropagation()}
+                  onError={onImgError}
                 />
               ) : (
                 <iframe
@@ -1317,10 +1335,17 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             {filtered.map((item, i) => {
               const { value: orderedCount, isBaseline } = getOrderedCount(item.name);
               return (
-                <div key={item.id} onClick={() => setSelectedMaster(item)} className="inventory-card">
+                <div
+                  key={item.id}
+                  onClick={() => setSelectedMaster(item)}
+                  className="inventory-card"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedMaster(item); } }}
+                >
                   <div className="card-img relative">
                     <span className="orders-badge">{isBaseline ? '+' : ''}{orderedCount} ordered</span>
-                    {item.image_url ? <img src={item.image_url} alt={item.name} /> : <div className="w-full h-full bg-amber-50" />}
+                    {item.image_url ? <img src={item.image_url} alt={item.name} onError={onImgError} /> : <div className="w-full h-full bg-amber-50" />}
                   </div>
                   <div className="p-4"><h3 className="font-bold text-gray-900 truncate">{getItemTranslation(item.name, language)}</h3></div>
                 </div>
@@ -1371,14 +1396,9 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
               <h3 className="font-bold text-[#C5A059] text-sm mb-5 uppercase tracking-widest">{t.quickLinks}</h3>
               <ul className="space-y-3">
                 <li>
-                  <button onClick={() => onNavigate('login')} className="flex items-center gap-2 text-sm text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors">
-                    <Lock size={14} className="text-[#C5A059]" /> {t.loginRegister}
-                  </button>
-                </li>
-                <li>
-                  <a href="https://wa.me/919175537373?text=Hi%2C%20I%20want%20to%20join%20as%20a%20vendor." target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors">
+                  <button onClick={() => onNavigate('signup')} className="flex items-center gap-2 text-sm text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors">
                     <Store size={14} className="text-[#C5A059]" /> {t.becomeVendor}
-                  </a>
+                  </button>
                 </li>
               </ul>
             </div>

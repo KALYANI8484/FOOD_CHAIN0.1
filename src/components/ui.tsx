@@ -1,4 +1,15 @@
-import { useEffect, useState, useRef, type ReactNode, type MouseEvent } from 'react';
+import { useEffect, useState, useRef, type ReactNode, type MouseEvent, type SyntheticEvent } from 'react';
+
+// Neutral amber placeholder (matches the app's existing "no image" empty-state color,
+// e.g. Landing.tsx's bg-amber-50 fallback div) shown when a content image's src 404s —
+// e.g. an S3 object that no longer exists — instead of the browser's broken-image icon.
+export const IMG_FALLBACK_SRC =
+  "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23FEF3E2'/%3E%3Ccircle cx='38' cy='36' r='7' fill='%23E8D5B5'/%3E%3Cpath d='M28 68 L45 46 L56 57 L72 38 L78 68 Z' fill='%23E8D5B5'/%3E%3C/svg%3E";
+
+export function onImgError(e: SyntheticEvent<HTMLImageElement>) {
+  e.currentTarget.onerror = null; // prevent a loop if the fallback itself somehow fails
+  e.currentTarget.src = IMG_FALLBACK_SRC;
+}
 
 export function LanguageSelector({
   onChange,
@@ -108,6 +119,15 @@ export function Modal({
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const sizes = {
@@ -153,6 +173,15 @@ export function Drawer({
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
@@ -177,8 +206,8 @@ export function Drawer({
 
 export function Toast({ message, type = 'success' }: { message: string; type?: 'success' | 'error' | 'info' }) {
   const colors = {
-    success: 'border-green-500/30 bg-green-500/10 text-green-400',
-    error: 'border-red-500/30 bg-red-500/10 text-red-400',
+    success: 'border-green-500/30 bg-green-500/10 text-green-800',
+    error: 'border-red-500/30 bg-red-500/10 text-red-800',
     info: 'border-accent/30 bg-accent/10 text-accent',
   };
   return (

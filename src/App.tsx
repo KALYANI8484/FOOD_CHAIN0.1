@@ -4,6 +4,7 @@ import { Landing } from './components/Landing';
 import { SuperAdmin } from './components/SuperAdmin';
 import { SubAdmin } from './components/SubAdmin';
 import { Vendor } from './components/Vendor';
+import { SESSION_TOKEN_KEY } from './lib/sessionAuth';
 
 type Screen = 'landing' | 'login' | 'signup' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
@@ -50,6 +51,11 @@ function App() {
     navigateToScreen(role, cred);
   };
 
+  const handleExit = () => {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    navigateToScreen('landing');
+  };
+
   return (
     <>
       {screen === 'landing' && (
@@ -60,9 +66,9 @@ function App() {
       {(screen === 'login' || screen === 'signup') && (
         <Login initialMode={screen === 'signup' ? 'signup' : 'login'} onLogin={handleLoginSuccess} onBack={() => navigateToScreen('landing')} />
       )}
-      {screen === 'super_admin' && <SuperAdmin onExit={() => navigateToScreen('landing')} />}
-      {screen === 'sub_admin' && <SubAdmin onExit={() => navigateToScreen('landing')} adminEmail={sessionCred} />}
-      {screen === 'vendor' && <Vendor onExit={() => navigateToScreen('landing')} vendorPhone={sessionCred} />}
+      {screen === 'super_admin' && <SuperAdmin onExit={handleExit} />}
+      {screen === 'sub_admin' && <SubAdmin onExit={handleExit} adminEmail={sessionCred} />}
+      {screen === 'vendor' && <Vendor onExit={handleExit} vendorPhone={sessionCred} />}
     </>
   );
 }
