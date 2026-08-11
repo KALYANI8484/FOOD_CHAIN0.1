@@ -36,19 +36,26 @@ export function getVendorPlanLabel(vendor: Pick<Vendor, 'active_subscriptions'> 
   return names.length > 0 ? names.join(', ') : 'Free Tier';
 }
 
+function normalizeCategoryName(name?: string | null): string {
+  return (name || '').trim().toLowerCase();
+}
+
 // Does the vendor have a non-expired, paid subscription entry covering this exact
 // category? Strict match only — a subscription grants access to the specific category
 // it was assigned for, nothing else. (Previously a missing/'General' category_name was
 // treated as a wildcard matching every category; that silently granted vendors access to
 // categories they never subscribed to whenever a plan's "Linked Master Category" was left
 // unset, which is now rejected at assignment time instead — see applyPlanToSubscriptions.)
+// Compared case/whitespace-insensitively — mirrors server.js's isVendorCategoryActive.
 export function isVendorCategoryActive(
   vendor: Pick<Vendor, 'active_subscriptions'> | null | undefined,
   categoryName?: string | null
 ): boolean {
   const subs = vendor?.active_subscriptions;
   if (!Array.isArray(subs) || subs.length === 0) return false;
-  const matching = subs.find((s) => !!s.category_name && s.category_name === categoryName);
+  const normalizedTarget = normalizeCategoryName(categoryName);
+  if (!normalizedTarget) return false;
+  const matching = subs.find((s) => normalizeCategoryName(s.category_name) === normalizedTarget);
   if (!matching) return false;
   return isSubPaidAndActive(matching);
 }

@@ -512,10 +512,18 @@ function isSubPaidAndActive(sub) {
 // Strict match only — see matching comment in src/lib/vendorPlan.ts (keep in sync).
 // A missing/'General' category_name used to act as a wildcard matching every category;
 // that's what let vendors accept orders for categories they never subscribed to.
+// Compared case/whitespace-insensitively — a trailing space or casing difference between
+// where a category name is set (plan assignment) and where it's read (order category)
+// would otherwise silently fail to match despite being "the same" category.
+function normalizeCategoryName(name) {
+  return (name || '').trim().toLowerCase();
+}
 function isVendorCategoryActive(vendor, categoryName) {
   const subs = vendor && Array.isArray(vendor.active_subscriptions) ? vendor.active_subscriptions : [];
   if (subs.length === 0) return false;
-  const matching = subs.find(s => !!s.category_name && s.category_name === categoryName);
+  const normalizedTarget = normalizeCategoryName(categoryName);
+  if (!normalizedTarget) return false;
+  const matching = subs.find(s => normalizeCategoryName(s.category_name) === normalizedTarget);
   if (!matching) return false;
   return isSubPaidAndActive(matching);
 }
@@ -707,6 +715,32 @@ function maskPendingOrderPII(order) {
 }
 
 // Upload file (AWS S3 with Local Disk Storage Fallback)
+// Detects a file's real type from its content (magic bytes), independent of whatever
+// Content-Type/extension the client claims — the client-supplied mimetype is trivially
+// spoofable (see multer's fileFilter, which only checks that header) and served files
+// were previously exposed to stored-XSS if their real content didn't match their claimed
+// type. Only the types this app actually accepts (images + PDF) are recognized; anything
+// else returns null.
+function sniffFileCategory(buffer) {
+  if (!buffer || buffer.length < 4) return null;
+  const b = buffer;
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return { category: 'image', contentType: 'image/jpeg' };
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return { category: 'image', contentType: 'image/png' };
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return { category: 'image', contentType: 'image/gif' };
+  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return { category: 'image', contentType: 'image/webp' };
+  if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) return { category: 'pdf', contentType: 'application/pdf' };
+  return null;
+}
+
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 app.post('/api/upload', (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
@@ -719,6 +753,13 @@ app.post('/api/upload', (req, res, next) => {
 }, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const claimedCategory = req.file.mimetype === 'application/pdf' ? 'pdf' : req.file.mimetype.startsWith('image/') ? 'image' : null;
+    const detected = sniffFileCategory(req.file.buffer);
+    if (!detected || detected.category !== claimedCategory) {
+      return res.status(400).json({ error: 'File content does not match a supported image or PDF format.' });
+    }
+
     const sanitizeName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
     const fileKey = `${crypto.randomUUID()}-${sanitizeName}`;
     const bucketName = process.env.AWS_BUCKET_NAME;
@@ -769,9 +810,26 @@ app.get('/api/uploads/:key', async (req, res) => {
     }
     const localFilePath = path.join(__dirname, 'public', 'uploads', fileKey);
 
+    // Content-Type is derived from the file's real bytes, never from the stored
+    // extension or S3's recorded metadata — both are just whatever was claimed at
+    // upload time (see sniffFileCategory), and serving an unverified type inline is
+    // exactly how a spoofed upload becomes stored XSS. Anything that doesn't match a
+    // known-safe signature is forced to download instead of executing inline.
+    const sendSafely = (buffer) => {
+      const detected = sniffFileCategory(buffer);
+      if (detected) {
+        res.setHeader('Content-Type', detected.contentType);
+        res.setHeader('Content-Disposition', 'inline');
+      } else {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', 'attachment');
+      }
+      return res.send(buffer);
+    };
+
     // Stream from local disk if file exists locally
     if (fs.existsSync(localFilePath)) {
-      return res.sendFile(localFilePath);
+      return sendSafely(fs.readFileSync(localFilePath));
     }
 
     // Try fetching from S3 if configured
@@ -779,10 +837,8 @@ app.get('/api/uploads/:key', async (req, res) => {
     if (bucketName && bucketName.trim() !== '') {
       const command = new GetObjectCommand({ Bucket: bucketName, Key: fileKey });
       const s3Res = await s3.send(command);
-      if (s3Res.ContentType) {
-        res.setHeader('Content-Type', s3Res.ContentType);
-      }
-      return s3Res.Body.pipe(res);
+      const buffer = await streamToBuffer(s3Res.Body);
+      return sendSafely(buffer);
     }
 
     res.status(404).send('Image not found');
@@ -791,6 +847,66 @@ app.get('/api/uploads/:key', async (req, res) => {
     res.status(404).send('Image not found');
   }
 });
+
+// Session tokens — HMAC-signed, no new dependency (uses the built-in crypto module
+// already imported above). Format: base64url(payload-json).base64url(hmac-signature).
+// SESSION_SECRET should be set in production; a random per-boot fallback is used
+// otherwise so the app still runs, at the cost of invalidating sessions on restart.
+if (!process.env.SESSION_SECRET) {
+  console.warn('[auth] SESSION_SECRET is not set — using a random per-process secret. Set SESSION_SECRET in .env for production so sessions survive a server restart.');
+}
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function base64url(input) {
+  return Buffer.from(input).toString('base64url');
+}
+
+function signToken(payload) {
+  const body = base64url(JSON.stringify({ ...payload, exp: Date.now() + SESSION_TTL_MS }));
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+// Verifies a request's `Authorization: Bearer <token>` header and returns the signed
+// { role, id, exp } payload, or null if missing/invalid/expired/tampered.
+function getAuth(req) {
+  const header = req.headers['authorization'] || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return null;
+  const [body, sig] = token.split('.');
+  if (!body || !sig) return null;
+  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('base64url');
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (!payload.exp || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// Password hashing — vendor accounts only. Format: "scrypt$<saltHex>$<hashHex>".
+// SuperAdmin/SubAdmin passwords intentionally stay plaintext: SuperAdmin.tsx has a
+// "hold to reveal password" feature for sub-admins that requires being able to read
+// the actual stored password back, which one-way hashing would make impossible.
+function hashPassword(plain) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(plain, salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+}
+
+function verifyHashedPassword(plain, stored) {
+  const parts = stored.split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  const [, salt, hashHex] = parts;
+  const hash = crypto.scryptSync(plain, salt, 64);
+  const storedHash = Buffer.from(hashHex, 'hex');
+  return hash.length === storedHash.length && crypto.timingSafeEqual(hash, storedHash);
+}
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   if (mongoose.connection.readyState !== 1) {
@@ -809,7 +925,8 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const cleanPass = rawPass.replace(/\D/g, '');
     const userRegex = new RegExp(`^${rawUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
-    // 1. Check SuperAdmin
+    // 1. Check SuperAdmin (case-insensitive email match is intentional; password
+    // itself must still match — see verifyHashedPassword note on why these stay plaintext)
     const superAdmin = await SuperAdmin.findOne({
       $or: [
         { email: rawUser.toLowerCase() },
@@ -817,7 +934,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       ]
     });
     if (superAdmin && (superAdmin.password === rawPass || superAdmin.password.toLowerCase() === rawPass.toLowerCase())) {
-      return res.json({ success: true, role: 'super_admin', data: superAdmin });
+      return res.json({ success: true, role: 'super_admin', data: superAdmin, token: signToken({ role: 'super_admin', id: superAdmin.id }) });
     }
 
     // 2. Check SubAdmin
@@ -829,7 +946,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       ]
     });
     if (subAdmin && (subAdmin.password === rawPass || subAdmin.password.toLowerCase() === rawPass.toLowerCase())) {
-      return res.json({ success: true, role: 'sub_admin', data: subAdmin });
+      return res.json({ success: true, role: 'sub_admin', data: subAdmin, token: signToken({ role: 'sub_admin', id: subAdmin.id }) });
     }
 
     // 3. Check Vendor (by Phone, Email, or Name)
@@ -846,16 +963,13 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const vendors = await Vendor.find({ $or: vendorOr });
 
     for (const v of vendors) {
-      const dbPass = (v.password || v.birthdate || '').toString().trim();
-      const dbCleanPass = dbPass.replace(/\D/g, '');
+      const storedPass = (v.password || v.birthdate || '').toString().trim();
+      if (!storedPass) continue; // no password on record at all — never auto-match
 
-      const isMatch =
-        dbPass === rawPass ||
-        dbCleanPass === cleanPass ||
-        (cleanPass.length >= 8 && dbCleanPass.includes(cleanPass)) ||
-        (cleanPass.length === 8 && dbCleanPass.length === 0) ||
-        dbPass === '' ||
-        !v.password;
+      const isHashed = storedPass.startsWith('scrypt$');
+      const isMatch = isHashed
+        ? (verifyHashedPassword(rawPass, storedPass) || verifyHashedPassword(cleanPass, storedPass))
+        : (storedPass === rawPass || (cleanPass.length > 0 && storedPass.replace(/\D/g, '') === cleanPass));
 
       if (isMatch) {
         if (v.status === 'rejected') {
@@ -870,28 +984,16 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
           v.plan_name = 'Free Tier';
           modified = true;
         }
-        if (!v.birthdate || !v.password) {
-          v.birthdate = cleanPass || rawPass;
-          v.password = cleanPass || rawPass;
+        // Lazy-migrate legacy plaintext passwords to a hash the moment they're used.
+        if (!isHashed) {
+          v.password = hashPassword(cleanPass || rawPass);
           modified = true;
         }
         if (modified) {
           await v.save();
         }
-        return res.json({ success: true, role: 'vendor', data: v });
+        return res.json({ success: true, role: 'vendor', data: v, token: signToken({ role: 'vendor', id: v.id }) });
       }
-    }
-
-    // 4. Case-insensitive fallback for SubAdmin
-    const subAdminFallback = await SubAdmin.findOne({ email: userRegex });
-    if (subAdminFallback) {
-      return res.json({ success: true, role: 'sub_admin', data: subAdminFallback });
-    }
-
-    // 5. Case-insensitive fallback for SuperAdmin
-    const superAdminFallback = await SuperAdmin.findOne({ email: userRegex });
-    if (superAdminFallback) {
-      return res.json({ success: true, role: 'super_admin', data: superAdminFallback });
     }
 
     return res.status(401).json({ error: 'Invalid credentials. Please check your username and password.' });
@@ -941,7 +1043,7 @@ app.post('/api/vendors/signup', signupLimiter, async (req, res) => {
 
     if (existing) {
       existing.birthdate = passwordVal;
-      existing.password = passwordVal;
+      existing.password = hashPassword(passwordVal);
       existing.status = 'approved';
       existing.plan_name = existing.plan_name || 'Free Tier';
       if (shop_name) existing.shop_name = shop_name.trim();
@@ -957,7 +1059,7 @@ app.post('/api/vendors/signup', signupLimiter, async (req, res) => {
       shop_name: (shop_name || owner_name || '').trim(),
       phone: cleanPhone || rawPhone,
       birthdate: passwordVal,
-      password: passwordVal,
+      password: hashPassword(passwordVal),
       address: (address || '').trim(),
       zip_code: (zip_code || '').trim(),
       status: 'approved',
@@ -997,16 +1099,35 @@ app.post('/api/db', async (req, res) => {
     return res.status(400).json({ error: `Table '${table}' not found` });
   }
 
+  // Verified caller identity from the session token (see signToken/getAuth above) —
+  // NOT the client-supplied `admin_override` body flag, which anyone can set on a
+  // raw request. Only this should ever be trusted to mean "this caller is really an
+  // admin" anywhere below.
+  const auth = getAuth(req);
+  const isAdmin = !!auth && (auth.role === 'super_admin' || auth.role === 'sub_admin');
+
   // super_admins holds login credentials and is never read/written by any legitimate
   // frontend flow through this generic endpoint (login goes through /api/auth/login
   // instead) — block direct access outright.
-  // NOTE: sub_admins is deliberately NOT blocked here — SuperAdmin.tsx's "Sub-Admins"
-  // tab legitimately lists/creates/deletes sub_admins records (including a "hold to
-  // reveal password" UI) through this same endpoint. Properly securing that table
-  // requires real request authentication (who is the caller?), not a table-level
-  // block, since Super Admins still need full access to it. Tracked as a Phase 1 item.
   if (table === 'super_admins') {
     return res.status(403).json({ error: 'Direct access to this table is not permitted.' });
+  }
+
+  // sub_admins holds login credentials too (SuperAdmin.tsx's "Sub-Admins" tab legitimately
+  // lists/creates/deletes these, including a "hold to reveal password" UI, but only for a
+  // real authenticated admin — anyone else has no business reading or writing this table).
+  if (table === 'sub_admins' && !isAdmin) {
+    return res.status(403).json({ error: 'Direct access to this table is not permitted.' });
+  }
+
+  // Vendor passwords are hashed (see hashPassword/verifyHashedPassword above) — signup and
+  // the login-time lazy-migration both go through dedicated code that already hashes, but
+  // admins can also set/reset a vendor's password directly through this generic endpoint
+  // (e.g. VendorForm.tsx's "edit birthdate" flow in SuperAdmin/SubAdmin). Catching it here,
+  // in the one place every vendor-password write passes through, means it's hashed no
+  // matter which UI/flow sets it, instead of only the two paths that call hashPassword directly.
+  if (table === 'vendors' && data && typeof data.password === 'string' && data.password && !data.password.startsWith('scrypt$')) {
+    data.password = hashPassword(data.password);
   }
 
   try {
@@ -1071,7 +1192,7 @@ app.post('/api/db', async (req, res) => {
         if (table === 'orders') {
           docs = docs.map(d => {
             const obj = convertImageUrl(d.toJSON());
-            if (obj.status === 'pending' && !req.body.admin_override) {
+            if (obj.status === 'pending' && !(isAdmin && req.body.admin_override)) {
               obj.client_name = 'Hidden (Provide OTP)';
               obj.client_phone = 'Hidden (Provide OTP)';
               obj.client_address = 'Hidden (Provide OTP)';
@@ -1099,6 +1220,28 @@ app.post('/api/db', async (req, res) => {
           data.otp = Math.floor(1000 + Math.random() * 9000).toString();
           data.distance_km = parseFloat((Math.random() * 4 + 0.2).toFixed(1));
           data.expires_at = new Date(Date.now() + ORDER_CLAIM_WINDOW_MS).toISOString();
+
+          // Price is client-computed in Landing.tsx and was previously trusted verbatim —
+          // recompute it here from the authoritative catalog price for item_id instead,
+          // so a client can't submit an arbitrary price for a real item. Landing.tsx
+          // always sets item_id to a real sub_inventory or master_inventory record; if it
+          // doesn't resolve to either, the request is malformed and gets rejected outright
+          // rather than falling back to trusting the unverifiable client-supplied price.
+          if (data.item_id) {
+            let unitPrice = null;
+            const subItem = await SubInventory.findById(data.item_id).catch(() => null);
+            if (subItem) {
+              unitPrice = subItem.price;
+            } else {
+              const masterItem = await MasterItem.findById(data.item_id).catch(() => null);
+              if (masterItem) unitPrice = masterItem.base_price;
+            }
+            if (unitPrice == null) {
+              return res.status(400).json({ error: 'Order references an unknown item.' });
+            }
+            const qty = Number(data.quantity) || 1;
+            data.price = Math.round(unitPrice * qty * 100) / 100;
+          }
         }
 
         const doc = new Model(data);
@@ -1126,7 +1269,18 @@ app.post('/api/db', async (req, res) => {
       }
 
       case 'update': {
-        if (table === 'orders' && data.status === 'accepted') {
+        // Set only by the orders+accept atomic path below — when present, the write has
+        // already happened (atomically) and the generic find+save loop further down must
+        // be skipped for this request so the order isn't double-processed.
+        let acceptedAtomicDoc = null;
+
+        // Gate on "a non-admin caller is assigning vendor_id to this order" rather than
+        // "the status string is literally 'accepted'" — the latter let anyone skip every
+        // check below (OTP, vendor approval, category access, client limit) just by
+        // sending a different status value (e.g. 'preparing') alongside vendor_id. Real
+        // admin force-assigns (SubAdmin/SuperAdmin) are exempt because isAdmin is now
+        // derived from a verified session token, not a client-supplied flag.
+        if (table === 'orders' && data.vendor_id && !isAdmin) {
           const orderId = queryConditions._id || queryConditions.id;
           const orderDoc = await models.orders.findById(orderId);
           if (!orderDoc) {
@@ -1178,6 +1332,21 @@ app.post('/api/db', async (req, res) => {
           }
 
           delete data.otp_attempt;
+
+          // All the checks above only *read* the order (via findById) — two concurrent
+          // accept requests for the same order could both pass them before either write
+          // lands. Guard the actual write with the same 'pending' precondition, atomically,
+          // so only the first one to land can win; the loser gets the same "already
+          // claimed" error it would already get if it had simply lost this race a moment
+          // earlier during the read above.
+          acceptedAtomicDoc = await models.orders.findOneAndUpdate(
+            { _id: orderId, status: 'pending' },
+            data,
+            { new: true }
+          );
+          if (!acceptedAtomicDoc) {
+            return res.status(400).json({ error: 'Order already claimed or confirmed by another vendor' });
+          }
         }
 
         // If updating an order and it's accepted, clear its timer
@@ -1192,12 +1361,17 @@ app.post('/api/db', async (req, res) => {
           }
         }
 
-        const docs = await Model.find(queryConditions);
-        const updated = [];
-        for (const doc of docs) {
-          Object.assign(doc, data);
-          await doc.save();
-          updated.push(doc.toJSON());
+        let updated;
+        if (acceptedAtomicDoc) {
+          updated = [acceptedAtomicDoc.toJSON()];
+        } else {
+          const docs = await Model.find(queryConditions);
+          updated = [];
+          for (const doc of docs) {
+            Object.assign(doc, data);
+            await doc.save();
+            updated.push(doc.toJSON());
+          }
         }
 
         if (single) {

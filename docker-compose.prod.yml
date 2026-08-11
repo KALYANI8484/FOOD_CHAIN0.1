@@ -21,6 +21,11 @@ services:
     restart: unless-stopped
     env_file: [.env]
     environment: [PORT=5000]
+    # Docker's embedded DNS resolver (127.0.0.11) frequently fails on the SRV-record
+    # lookup that `mongodb+srv://` needs, surfacing as `querySrv ECONNREFUSED
+    # _mongodb._tcp....` even though the host's own DNS resolves it fine outside a
+    # container. Point at public resolvers directly instead of relying on Docker's proxy.
+    dns: [8.8.8.8, 8.8.4.4]
     ports: ["127.0.0.1:5000:5000"]
     volumes: [uploads:/app/public/uploads]
 
@@ -30,6 +35,7 @@ services:
     restart: unless-stopped
     env_file: [.env]
     environment: [PORT=5000]
+    dns: [8.8.8.8, 8.8.4.4]
     ports: ["127.0.0.1:5001:5000"]
     volumes: [uploads:/app/public/uploads]
 
@@ -39,6 +45,7 @@ services:
     restart: unless-stopped
     env_file: [.env]
     environment: [PORT=5000]
+    dns: [8.8.8.8, 8.8.4.4]
     ports: ["127.0.0.1:5002:5000"]
     volumes: [uploads:/app/public/uploads]
 

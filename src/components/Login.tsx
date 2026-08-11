@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Spinner, LanguageSelector, useSyncedLanguage } from './ui';
 import { AntigravitySuccessModal, CelebratorySubmitButton } from './AntigravitySuccessModal';
+import { SESSION_TOKEN_KEY } from '../lib/sessionAuth';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
@@ -179,7 +180,10 @@ export function Login({
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Invalid credentials');
-      else onLogin(data.role, username.trim());
+      else {
+        if (data.token) localStorage.setItem(SESSION_TOKEN_KEY, data.token);
+        onLogin(data.role, username.trim());
+      }
     } catch { setError('Network error — please try again'); }
     finally { setLoading(false); }
   };
@@ -189,6 +193,9 @@ export function Login({
     setError(''); setSuccess('');
     if (!sf.name || !sf.phone || !sf.dob || !sf.address || !sf.pincode) {
       setError('All required fields must be completed'); return;
+    }
+    if (!/^\d{10}$/.test(sf.phone.replace(/\D/g, ''))) {
+      setError('Phone number must be exactly 10 digits.'); return;
     }
     const cleanDob = sf.dob.replace(/\D/g, '');
     if (cleanDob.length !== 8) {

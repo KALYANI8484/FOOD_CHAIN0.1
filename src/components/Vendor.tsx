@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { supabase, type Vendor as VendorType, type VendorItem, type Order, type Plan, type MasterItem } from '../lib/supabase';
-import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, useSyncedLanguage, type Language } from './ui';
+import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, LanguageSelector, useSyncedLanguage, onImgError, type Language } from './ui';
 import { getVendorTier, isVendorCategoryActive, getVendorPlanLabel, FREE_PLAN_NAMES } from '../lib/vendorPlan';
 import { getItemTranslation } from './Landing';
 import { AntigravitySuccessModal } from './AntigravitySuccessModal';
@@ -78,6 +78,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 
   const [vendor, setVendor] = useState<VendorType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast, show } = useToast();
   
@@ -124,6 +125,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         setVendor(targetVendor);
       } catch (e) {
         console.error('Failed to load vendor session:', e);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -315,8 +317,12 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
           <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
             <AlertCircle size={28} className="text-amber-500" />
           </div>
-          <h2 className="text-xl font-bold">Awaiting Credentials Verification</h2>
-          <p className="text-muted mt-2 text-sm">No approved vendor matching this login was found, or your registration is in review by the Super Admin.</p>
+          <h2 className="text-xl font-bold">{loadError ? 'Connection Problem' : 'Awaiting Credentials Verification'}</h2>
+          <p className="text-muted mt-2 text-sm">
+            {loadError
+              ? "We couldn't reach the server to load your account. Please check your internet connection and try again."
+              : 'No approved vendor matching this login was found, or your registration is in review by the Super Admin.'}
+          </p>
           <Button className="mt-6" onClick={onExit}>Back to Home</Button>
         </div>
       </div>
@@ -411,7 +417,13 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
       <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} ${
         vendor.status === 'grace_period' ? 'mt-10 lg:mt-0' : ''
       }`}>
-        <div className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group" onClick={onExit}>
+        <div
+          className="px-5 py-5 border-b border-border hidden lg:flex items-center gap-2.5 cursor-pointer group"
+          onClick={onExit}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExit(); } }}
+        >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center group-hover:rotate-12 transition-transform">
             <Store size={18} className="text-white" />
           </div>
@@ -581,8 +593,17 @@ const vTrans = {
     paidPlanRequired: 'Paid Plan Required',
     awaitingActivation: 'Awaiting Activation',
     confirmOrder: 'Confirm Order',
-    radarSilentTitle: 'Radar Search is Silent',
-    radarSilentDesc: 'Upgrade your plan to connect with clients and unlock exclusive premium features.',
+    confirming: 'Confirming...',
+    radarSilentTitle: 'Track your orders right here',
+    orderCategory: 'Category',
+    orderItemsSummary: 'Order Items & Quantity',
+    ordersYouCanAccept: 'Orders You Can Accept',
+    otherNearbyOrders: 'Other Nearby Orders',
+    nearbyAreaCluster: 'Nearby Area Cluster',
+    liveClientOrderAvailable: 'Live Client Order Available',
+    upgradeToUnlockCategoryDesc: 'Upgrade your plan to unlock and claim live client orders in this category!',
+    upgradePlanNow: 'Upgrade Subscription Plan Now',
+    upgradePlanToUnlock: 'Upgrade Plan to Unlock',
     // Kanban Active Orders
     kanbanTitle: 'Active Orders Board',
     kanbanSubtitle: 'Progress board for kitchen preparation and dispatch',
@@ -688,8 +709,17 @@ const vTrans = {
     paidPlanRequired: 'पेड प्लान आवश्यक',
     awaitingActivation: 'एक्टिवेशन की प्रतीक्षा है',
     confirmOrder: 'ऑर्डर की पुष्टि करें',
-    radarSilentTitle: 'रडार खोज शांत है',
-    radarSilentDesc: 'आपकी सदस्यता योजना के लिए वर्तमान में कोई सक्रिय ग्राहक ऑर्डर प्रसारित नहीं हो रहे हैं।',
+    confirming: 'पुष्टि हो रही है...',
+    radarSilentTitle: 'यहाँ आपके ऑर्डर ट्रैक करें',
+    orderCategory: 'श्रेणी',
+    orderItemsSummary: 'ऑर्डर आइटम और मात्रा',
+    ordersYouCanAccept: 'आप जो ऑर्डर स्वीकार कर सकते हैं',
+    otherNearbyOrders: 'अन्य नज़दीकी ऑर्डर',
+    nearbyAreaCluster: 'नज़दीकी क्षेत्र क्लस्टर',
+    liveClientOrderAvailable: 'लाइव ग्राहक ऑर्डर उपलब्ध है',
+    upgradeToUnlockCategoryDesc: 'इस श्रेणी में लाइव ग्राहक ऑर्डर अनलॉक करने और स्वीकार करने के लिए अपनी योजना अपग्रेड करें!',
+    upgradePlanNow: 'सदस्यता योजना अभी अपग्रेड करें',
+    upgradePlanToUnlock: 'अनलॉक करने के लिए प्लान अपग्रेड करें',
     // Kanban Active Orders
     kanbanTitle: 'सक्रिय ऑर्डर बोर्ड',
     kanbanSubtitle: 'रसोई की तैयारी और प्रेषण के लिए प्रगति बोर्ड',
@@ -795,8 +825,17 @@ const vTrans = {
     paidPlanRequired: 'पेड प्लॅन आवश्यक',
     awaitingActivation: 'ॲक्टिव्हेशनची वाट पाहत आहे',
     confirmOrder: 'ऑर्डरची पुष्टी करा',
-    radarSilentTitle: 'रडार शोध शांत आहे',
-    radarSilentDesc: 'तुमच्या सबस्क्रिप्शन प्लॅनसाठी सध्या कोणतेही सक्रिय ग्राहक ऑर्डर्स प्रसारित होत नाहीत.',
+    confirming: 'पुष्टी होत आहे...',
+    radarSilentTitle: 'तुमचे ऑर्डर्स इथेच ट्रॅक करा',
+    orderCategory: 'श्रेणी',
+    orderItemsSummary: 'ऑर्डर आयटम आणि प्रमाण',
+    ordersYouCanAccept: 'तुम्ही स्वीकारू शकता असे ऑर्डर्स',
+    otherNearbyOrders: 'इतर जवळपासचे ऑर्डर्स',
+    nearbyAreaCluster: 'जवळपासचा परिसर क्लस्टर',
+    liveClientOrderAvailable: 'लाइव्ह ग्राहक ऑर्डर उपलब्ध आहे',
+    upgradeToUnlockCategoryDesc: 'या श्रेणीतील लाइव्ह ग्राहक ऑर्डर्स अनलॉक करून स्वीकारण्यासाठी तुमचा प्लॅन अपग्रेड करा!',
+    upgradePlanNow: 'सबस्क्रिप्शन प्लॅन आत्ताच अपग्रेड करा',
+    upgradePlanToUnlock: 'अनलॉक करण्यासाठी प्लॅन अपग्रेड करा',
     // Kanban Active Orders
     kanbanTitle: 'सक्रिय ऑर्डर्स बोर्ड',
     kanbanSubtitle: 'किचन तयारी आणि डिस्पॅचसाठी प्रगती बोर्ड',
@@ -1457,6 +1496,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
   const t = vTrans[lang];
   const [timers, setTimers] = useState<Record<string, number>>({});
   const [otpInputs, setOtpInputs] = useState<Record<string, string>>({});
+  const [acceptingIds, setAcceptingIds] = useState<Record<string, boolean>>({});
 
   // Clean timer loop
   useEffect(() => {
@@ -1480,7 +1520,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
     // Strictly block Free / Unsubscribed or Expired vendors from accepting client orders
     if (getVendorTier(vendor) === 'free' || vendor.status === 'expired' || vendor.status !== 'approved') {
       setShowUpgradeModal(true);
-      show('Upgrade Subscription Plan Now to accept live client orders.', 'error');
+      show(`${t.upgradePlanNow} to accept live client orders.`, 'error');
       return;
     }
 
@@ -1496,21 +1536,33 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
     const orderId = order.id || (order as any)._id || '';
     const vendorId = vendor.id || (vendor as any)._id || '';
 
-    const res = await fetch('/api/db', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        table: 'orders',
-        action: 'update',
-        filters: { _id: orderId },
-        data: {
-          vendor_id: vendorId,
-          status: 'accepted',
-          otp_attempt: otpAttempt,
-          accepted_at: new Date().toISOString()
-        }
-      })
-    });
-    const d = await res.json();
+    if (acceptingIds[orderId]) return; // already in flight — ignore a repeat click
+    setAcceptingIds((prev) => ({ ...prev, [orderId]: true }));
+
+    let d: any;
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders',
+          action: 'update',
+          filters: { _id: orderId },
+          data: {
+            vendor_id: vendorId,
+            status: 'accepted',
+            otp_attempt: otpAttempt,
+            accepted_at: new Date().toISOString()
+          }
+        })
+      });
+      d = await res.json();
+    } finally {
+      setAcceptingIds((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }
 
     if (d.error) {
       show(d.error || 'Failed to confirm order', 'error');
@@ -1553,7 +1605,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
   const acceptableOrders = visibleRadarOrders.filter(isOrderAcceptable);
   const otherOrders = visibleRadarOrders.filter((o) => !isOrderAcceptable(o));
 
-  const renderOrderCard = (o: Order) => {
+  const renderOrderCard = (o: Order, isAcceptableSection: boolean = false) => {
           const orderId = o.id || (o as any)._id || '';
           const isZipMatch = (o.client_zip || '').substring(0, 3) === (vendor.zip_code || '').substring(0, 3);
           const isActive = vendor.status === 'approved';
@@ -1577,7 +1629,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
             btnLabel = t.outOfZone;
             disabled = true;
           } else if (isLockedUpsell) {
-            btnLabel = 'Upgrade Subscription Plan Now';
+            btnLabel = t.upgradePlanNow;
           }
 
           return (
@@ -1600,24 +1652,24 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
                   
                   <div className="space-y-1 my-auto">
                     <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black uppercase tracking-wider">
-                      📍 Nearby Area Cluster ({vendor.zip_code?.substring(0, 3)}xxx)
+                      📍 {t.nearbyAreaCluster} ({vendor.zip_code?.substring(0, 3)}xxx)
                     </span>
                     <h4 className="font-black text-gray-900 text-base mt-2">
-                      Live Client Order Available
+                      {t.liveClientOrderAvailable}
                     </h4>
                     <p className="text-xs font-bold text-amber-800 max-w-xs mx-auto">
-                      Category: <span className="font-extrabold text-gray-900">{o.master_category_name || 'General'}</span>
+                      {t.orderCategory}: <span className="font-extrabold text-gray-900">{o.master_category_name || 'General'}</span>
                     </p>
                     <p className="text-[11px] text-gray-600 max-w-xs mx-auto italic mt-1">
-                      Upgrade your plan to unlock and claim live client orders in this category!
+                      {t.upgradeToUnlockCategoryDesc}
                     </p>
                   </div>
 
-                  <Button 
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer py-3" 
+                  <Button
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer py-3"
                     onClick={() => setShowUpgradeModal(true)}
                   >
-                    <Sparkles size={16} /> Upgrade Plan to Unlock
+                    <Sparkles size={16} /> {t.upgradePlanToUnlock}
                   </Button>
                 </div>
               )}
@@ -1635,32 +1687,32 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
                 </div>
 
                 <div className="my-4 space-y-2 text-xs text-muted">
-                  <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-1.5">
-                    <p className="text-amber-900 font-extrabold text-sm mb-1 flex items-center gap-1.5 border-b border-amber-200/60 pb-1">
+                  <div className={`p-3 rounded-xl border space-y-1.5 ${isAcceptableSection ? 'bg-emerald-50/70 border-emerald-300/80' : 'bg-amber-50/70 border-amber-200/80'}`}>
+                    <p className={`font-extrabold text-sm mb-1 flex items-center gap-1.5 border-b pb-1 ${isAcceptableSection ? 'text-emerald-900 border-emerald-300/60' : 'text-amber-900 border-amber-200/60'}`}>
                       <span>📢</span> {t.newBroadcastNotif}
                     </p>
-                    <p className="text-amber-900 font-bold">
-                      🔑 {t.clientOtp} <span className="font-black text-amber-950 text-sm tracking-wider px-1.5 py-0.5 bg-amber-100 rounded border border-amber-300">{o.otp}</span>
+                    <p className={`font-bold ${isAcceptableSection ? 'text-emerald-900' : 'text-amber-900'}`}>
+                      🔑 {t.clientOtp} <span className={`font-black text-sm tracking-wider px-1.5 py-0.5 rounded border ${isAcceptableSection ? 'text-emerald-950 bg-emerald-100 border-emerald-300' : 'text-amber-950 bg-amber-100 border-amber-300'}`}>{o.otp}</span>
                     </p>
                     {o.client_landmark && (
-                      <p className="text-amber-800 font-medium">
-                        📍 {t.landmark} <span className="font-bold text-amber-950">{o.client_landmark}</span>
+                      <p className={`font-medium ${isAcceptableSection ? 'text-emerald-800' : 'text-amber-800'}`}>
+                        📍 {t.landmark} <span className={`font-bold ${isAcceptableSection ? 'text-emerald-950' : 'text-amber-950'}`}>{o.client_landmark}</span>
                       </p>
                     )}
                     {/* Order Category and Order Summary Items below Landmark */}
-                    <div className="mt-2 p-2 bg-amber-100/80 rounded-lg border border-amber-300/80 text-amber-950 space-y-1">
-                      <p className="text-xs font-bold text-amber-900">
-                        🏷️ <span className="font-semibold">{(t as any).orderCategory || 'Category'}:</span> <span className="font-extrabold text-amber-950">{getItemTranslation(o.master_category_name || '', lang) || o.master_category_name || 'General'}</span>
+                    <div className={`mt-2 p-2 rounded-lg border space-y-1 ${isAcceptableSection ? 'bg-emerald-100/80 border-emerald-300/80 text-emerald-950' : 'bg-amber-100/80 border-amber-300/80 text-amber-950'}`}>
+                      <p className={`text-xs font-bold ${isAcceptableSection ? 'text-emerald-900' : 'text-amber-900'}`}>
+                        🏷️ <span className="font-semibold">{t.orderCategory}:</span> <span className={`font-extrabold ${isAcceptableSection ? 'text-emerald-950' : 'text-amber-950'}`}>{getItemTranslation(o.master_category_name || '', lang) || o.master_category_name || 'General'}</span>
                       </p>
-                      <p className="text-xs font-extrabold text-amber-900 flex items-start gap-1">
+                      <p className={`text-xs font-extrabold flex items-start gap-1 ${isAcceptableSection ? 'text-emerald-900' : 'text-amber-900'}`}>
                         <span>📦</span>
                         <span>
-                          <span className="font-bold">{(t as any).orderItemsSummary || 'Order Items & Quantity'}:</span>{' '}
-                          <span className="font-black text-amber-950 text-sm">{getItemTranslation(o.item_name || '', lang)}</span>
+                          <span className="font-bold">{t.orderItemsSummary}:</span>{' '}
+                          <span className={`font-black text-sm ${isAcceptableSection ? 'text-emerald-950' : 'text-amber-950'}`}>{getItemTranslation(o.item_name || '', lang)}</span>
                         </span>
                       </p>
                     </div>
-                    <p className="text-[10px] text-amber-700/80 mt-1 italic">{t.fullInfoNote}</p>
+                    <p className={`text-[10px] mt-1 italic ${isAcceptableSection ? 'text-emerald-700/80' : 'text-amber-700/80'}`}>{t.fullInfoNote}</p>
                   </div>
                   
                   {isZipMatch && isActive && !isFreeOrUnsubscribed && categoryAllowed && (
@@ -1670,7 +1722,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
                         placeholder={t.insertOtpPlaceholder}
                         value={otpInputs[o.id] || ''}
                         onChange={(e) => setOtpInputs({ ...otpInputs, [o.id]: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-surface-2 border-2 border-border text-text placeholder:text-muted/60 focus:border-accent outline-none text-sm font-bold shadow-sm transition-all text-center tracking-widest"
+                        className="w-full px-4 py-3 rounded-xl bg-emerald-50/40 border-2 border-emerald-400/70 text-text placeholder:text-emerald-700/50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none text-sm font-bold shadow-sm transition-all text-center tracking-widest"
                       />
                     </div>
                   )}
@@ -1683,7 +1735,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
                     className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold shadow-md flex items-center justify-center gap-1.5 cursor-pointer" 
                     onClick={() => setShowUpgradeModal(true)}
                   >
-                    <Sparkles size={15} /> Upgrade Subscription Plan Now
+                    <Sparkles size={15} /> {t.upgradePlanNow}
                   </Button>
                 ) : (
                   <div className="relative group/tooltip">
@@ -1700,16 +1752,16 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
                           acceptOrder(o, otpInputs[o.id] || '');
                         }
                       }}
-                      disabled={disabled || (isZipMatch && !(otpInputs[o.id]?.trim()))}
+                      disabled={disabled || acceptingIds[orderId] || (isZipMatch && !(otpInputs[o.id]?.trim()))}
                     >
                       {!isZipMatch && <Padlock size={14} />}
-                      {btnLabel}
+                      {acceptingIds[orderId] ? t.confirming : btnLabel}
                     </Button>
                     
                     {/* Hover tooltip for disabled buttons */}
                     {disabled && !isZipMatch && (
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-text text-bg text-[10px] rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none text-center shadow-lg font-semibold">
-                        This kitchen is registered in zip zone {vendor.zip_code}. Order belongs to zip {o.client_zip}.
+                        Order out of area
                       </span>
                     )}
                   </div>
@@ -1731,10 +1783,10 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
         {acceptableOrders.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-sm font-black text-emerald-700 uppercase tracking-wider flex items-center gap-2">
-              ✅ Orders You Can Accept ({acceptableOrders.length})
+              ✅ {t.ordersYouCanAccept} ({acceptableOrders.length})
             </h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {acceptableOrders.map(renderOrderCard)}
+              {acceptableOrders.map((o) => renderOrderCard(o, true))}
             </div>
           </div>
         )}
@@ -1743,10 +1795,10 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
         {otherOrders.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-sm font-black text-muted uppercase tracking-wider flex items-center gap-2">
-              🔒 Other Nearby Orders ({otherOrders.length})
+              🔒 {t.otherNearbyOrders} ({otherOrders.length})
             </h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {otherOrders.map(renderOrderCard)}
+              {otherOrders.map((o) => renderOrderCard(o, false))}
             </div>
           </div>
         )}
@@ -1754,26 +1806,39 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
         {visibleRadarOrders.length === 0 && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="col-span-full">
-              <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-amber-500/15 via-orange-500/15 to-amber-500/15 border-2 border-amber-500/40 text-center shadow-xl animate-fade-in my-4 relative overflow-hidden">
-                <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-400/20 blur-2xl pointer-events-none" />
-                <div className="relative z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white mx-auto flex items-center justify-center mb-4 shadow-lg shadow-amber-500/30 animate-pulse">
-                    <Sparkles size={32} />
+              {isFreeOrUnsubscribed ? (
+                <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-amber-500/15 via-orange-500/15 to-amber-500/15 border-2 border-amber-500/40 text-center shadow-xl animate-fade-in my-4 relative overflow-hidden">
+                  <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-400/20 blur-2xl pointer-events-none" />
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white mx-auto flex items-center justify-center mb-4 shadow-lg shadow-amber-500/30 animate-pulse">
+                      <Sparkles size={32} />
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight max-w-2xl mx-auto leading-snug">
+                      Upgrade your plan to connect with clients and unlock exclusive premium features.
+                    </h3>
+                    <p className="text-sm font-bold text-amber-800 mt-3 max-w-lg mx-auto">
+                      Start receiving live order broadcasts directly from nearby clients on your vendor radar.
+                    </p>
+                    <button
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="mt-6 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-black text-sm transition-all shadow-xl shadow-amber-500/30 inline-flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Sparkles size={18} /> {t.upgradePlanNow}
+                    </button>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight max-w-2xl mx-auto leading-snug">
-                    Upgrade your plan to connect with clients and unlock exclusive premium features.
-                  </h3>
-                  <p className="text-sm font-bold text-amber-800 mt-3 max-w-lg mx-auto">
-                    Start receiving live order broadcasts directly from nearby clients on your vendor radar.
-                  </p>
-                  <button
-                    onClick={() => setShowUpgradeModal(true)}
-                    className="mt-6 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-black text-sm transition-all shadow-xl shadow-amber-500/30 inline-flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <Sparkles size={18} /> Upgrade Subscription Plan Now
-                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="p-8 sm:p-12 rounded-3xl bg-surface border-2 border-border text-center shadow-md animate-fade-in my-4 relative overflow-hidden">
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent/70 text-white mx-auto flex items-center justify-center mb-4 shadow-lg shadow-accent/20">
+                      <Radar size={32} />
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-text tracking-tight max-w-2xl mx-auto leading-snug">
+                      {t.radarSilentTitle}
+                    </h3>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1784,14 +1849,14 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
         <Modal
           open={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}
-          title="Upgrade Subscription Plan Now"
+          title={t.upgradePlanNow}
         >
           <div className="text-center space-y-5 p-3">
             <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mx-auto flex items-center justify-center shadow-inner">
               <Sparkles size={32} />
             </div>
             <div>
-              <h3 className="text-xl font-extrabold text-[#111827]">Upgrade Subscription Plan Now</h3>
+              <h3 className="text-xl font-extrabold text-[#111827]">{t.upgradePlanNow}</h3>
               <p className="text-xs text-[#6B7280] mt-2 max-w-sm mx-auto leading-relaxed">
                 Free Tier accounts cannot claim or accept client orders. Please upgrade your subscription plan to connect with clients and accept live orders.
               </p>
@@ -1809,7 +1874,7 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
                 }}
                 className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
-                <Sparkles size={14} /> Upgrade Subscription Plan Now
+                <Sparkles size={14} /> {t.upgradePlanNow}
               </Button>
             </div>
           </div>
@@ -1828,6 +1893,7 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [otpVal, setOtpVal] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const load = async () => {
     try {
@@ -1875,17 +1941,22 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
 
     const oId = selectedOrder.id || (selectedOrder as any)._id || '';
 
-    await fetch('/api/db', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        table: 'orders', action: 'update', filters: { _id: oId },
-        data: { status: 'delivered', delivered_at: new Date().toISOString() }
-      })
-    });
+    setSubmitting(true);
+    try {
+      await fetch('/api/db', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'orders', action: 'update', filters: { _id: oId },
+          data: { status: 'delivered', delivered_at: new Date().toISOString() }
+        })
+      });
 
-    show('Order delivered successfully! Payment processed.');
-    setSelectedOrder(null);
-    load();
+      show('Order delivered successfully! Payment processed.');
+      setSelectedOrder(null);
+      load();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return <Spinner />;
@@ -2035,7 +2106,7 @@ function VendorKanban({ vendor, show }: { vendor: VendorType; show: (m: string, 
             />
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
               <Button variant="outline" onClick={() => setSelectedOrder(null)}>{t.cancel}</Button>
-              <Button onClick={verifyOTPAndDeliver} disabled={!otpVal}>{t.confirmHandover}</Button>
+              <Button onClick={verifyOTPAndDeliver} disabled={!otpVal || submitting}>{t.confirmHandover}</Button>
             </div>
           </div>
         )}
@@ -2362,7 +2433,7 @@ function VendorGuidesList() {
                   {g.file_name && <p className="text-[11px] text-muted font-semibold mt-0.5">{g.file_name}</p>}
                   {isImage && (
                     <div className="mt-3 relative group cursor-pointer" onClick={() => setSelectedGuideImg(g.file_data)}>
-                      <img src={g.file_data} alt={g.title} className="w-full h-auto max-h-56 object-contain rounded-xl border border-border/80 bg-white" />
+                      <img src={g.file_data} alt={g.title} className="w-full h-auto max-h-56 object-contain rounded-xl border border-border/80 bg-white" onError={onImgError} />
                       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center text-white text-xs font-bold">
                         Click to View Full Image
                       </div>
@@ -2399,7 +2470,7 @@ function VendorGuidesList() {
       <Modal open={!!selectedGuideImg} onClose={() => setSelectedGuideImg(null)} title="Full Image View">
         {selectedGuideImg && (
           <div className="space-y-4 text-center">
-            <img src={selectedGuideImg} alt="Guide" className="w-full h-auto max-h-[75vh] object-contain rounded-xl border border-border bg-white mx-auto shadow-md" />
+            <img src={selectedGuideImg} alt="Guide" className="w-full h-auto max-h-[75vh] object-contain rounded-xl border border-border bg-white mx-auto shadow-md" onError={onImgError} />
             <a
               href={selectedGuideImg}
               download="guide_image.png"
@@ -2693,7 +2764,7 @@ function VendorMenu({ vendor }: { vendor: VendorType }) {
                             <div className="flex items-start justify-between gap-3">
                               <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center overflow-hidden shrink-0">
                                 {item.image_url ? (
-                                  <img src={item.image_url} alt={item.item_name} className="w-full h-full object-cover" />
+                                  <img src={item.image_url} alt={item.item_name} className="w-full h-full object-cover" onError={onImgError} />
                                 ) : (
                                   <span className="text-2xl">🍲</span>
                                 )}

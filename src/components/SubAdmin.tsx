@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase, type Vendor, type Activity, type VendorItem, type Plan } from '../lib/supabase';
 import { getVendorPlanLabel } from '../lib/vendorPlan';
-import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer, LanguageSelector, useSyncedLanguage, type Language } from './ui';
+import { Button, Badge, useToast, Toast, Spinner, EmptyState, SpotlightCard, Modal, Drawer, LanguageSelector, useSyncedLanguage, onImgError, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 import { exportCSV } from './SuperAdmin';
 
@@ -60,7 +60,13 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
     <div className="flex h-screen bg-bg text-text overflow-hidden relative">
       {/* Mobile Top Navbar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={onExit}>
+        <div
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={onExit}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExit(); } }}
+        >
           <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain shrink-0" />
           <span className="font-extrabold text-sm tracking-tight text-black">VIKRAM ADS</span>
         </div>
@@ -85,7 +91,13 @@ export function SubAdmin({ onExit, adminEmail }: { onExit: () => void; adminEmai
 
       {/* Responsive Drawer Sidebar */}
       <aside className={`w-64 border-r border-border bg-surface flex flex-col h-screen fixed lg:sticky top-0 z-40 transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="px-5 py-4 border-b border-border hidden lg:flex items-center gap-3 cursor-pointer group" onClick={onExit}>
+        <div
+          className="px-5 py-4 border-b border-border hidden lg:flex items-center gap-3 cursor-pointer group"
+          onClick={onExit}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExit(); } }}
+        >
           <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain shrink-0" />
           <div>
             <p className="font-extrabold text-base tracking-tight text-black">VIKRAM ADS</p>
@@ -766,7 +778,7 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
                   <tr key={v.id} className="hover:bg-gray-50/60 transition-colors bg-white">
                     <td className="px-6 py-4 flex items-center gap-3">
                       {v.logo_url ? (
-                        <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-gray-200" />
+                        <img src={v.logo_url} alt={v.shop_name} className="w-10 h-10 rounded-xl object-cover border border-gray-200" onError={onImgError} />
                       ) : (
                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center border border-gray-200"><Store size={16} className="text-gray-400" /></div>
                       )}
@@ -1006,7 +1018,7 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
           <div className="space-y-6">
             <div className="text-center pb-6 border-b border-border">
               {viewVendor.logo_url ? (
-                <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-20 h-20 rounded-2xl object-cover mx-auto border border-border" />
+                <img src={viewVendor.logo_url} alt={viewVendor.shop_name} className="w-20 h-20 rounded-2xl object-cover mx-auto border border-border" onError={onImgError} />
               ) : (
                 <div className="w-20 h-20 rounded-2xl bg-surface-2 mx-auto flex items-center justify-center border border-border"><Store size={32} className="text-muted" /></div>
               )}
@@ -1047,7 +1059,7 @@ function MyVendors({ show, adminEmail }: { show: (m: string, t?: 'success' | 'er
                   {viewInventory.map(item => (
                     <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-2 border border-border">
                       <div className="flex items-center gap-2 min-w-0">
-                        {item.image_url && <img src={item.image_url} alt={item.item_name} className="w-8 h-8 rounded-lg object-cover border border-border" />}
+                        {item.image_url && <img src={item.image_url} alt={item.item_name} className="w-8 h-8 rounded-lg object-cover border border-border" onError={onImgError} />}
                         <div className="min-w-0">
                           <p className="text-xs font-bold truncate text-text">{item.item_name}</p>
                           <p className="text-[10px] text-muted">{item.category}</p>
@@ -1184,9 +1196,9 @@ function CorrectionInbox({ show }: { show: (m: string, t?: 'success' | 'error' |
           {vendors.map((v) => (
             <div key={v.id} className="card p-6 bg-surface border border-border relative hover:border-red-500/30 transition-all flex flex-col justify-between">
               <div>
-                <div className="flex items-start justify-between">
-                  <h3 className="font-extrabold text-base truncate text-text">{v.shop_name}</h3>
-                  <Badge variant="error">{t.rejected}</Badge>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-extrabold text-base truncate text-text min-w-0 flex-1">{v.shop_name}</h3>
+                  <Badge variant="error" className="shrink-0">{t.rejected}</Badge>
                 </div>
 
                 {/* Highlighted Rejection feedback note */}
@@ -1469,7 +1481,7 @@ function SubGuides() {
             </div>
             <div className="rounded-xl border border-border overflow-hidden min-h-[40vh]">
               {selectedGuide.file_data && (selectedGuide.file_data.startsWith('data:image') || /\.(png|jpg|jpeg|webp|gif|svg)($|\?)/i.test(selectedGuide.file_name || '')) ? (
-                <img src={selectedGuide.file_data} alt={selectedGuide.title} className="w-full h-auto object-contain" />
+                <img src={selectedGuide.file_data} alt={selectedGuide.title} className="w-full h-auto object-contain" onError={onImgError} />
               ) : selectedGuide.file_data ? (
                 <iframe src={selectedGuide.file_data} title={selectedGuide.title} className="w-full h-[65vh] border-0" />
               ) : (
@@ -1729,7 +1741,12 @@ function SubAdminLiveOrderTrackerTab({ show }: { show: (m: string, t?: 'success'
           filters: { id: targetId },
           data: {
             status: 'pending',
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            // The 9h vendor pickup window should start at broadcast time, not at the
+            // original client submission time — without this, expires_at is left over
+            // from insert() and orders approved late (or after their original 9h had
+            // already elapsed) get auto-expired almost immediately after approval.
+            expires_at: new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString()
           },
           admin_override: true
         })
@@ -1745,6 +1762,7 @@ function SubAdminLiveOrderTrackerTab({ show }: { show: (m: string, t?: 'success'
   };
 
   const handleDiscardOrder = async (order: any) => {
+    if (!confirm('Discard this order? This permanently deletes it and cannot be undone.')) return;
     try {
       const targetId = order.id || order._id;
       const res = await fetch('/api/db', {
@@ -2227,7 +2245,12 @@ function SubAdminLiveOrderTrackerTab({ show }: { show: (m: string, t?: 'success'
 // Orders are considered "missed" once they've broadcast past the 9-hour vendor pickup window
 // (kept consistent with the SLA countdown shown on Vendor.tsx and on each order card below).
 const MISSED_ORDER_THRESHOLD_SECS = 32400;
-const isOrderMissed = (o: any) => Math.max(0, Date.now() - new Date(o.created_at).getTime()) / 1000 >= MISSED_ORDER_THRESHOLD_SECS;
+// An order counts as "missed" either once the backend has already auto-expired it past the
+// 9-hour claim window (status flips to 'System Denied' — see ORDER_CLAIM_WINDOW_MS in server.js),
+// or in the brief window before that sweep runs, where it's still 'pending' but already past age.
+const isOrderMissed = (o: any) =>
+  o.status === 'System Denied' ||
+  (o.status === 'pending' && Math.max(0, Date.now() - new Date(o.created_at).getTime()) / 1000 >= MISSED_ORDER_THRESHOLD_SECS);
 
 const podTrans = {
   en: {
@@ -2414,7 +2437,7 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
         body: JSON.stringify({
           table: 'orders',
           action: 'select',
-          filters: { status: 'pending' },
+          filters: [{ field: 'status', op: 'in', value: ['pending', 'System Denied'] }],
           admin_override: true
         })
       });
@@ -2459,7 +2482,10 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
         filters: { id: targetId },
         data: {
           status: 'pending',
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          // Without this, the order keeps its original (already elapsed) deadline and the
+          // next periodic expiry sweep (server.js, every 5 min) immediately re-expires it.
+          expires_at: new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString()
         },
         admin_override: true
       })
@@ -2541,7 +2567,11 @@ function SubAdminPendingOrdersTab({ show }: { show: (m: string, t?: 'success' | 
               vendor_id: selectedVendorId,
               vendor_name: targetVendor.shop_name,
               vendor_phone: targetVendor.phone,
-              status: 'accepted'
+              // 'accepted' requires a matching otp_attempt server-side (see /api/db update
+              // handler in server.js), which a force-assign never has — use 'preparing'
+              // instead, same as SuperAdmin.tsx's working manual-assign flow.
+              status: 'preparing',
+              accepted_at: new Date().toISOString()
             },
             admin_override: true
           })
