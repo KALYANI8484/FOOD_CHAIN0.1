@@ -709,8 +709,9 @@ function maskPendingOrderPII(order) {
   return {
     ...order,
     client_name: 'Hidden (Provide OTP)',
-    client_phone: 'Hidden (Provide OTP)',
-    client_address: 'Hidden (Provide OTP)'
+    client_phone: 'Hidden (Provide OTP)'
+    // client_address is intentionally NOT masked — vendors need the full address
+    // pre-claim; only the phone number stays hidden until the order is claimed.
   };
 }
 
@@ -1195,7 +1196,8 @@ app.post('/api/db', async (req, res) => {
             if (obj.status === 'pending' && !(isAdmin && req.body.admin_override)) {
               obj.client_name = 'Hidden (Provide OTP)';
               obj.client_phone = 'Hidden (Provide OTP)';
-              obj.client_address = 'Hidden (Provide OTP)';
+              // client_address is intentionally NOT masked — vendors need the full
+              // address pre-claim; only the phone number stays hidden until claimed.
             }
             return obj;
           });
