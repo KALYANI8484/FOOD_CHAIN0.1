@@ -586,6 +586,7 @@ const vTrans = {
     newBroadcastNotif: 'New Broadcast Notification',
     clientOtp: "Client's OTP:",
     landmark: 'Landmark:',
+    address: 'Address:',
     fullInfoNote: 'Full info will display in Active Orders once confirmed.',
     insertOtpPlaceholder: "Insert client's OTP here to claim *",
     outOfZone: 'Out of Delivery Zone',
@@ -702,6 +703,7 @@ const vTrans = {
     newBroadcastNotif: 'नई ब्रॉडकास्ट अधिसूचना',
     clientOtp: 'ग्राहक ओटीपी:',
     landmark: 'लैंडमार्क:',
+    address: 'पता:',
     fullInfoNote: 'पुष्टि होने के बाद पूरी जानकारी सक्रिय ऑर्डर में दिखाई देगी।',
     insertOtpPlaceholder: 'दावा करने के लिए ग्राहक ओटीपी दर्ज करें *',
     outOfZone: 'डिलीवरी क्षेत्र से बाहर',
@@ -818,6 +820,7 @@ const vTrans = {
     newBroadcastNotif: 'नवीन ब्रॉडकास्ट सूचना',
     clientOtp: 'ग्राहकाचा ओटीपी:',
     landmark: 'लँडमार्क:',
+    address: 'पत्ता:',
     fullInfoNote: 'खात्री झाल्यावर संपूर्ण माहिती सक्रिय ऑर्डरमध्ये दिसेल.',
     insertOtpPlaceholder: 'स्वीकारण्यासाठी ग्राहकाचा ओटीपी प्रविष्ट करा *',
     outOfZone: 'डिलिव्हरी क्षेत्राबाहेर',
@@ -1697,6 +1700,11 @@ function OrderRadar({ vendor, radarOrders, onTab, show, onOrderClaimed }: OrderR
                     {o.client_landmark && (
                       <p className={`font-medium ${isAcceptableSection ? 'text-emerald-800' : 'text-amber-800'}`}>
                         📍 {t.landmark} <span className={`font-bold ${isAcceptableSection ? 'text-emerald-950' : 'text-amber-950'}`}>{o.client_landmark}</span>
+                      </p>
+                    )}
+                    {o.client_address && (
+                      <p className={`font-medium ${isAcceptableSection ? 'text-emerald-800' : 'text-amber-800'}`}>
+                        🏠 {t.address} <span className={`font-bold ${isAcceptableSection ? 'text-emerald-950' : 'text-amber-950'}`}>{o.client_address}</span>
                       </p>
                     )}
                     {/* Order Category and Order Summary Items below Landmark */}
