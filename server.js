@@ -82,6 +82,15 @@ const resetPasswordLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many password reset requests. Please try again later.' }
 });
+// The frontend already dedupes this to once per browser (localStorage), so this limit
+// only needs to catch a script bypassing that — not real shared-IP traffic.
+const siteViewLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests.' }
+});
 
 // Disable Mongoose query buffering so disconnected DB immediately returns error instead of 10s timeout
 mongoose.set('bufferCommands', false);
@@ -176,6 +185,16 @@ const initDb = async () => {
       }
     } catch (err) {
       console.error('Legacy vendor auto-repair notice:', err.message);
+    }
+
+    try {
+      // Backfill site_views on a settings singleton created before this field existed.
+      // Mongoose's schema `default` only applies when hydrating a document through the
+      // normal read/create path; the raw $inc used by /api/site-views/increment operates
+      // directly on stored BSON and treats a genuinely-missing field as starting from 0.
+      await Settings.updateMany({ site_views: { $exists: false } }, { $set: { site_views: 12000 } });
+    } catch (err) {
+      console.error('Settings site_views backfill notice:', err.message);
     }
 
     // ─── Auto-Expiry & Grace Period Cron (runs every 24 hours) ───────────────────
@@ -438,6 +457,7 @@ const settingsSchema = new mongoose.Schema({
   qr_url: { type: String, default: null },
   maintenance_mode: { type: Boolean, default: false },
   live_orders_offset: { type: Number, default: 764 },
+  site_views: { type: Number, default: 12000 },
   support_email: { type: String, default: 'support@vikramads.com' },
   updated_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
@@ -1082,6 +1102,24 @@ app.post('/api/vendors/signup', signupLimiter, async (req, res) => {
     io.emit('activityAdded');
     
     res.json({ data: newVendor, error: null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Public website-view counter for the landing page hero KPI. Each unique visitor (deduped
+// client-side via localStorage — see Landing.tsx) counts as +3 views. Deliberately NOT
+// routed through the generic /api/db endpoint below: that endpoint rejects any `$`-prefixed
+// key in a request body as an injection guard, and a real atomic increment needs exactly
+// that operator — a small dedicated endpoint here avoids weakening that guard just for this.
+app.post('/api/site-views/increment', siteViewLimiter, async (req, res) => {
+  try {
+    const updated = await Settings.findOneAndUpdate(
+      {},
+      { $inc: { site_views: 3 } },
+      { upsert: true, new: true }
+    );
+    res.json({ site_views: updated.site_views });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

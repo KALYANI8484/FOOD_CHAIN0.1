@@ -815,7 +815,7 @@ function OrderModal({ master, onClose, onOrderPlaced, t, lang }: OrderModalProps
                   }`}
                 >
                   <ShoppingBag size={22} className="text-amber-600" />
-                  <span className="font-bold text-sm text-gray-900">Place an Order 🛒</span>
+                  <span className="font-bold text-sm text-gray-900">Product Enquiry 🛒</span>
                   <span className="text-[11px] text-gray-500">Enter delivery details</span>
                 </button>
               </div>
@@ -982,6 +982,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
   const [loadingItems, setLoadingItems] = useState(true);
   const [totalOrders, setTotalOrders] = useState<number | null>(null);
   const [totalVendors, setTotalVendors] = useState<number | null>(null);
+  const [siteViews, setSiteViews] = useState<number | null>(null);
   const [planDocs, setPlanDocs] = useState<any[]>([]);
   const [plansViewerOpen, setPlansViewerOpen] = useState(false);
   const [activePlanDocIndex, setActivePlanDocIndex] = useState<number | null>(null);
@@ -996,6 +997,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
   const [language] = useSyncedLanguage();
   const t = translations[language];
+  const { count: siteViewsCount, ref: siteViewsRef } = useCountUp(siteViews);
 
   useScrollReveal();
 
@@ -1048,7 +1050,8 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         const [id, od, vd, gd, sd] = await Promise.all([iR.json(), oR.json(), vR.json(), gR.json(), sR.json()]);
         
         const settingsOffset = sd.data?.[0]?.live_orders_offset || 764;
-        
+        if (sd.data?.[0]) setSiteViews(sd.data[0].site_views || 0);
+
         if (id.data) setMasterItems(id.data);
         if (od.data) {
           setTotalOrders(od.data.length + settingsOffset);
@@ -1067,6 +1070,23 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         }
       } catch (e) { console.error(e); }
       finally { setLoadingItems(false); }
+    })();
+  }, []);
+
+  // Website-views KPI: count each unique visitor once (deduped via localStorage, not
+  // per page load/refresh) and worth 3 views each — see /api/site-views/increment.
+  useEffect(() => {
+    if (localStorage.getItem('site_visited')) return;
+    // Set the flag synchronously, before the async call — otherwise React StrictMode's
+    // dev-mode double-invoke (or any other rapid double-mount) sees the flag still unset
+    // on both passes and fires two increments instead of one.
+    localStorage.setItem('site_visited', '1');
+    (async () => {
+      try {
+        const res = await fetch('/api/site-views/increment', { method: 'POST' });
+        const d = await res.json();
+        if (typeof d.site_views === 'number') setSiteViews(d.site_views);
+      } catch (e) { console.error(e); }
     })();
   }, []);
 
@@ -1278,9 +1298,16 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             Maharashtra’s Wholesale Food Network
           </div>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold leading-tight animate-fade-in-up" style={{ fontFamily:"'Playfair Display', serif" }}>
-            Fresh Bulk Food,<br /><span className="text-[#C5A059]">Verified Local Vendors</span>
-          </h1>
+          <div ref={siteViewsRef} className="animate-fade-in-up">
+            {siteViews === null ? (
+              <div className="h-[1em] flex items-center justify-center py-2"><Spinner /></div>
+            ) : (
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold leading-tight" style={{ fontFamily:"'Playfair Display', serif" }}>
+                {siteViewsCount.toLocaleString()}+
+              </h1>
+            )}
+            <p className="text-[#C5A059] text-sm sm:text-base font-bold uppercase tracking-widest mt-2">Website Visits</p>
+          </div>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-12 overflow-hidden">
           <svg viewBox="0 0 1440 48" preserveAspectRatio="none" className="w-full h-full" fill="#F7F4EF"><path d="M0,48 C360,0 1080,48 1440,0 L1440,48 Z" /></svg>
