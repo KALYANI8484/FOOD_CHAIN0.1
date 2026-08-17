@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, MapPin, ChevronRight,
-  ChevronLeft, Hash, User, CheckCircle, Globe,
-  Package, Users as UsersIcon, TrendingUp, Star, UserPlus, Maximize2, FileText, Search
+  ChevronLeft, Hash, User, CheckCircle,
+  TrendingUp, Star, UserPlus, Maximize2, FileText, Search
 } from 'lucide-react';
 import { Spinner, LanguageSelector, useSyncedLanguage, onImgError, type Language } from './ui';
 import { supabase, type TopTrending } from '../lib/supabase';
