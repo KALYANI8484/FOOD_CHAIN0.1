@@ -1682,13 +1682,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 ))}
               </ul>
 
-              <div className="mt-6 pt-5 border-t border-[#C5A059]/20">
-                <p className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest mb-2">Co-Founders</p>
-                <ul className="space-y-1.5 text-sm text-[#F7F4EF]/80">
-                  <li>Pratibha Satere — 9689784930</li>
-                  <li>Sonam Mutke</li>
-                </ul>
-              </div>
             </div>
 
             <div className="reveal reveal-right">
