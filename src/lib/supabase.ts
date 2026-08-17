@@ -182,6 +182,19 @@ export type ClientProfile = {
   created_at: string;
 };
 
+export type TopTrending = {
+  id: string;
+  name: string;
+  city: string;
+  phone: string;
+  category: string;
+  price: number;
+  image_url: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 class QueryBuilder {
   private table: string;
   private action: 'select' | 'insert' | 'update' | 'delete' = 'select';

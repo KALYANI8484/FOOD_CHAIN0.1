@@ -2,9 +2,9 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Store, Package, CreditCard, FileText, Users,
   CheckCircle2, Search, Plus, Minus, Check, Trash2, Upload, AlertCircle,
-  Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles
+  Activity as ActivityIcon, Eye, Edit2, Pencil, FileUp, Menu, X, Phone, Mail, MapPin, DollarSign, ShoppingBag, ChevronLeft, Clock, MessageSquare, Download, MessageCircle, Sparkles, TrendingUp
 } from 'lucide-react';
-import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription, type AppliedAddon } from '../lib/supabase';
+import { supabase, type Vendor, type Plan, type MasterItem, type SubInventory, type Order, type Activity, type SubAdmin, type UpgradeRequest, type VendorItem, type VendorSubscription, type AppliedAddon, type TopTrending } from '../lib/supabase';
 import { Button, Badge, Modal, Input, Select, useToast, Toast, Spinner, EmptyState, SpotlightCard, Drawer, LanguageSelector, useSyncedLanguage, onImgError, type Language } from './ui';
 import { VendorForm } from './VendorForm';
 import { getVendorTier, isVendorCategoryActive } from '../lib/vendorPlan';
@@ -39,7 +39,7 @@ const applyPlanToSubscriptions = (existingSubs: VendorSubscription[], plan: Plan
   return [...existingSubs, newSub];
 };
 
-type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins';
+type Tab = 'vendors' | 'approvals' | 'plans' | 'inventory' | 'guides' | 'sub_admins' | 'top_trending';
 
 // Helper to compress images client-side before upload to bypass Nginx payload limits
 const compressImageFile = (file: File, maxWidth = 1024, quality = 0.8): Promise<File> => {
@@ -84,9 +84,9 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
   const [lang] = useSyncedLanguage();
 
   const navLabels = {
-    en: { approvals: 'Team Approvals', vendors: 'Vendor Database', plans: 'Pricing Plans', inventory: 'Master Inventory', guides: 'Guide Documents', sub_admins: 'Sub-Admins', exit: 'Exit Dashboard' },
-    hi: { approvals: 'टीम मंजूरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'मूल्य निर्धारण प्लान', inventory: 'मास्टर इन्वेंटरी', guides: 'गाइड दस्तावेज', sub_admins: 'सब-एडमिन', exit: 'डैशबोर्ड से बाहर निकलें' },
-    mr: { approvals: 'टीम मंजुरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'किंमत प्लॅन्स', inventory: 'मास्टर इन्व्हेंटरी', guides: 'मार्गदर्शक दस्तऐवज', sub_admins: 'सब-ॲडमिन', exit: 'डॅशबोर्डवरून बाहेर पडा' },
+    en: { approvals: 'Team Approvals', vendors: 'Vendor Database', plans: 'Pricing Plans', inventory: 'Master Inventory', guides: 'Guide Documents', sub_admins: 'Sub-Admins', top_trending: 'Top Trending', exit: 'Exit Dashboard' },
+    hi: { approvals: 'टीम मंजूरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'मूल्य निर्धारण प्लान', inventory: 'मास्टर इन्वेंटरी', guides: 'गाइड दस्तावेज', sub_admins: 'सब-एडमिन', top_trending: 'टॉप ट्रेंडिंग', exit: 'डैशबोर्ड से बाहर निकलें' },
+    mr: { approvals: 'टीम मंजुरी (Approvals)', vendors: 'विक्रेता डेटाबेस', plans: 'किंमत प्लॅन्स', inventory: 'मास्टर इन्व्हेंटरी', guides: 'मार्गदर्शक दस्तऐवज', sub_admins: 'सब-ॲडमिन', top_trending: 'टॉप ट्रेंडिंग', exit: 'डॅशबोर्डवरून बाहेर पडा' },
   }[lang];
 
   const [tab, setTabState] = useState<Tab>('approvals');
@@ -119,7 +119,8 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
     { id: 'plans', label: navLabels.plans, icon: CreditCard },
     { id: 'inventory', label: navLabels.inventory, icon: Package },
     { id: 'guides', label: navLabels.guides, icon: FileText },
-    { id: 'sub_admins', label: navLabels.sub_admins, icon: Users }
+    { id: 'sub_admins', label: navLabels.sub_admins, icon: Users },
+    { id: 'top_trending', label: navLabels.top_trending, icon: TrendingUp }
   ];
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -210,6 +211,7 @@ export function SuperAdmin({ onExit }: { onExit: () => void }) {
           {tab === 'inventory' && <InventoryTab lang={lang} show={show} />}
           {tab === 'guides' && <GuidesTab lang={lang} show={show} />}
           {tab === 'sub_admins' && <SubAdminsTab lang={lang} show={show} />}
+          {tab === 'top_trending' && <TopTrendingTab lang={lang} show={show} />}
         </div>
       </main>
 
@@ -4917,6 +4919,398 @@ function SubAdminsTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'i
             <Button onClick={handleCreate}>{t.saveCredentials}</Button>
           </div>
         </div>
+      </Modal>
+    </div>
+  );
+}
+
+// 9. Top Trending — super-admin-curated vendor spotlight surfaced on the landing page
+const topTrendingTrans = {
+  en: {
+    title: 'Top Trending Kitchens',
+    subtitle: 'Curate the vendor spotlight that appears under "Do You Run a Kitchen?" on the public landing page',
+    create: 'Add Trending Card',
+    edit: 'Edit Trending Card',
+    view: 'Card Preview',
+    searchPlaceholder: 'Search by name, city, or category…',
+    colImage: 'Image',
+    colName: 'Name / Shop',
+    colCity: 'City',
+    colPhone: 'Phone',
+    colCategory: 'Category',
+    colPrice: 'Price',
+    colOrder: 'Order',
+    colActions: 'Actions',
+    fldName: 'Name / Shop Name',
+    fldCity: 'City',
+    fldPhone: 'Phone Number',
+    fldCategory: 'Category',
+    fldPrice: 'Category Price (₹)',
+    fldOrder: 'Sort Order (lower = shown first)',
+    fldImage: 'Card Image',
+    uploadHelp: 'JPG, PNG, or WebP · up to 15 MB · compressed automatically',
+    uploading: 'Uploading…',
+    save: 'Save Card',
+    cancel: 'Cancel',
+    empty: 'No trending cards yet',
+    emptyHelp: 'Add your first card to spotlight a kitchen on the landing page.',
+    noMatch: 'No cards match your search.',
+    confirmRemove: (name: string) => `Remove "${name}" from Top Trending?`,
+    toastCreated: (name: string) => `Trending card "${name}" added`,
+    toastUpdated: (name: string) => `Trending card "${name}" updated`,
+    toastRemoved: (name: string) => `Trending card "${name}" removed`,
+    validationRequired: 'Name, city, phone, category and price are required',
+  },
+  hi: {
+    title: 'टॉप ट्रेंडिंग किचन',
+    subtitle: 'लैंडिंग पेज पर "क्या आप किचन चलाते हैं?" के नीचे दिखने वाले वेंडर स्पॉटलाइट को क्यूरेट करें',
+    create: 'ट्रेंडिंग कार्ड जोड़ें',
+    edit: 'ट्रेंडिंग कार्ड संपादित करें',
+    view: 'कार्ड पूर्वावलोकन',
+    searchPlaceholder: 'नाम, शहर या श्रेणी से खोजें…',
+    colImage: 'चित्र',
+    colName: 'नाम / शॉप',
+    colCity: 'शहर',
+    colPhone: 'फ़ोन',
+    colCategory: 'श्रेणी',
+    colPrice: 'क़ीमत',
+    colOrder: 'क्रम',
+    colActions: 'कार्रवाई',
+    fldName: 'नाम / शॉप का नाम',
+    fldCity: 'शहर',
+    fldPhone: 'फ़ोन नंबर',
+    fldCategory: 'श्रेणी',
+    fldPrice: 'श्रेणी क़ीमत (₹)',
+    fldOrder: 'क्रम (कम = पहले दिखे)',
+    fldImage: 'कार्ड चित्र',
+    uploadHelp: 'JPG, PNG या WebP · 15 MB तक · स्वतः संकुचित',
+    uploading: 'अपलोड हो रहा है…',
+    save: 'कार्ड सहेजें',
+    cancel: 'रद्द करें',
+    empty: 'अभी तक कोई ट्रेंडिंग कार्ड नहीं',
+    emptyHelp: 'लैंडिंग पेज पर किचन को स्पॉटलाइट करने के लिए पहला कार्ड जोड़ें।',
+    noMatch: 'आपकी खोज से मेल खाता कोई कार्ड नहीं।',
+    confirmRemove: (name: string) => `"${name}" को टॉप ट्रेंडिंग से हटाएं?`,
+    toastCreated: (name: string) => `ट्रेंडिंग कार्ड "${name}" जोड़ा गया`,
+    toastUpdated: (name: string) => `ट्रेंडिंग कार्ड "${name}" अपडेट किया गया`,
+    toastRemoved: (name: string) => `ट्रेंडिंग कार्ड "${name}" हटाया गया`,
+    validationRequired: 'नाम, शहर, फ़ोन, श्रेणी और क़ीमत आवश्यक हैं',
+  },
+  mr: {
+    title: 'टॉप ट्रेंडिंग किचन',
+    subtitle: 'लँडिंग पेजवर "तुम्ही किचन चालवता का?" खाली दिसणाऱ्या व्हेंडर स्पॉटलाइटचे व्यवस्थापन करा',
+    create: 'ट्रेंडिंग कार्ड जोडा',
+    edit: 'ट्रेंडिंग कार्ड संपादित करा',
+    view: 'कार्ड पूर्वावलोकन',
+    searchPlaceholder: 'नाव, शहर किंवा श्रेणीने शोधा…',
+    colImage: 'चित्र',
+    colName: 'नाव / शॉप',
+    colCity: 'शहर',
+    colPhone: 'फोन',
+    colCategory: 'श्रेणी',
+    colPrice: 'किंमत',
+    colOrder: 'क्रम',
+    colActions: 'कृती',
+    fldName: 'नाव / शॉपचे नाव',
+    fldCity: 'शहर',
+    fldPhone: 'फोन नंबर',
+    fldCategory: 'श्रेणी',
+    fldPrice: 'श्रेणी किंमत (₹)',
+    fldOrder: 'क्रम (कमी = आधी दिसेल)',
+    fldImage: 'कार्ड चित्र',
+    uploadHelp: 'JPG, PNG किंवा WebP · 15 MB पर्यंत · स्वयंचलित संकुचित',
+    uploading: 'अपलोड होत आहे…',
+    save: 'कार्ड जतन करा',
+    cancel: 'रद्द करा',
+    empty: 'अजून कोणतेही ट्रेंडिंग कार्ड नाही',
+    emptyHelp: 'लँडिंग पेजवर किचन स्पॉटलाइट करण्यासाठी पहिले कार्ड जोडा.',
+    noMatch: 'तुमच्या शोधाशी जुळणारे कोणतेही कार्ड नाही.',
+    confirmRemove: (name: string) => `"${name}" टॉप ट्रेंडिंगमधून काढून टाकायचे?`,
+    toastCreated: (name: string) => `ट्रेंडिंग कार्ड "${name}" जोडले`,
+    toastUpdated: (name: string) => `ट्रेंडिंग कार्ड "${name}" अद्ययावत केले`,
+    toastRemoved: (name: string) => `ट्रेंडिंग कार्ड "${name}" काढले`,
+    validationRequired: 'नाव, शहर, फोन, श्रेणी आणि किंमत आवश्यक आहेत',
+  },
+};
+
+type TopTrendingForm = {
+  name: string; city: string; phone: string;
+  category: string; price: string; sort_order: string;
+  image_url: string;
+};
+
+const emptyTopTrendingForm = (): TopTrendingForm => ({
+  name: '', city: '', phone: '', category: '', price: '', sort_order: '0', image_url: ''
+});
+
+function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
+  const [lang] = useSyncedLanguage();
+  const t = topTrendingTrans[lang];
+  const [items, setItems] = useState<TopTrending[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<TopTrending | null>(null);
+  const [form, setForm] = useState<TopTrendingForm>(emptyTopTrendingForm());
+  const [search, setSearch] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const load = async () => {
+    const { data } = await supabase.from('top_trending').select('*').order('sort_order', { ascending: true });
+    setItems((data as TopTrending[]) || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const MAX_SIZE = 15 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum application limit of 15 MB.`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const compressedFile = await compressImageFile(file);
+      const formData = new FormData();
+      formData.append('file', compressedFile);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const contentType = res.headers.get('content-type');
+      let data: any;
+      if (contentType && contentType.indexOf('application/json') !== -1) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (res.status === 413 || text.includes('413')) throw new Error('Image too large for the server configuration.');
+        throw new Error(`Server returned HTML error (${res.status}) instead of JSON`);
+      }
+      if (!res.ok) throw new Error(data?.error || 'Upload failed');
+      setForm(f => ({ ...f, image_url: data.url }));
+    } catch (err: any) {
+      alert(err.message || 'Image upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyTopTrendingForm());
+    setModal(true);
+  };
+
+  const openEdit = (item: TopTrending) => {
+    setEditingId(item.id);
+    setForm({
+      name: item.name || '',
+      city: item.city || '',
+      phone: item.phone || '',
+      category: item.category || '',
+      price: String(item.price ?? ''),
+      sort_order: String(item.sort_order ?? 0),
+      image_url: item.image_url || ''
+    });
+    setModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.city.trim() || !form.phone.trim() || !form.category.trim() || form.price === '') {
+      show(t.validationRequired, 'error');
+      return;
+    }
+    const payload = {
+      name: form.name.trim(),
+      city: form.city.trim(),
+      phone: form.phone.trim(),
+      category: form.category.trim(),
+      price: Number(form.price) || 0,
+      sort_order: Number(form.sort_order) || 0,
+      image_url: form.image_url || null,
+      updated_at: new Date().toISOString()
+    };
+    if (editingId) {
+      await supabase.from('top_trending').update(payload).eq('id', editingId);
+      await supabase.from('activity_log').insert({ action: `Updated Top Trending card: ${payload.name}`, actor: 'Super Admin' });
+      show(t.toastUpdated(payload.name));
+    } else {
+      await supabase.from('top_trending').insert(payload);
+      await supabase.from('activity_log').insert({ action: `Added Top Trending card: ${payload.name}`, actor: 'Super Admin' });
+      show(t.toastCreated(payload.name));
+    }
+    setModal(false);
+    setEditingId(null);
+    setForm(emptyTopTrendingForm());
+    load();
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(t.confirmRemove(name))) return;
+    await supabase.from('top_trending').delete().eq('id', id);
+    await supabase.from('activity_log').insert({ action: `Removed Top Trending card: ${name}`, actor: 'Super Admin' });
+    show(t.toastRemoved(name), 'info');
+    load();
+  };
+
+  const filtered = items.filter((it) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (it.name || '').toLowerCase().includes(q) ||
+      (it.city || '').toLowerCase().includes(q) ||
+      (it.category || '').toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title={t.title}
+        subtitle={t.subtitle}
+        action={<Button onClick={openCreate}><Plus size={16} /> {t.create}</Button>}
+      />
+
+      <div className="card bg-surface border border-border p-4">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.searchPlaceholder}
+            className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
+          />
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyState icon={<TrendingUp size={40} />} title={t.empty} description={t.emptyHelp} />
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted text-sm">{t.noMatch}</div>
+      ) : (
+        <div className="card overflow-hidden bg-surface border border-border">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left text-sm border-collapse min-w-[860px]">
+              <thead>
+                <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
+                  <th className="px-6 py-4">{t.colImage}</th>
+                  <th className="px-6 py-4">{t.colName}</th>
+                  <th className="px-6 py-4">{t.colCity}</th>
+                  <th className="px-6 py-4">{t.colPhone}</th>
+                  <th className="px-6 py-4">{t.colCategory}</th>
+                  <th className="px-6 py-4">{t.colPrice}</th>
+                  <th className="px-6 py-4">{t.colOrder}</th>
+                  <th className="px-6 py-4 text-right">{t.colActions}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {filtered.map((it) => (
+                  <tr key={it.id} className="hover:bg-surface-2/20 transition-all">
+                    <td className="px-6 py-4">
+                      {it.image_url ? (
+                        <img src={it.image_url} alt={it.name} onError={onImgError} className="w-12 h-12 rounded-lg object-cover border border-border" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-muted"><TrendingUp size={16} /></div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 font-bold text-text">{it.name}</td>
+                    <td className="px-6 py-4 text-muted">{it.city}</td>
+                    <td className="px-6 py-4 text-muted font-mono text-xs">{it.phone}</td>
+                    <td className="px-6 py-4"><Badge>{it.category}</Badge></td>
+                    <td className="px-6 py-4 font-semibold">₹{Number(it.price).toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-xs text-muted">{it.sort_order ?? 0}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        <button onClick={() => setViewing(it)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-accent hover:bg-border/20 transition-all" aria-label="View card">
+                          <Eye size={14} />
+                        </button>
+                        <button onClick={() => openEdit(it)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-accent hover:bg-border/20 transition-all" aria-label="Edit card">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => handleDelete(it.id, it.name)} className="p-2 rounded bg-surface-2 border border-border/40 text-muted hover:text-red-500 hover:bg-border/20 transition-all" aria-label="Delete card">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
+      <Modal
+        open={modal}
+        onClose={() => { setModal(false); setEditingId(null); setForm(emptyTopTrendingForm()); }}
+        title={editingId ? t.edit : t.create}
+      >
+        <div className="space-y-4">
+          <Input label={t.fldName} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label={t.fldCity} value={form.city} onChange={(v) => setForm({ ...form, city: v })} required />
+            <Input label={t.fldPhone} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label={t.fldCategory} value={form.category} onChange={(v) => setForm({ ...form, category: v })} required />
+            <Input label={t.fldPrice} type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} required />
+          </div>
+          <Input label={t.fldOrder} type="number" value={form.sort_order} onChange={(v) => setForm({ ...form, sort_order: v })} />
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">{t.fldImage}</label>
+            <div className="flex items-center gap-3">
+              {form.image_url ? (
+                <img src={form.image_url} alt="Preview" onError={onImgError} className="w-16 h-16 rounded-lg object-cover border border-border" />
+              ) : (
+                <div className="w-16 h-16 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-muted"><Upload size={18} /></div>
+              )}
+              <label className="flex-1 cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text hover:border-accent transition-colors">
+                <Upload size={14} />
+                <span>{uploading ? t.uploading : t.fldImage}</span>
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+              </label>
+            </div>
+            <p className="text-[11px] text-muted">{t.uploadHelp}</p>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => { setModal(false); setEditingId(null); setForm(emptyTopTrendingForm()); }}>{t.cancel}</Button>
+            <Button onClick={handleSave} disabled={uploading}>{t.save}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* View Modal — mimics how the card will look on the landing page */}
+      <Modal open={!!viewing} onClose={() => setViewing(null)} title={t.view}>
+        {viewing && (
+          <div className="space-y-4">
+            <div className="rounded-2xl overflow-hidden border border-[#C5A059]/30 bg-gradient-to-br from-white to-[#FBF7EE] shadow-lg">
+              <div className="aspect-square bg-surface-2 relative">
+                {viewing.image_url ? (
+                  <img src={viewing.image_url} alt={viewing.name} onError={onImgError} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted"><TrendingUp size={48} /></div>
+                )}
+                <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#4A0E17]/90 text-[#C5A059] text-[10px] font-black uppercase tracking-wider">{viewing.category}</span>
+              </div>
+              <div className="p-4">
+                <h3 className="font-extrabold text-lg text-[#2B2B2B]">{viewing.name}</h3>
+                <p className="text-xs text-[#6E6B65] flex items-center gap-1 mt-0.5"><MapPin size={11} /> {viewing.city}</p>
+                <p className="mt-2 text-xl font-extrabold text-[#4A0E17]">₹{Number(viewing.price).toLocaleString('en-IN')}</p>
+                <p className="text-[11px] text-muted font-mono mt-1">{viewing.phone}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setViewing(null)}>{t.cancel}</Button>
+              <Button onClick={() => { const v = viewing; setViewing(null); openEdit(v); }}><Pencil size={14} /> {t.edit}</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

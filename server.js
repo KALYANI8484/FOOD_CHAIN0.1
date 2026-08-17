@@ -497,6 +497,19 @@ const clientSchema = new mongoose.Schema({
   created_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
 
+const topTrendingSchema = new mongoose.Schema({
+  _id: { type: String, default: () => crypto.randomUUID() },
+  name: { type: String, required: true },
+  city: { type: String, required: true },
+  phone: { type: String, required: true },
+  category: { type: String, required: true },
+  price: { type: Number, required: true, default: 0 },
+  image_url: { type: String, default: null },
+  sort_order: { type: Number, default: 0 },
+  created_at: { type: String, default: () => new Date().toISOString() },
+  updated_at: { type: String, default: () => new Date().toISOString() }
+}, schemaOptions);
+
 // Models
 const SuperAdmin = mongoose.model('SuperAdmin', superAdminSchema, 'super_admins');
 const SubAdmin = mongoose.model('SubAdmin', subAdminSchema, 'sub_admins');
@@ -512,6 +525,7 @@ const Activity = mongoose.model('Activity', activitySchema, 'activity_log');
 const UpgradeRequest = mongoose.model('UpgradeRequest', upgradeRequestSchema, 'upgrade_requests');
 const ClientProfile = mongoose.model('ClientProfile', clientSchema, 'clients');
 const Broadcast = mongoose.model('Broadcast', broadcastSchema, 'broadcasts');
+const TopTrending = mongoose.model('TopTrending', topTrendingSchema, 'top_trending');
 
 const Addon = mongoose.model('Addon', addonSchema, 'addons');
 
@@ -621,7 +635,8 @@ const models = {
   subadmin_requests: SubadminRequest,
   broadcasts: Broadcast,
   vendor_suggestions: VendorSuggestion,
-  clients: ClientProfile
+  clients: ClientProfile,
+  top_trending: TopTrending
 };
 
 // How long a pending order stays claimable before being auto-expired to
