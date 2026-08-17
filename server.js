@@ -1203,6 +1203,17 @@ app.post('/api/db', async (req, res) => {
       }
     }
 
+    // Scope vendor-role callers to their own vendors row. Overrides any client-supplied
+    // id/phone filter so a vendor can never read or mutate another vendor's document —
+    // and, load-bearing for the dashboard header: if a client-side lookup ever forgets
+    // to pass an id, the server still refuses to hand back some other vendor's record
+    // (which is what produced "Welcome, Padmavati food" for other vendors previously).
+    // Admin roles (super_admin, sub_admin) are intentionally exempt: SuperAdmin.tsx's
+    // Vendors tab needs to list, edit, and delete arbitrary vendor rows.
+    if (table === 'vendors' && auth && auth.role === 'vendor') {
+      queryConditions._id = auth.id;
+    }
+
     let responseData;
 
     switch (action) {

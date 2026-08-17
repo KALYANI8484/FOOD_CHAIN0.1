@@ -182,7 +182,10 @@ export function Login({
       if (!res.ok) setError(data.error || 'Invalid credentials');
       else {
         if (data.token) localStorage.setItem(SESSION_TOKEN_KEY, data.token);
-        onLogin(data.role, username.trim());
+        // Forward the server-resolved vendor id (not the raw typed username) so the
+        // dashboard fetches the correct vendor row instead of falling back to whichever
+        // vendor Mongo returns first when the typed string doesn't exact-match `phone`.
+        onLogin(data.role, data.data?.id || username.trim());
       }
     } catch { setError('Network error — please try again'); }
     finally { setLoading(false); }
