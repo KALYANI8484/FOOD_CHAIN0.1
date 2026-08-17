@@ -53,6 +53,10 @@ function App() {
 
   const handleExit = () => {
     localStorage.removeItem(SESSION_TOKEN_KEY);
+    // Clear the in-memory credential too — otherwise a Back-button popstate can
+    // rehydrate it from history state (see handlePopState above / pushState in
+    // navigateToScreen), leaking the previous user's identifier into a fresh login.
+    setSessionCred('');
     navigateToScreen('landing');
   };
 
@@ -68,7 +72,7 @@ function App() {
       )}
       {screen === 'super_admin' && <SuperAdmin onExit={handleExit} />}
       {screen === 'sub_admin' && <SubAdmin onExit={handleExit} adminEmail={sessionCred} />}
-      {screen === 'vendor' && <Vendor onExit={handleExit} vendorPhone={sessionCred} />}
+      {screen === 'vendor' && <Vendor onExit={handleExit} vendorId={sessionCred} />}
     </>
   );
 }

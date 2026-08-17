@@ -50,7 +50,7 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
 
 type Tab = 'dashboard' | 'menu' | 'radar' | 'kanban' | 'activation' | 'upgrade';
 
-export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhone?: string }) {
+export function Vendor({ onExit, vendorId: sessionVendorId }: { onExit: () => void; vendorId?: string }) {
   const [lang] = useSyncedLanguage();
   const t = vTrans[lang];
 
@@ -64,7 +64,7 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   };
 
   useEffect(() => {
-    window.history.replaceState({ vendorTab: 'dashboard', appScreen: 'vendor', cred: vendorPhone }, '', '#vendor/dashboard');
+    window.history.replaceState({ vendorTab: 'dashboard', appScreen: 'vendor', cred: sessionVendorId }, '', '#vendor/dashboard');
 
     const handleVendorPopState = (e: PopStateEvent) => {
       if (e.state && e.state.vendorTab) {
@@ -91,38 +91,29 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
   useEffect(() => {
     (async () => {
       try {
-        const queryPhone = vendorPhone || '';
-        let targetVendor: VendorType | null = null;
-
-        // Try /api/db for MongoDB vendors
+        // Identity is the vendor id resolved server-side at login (Login.tsx forwards
+        // data.data.id, not the raw typed username). No fallback: if this lookup
+        // returns nothing the session is invalid — do NOT silently render some other
+        // vendor's record.
+        if (!sessionVendorId) {
+          setLoadError(true);
+          return;
+        }
         const res = await fetch('/api/db', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             table: 'vendors',
             action: 'select',
-            filters: queryPhone ? { phone: queryPhone } : {}
+            filters: { id: sessionVendorId }
           })
         });
         const d = await res.json();
         if (d.data && d.data.length > 0) {
-          targetVendor = d.data[0];
+          setVendor(d.data[0]);
+        } else {
+          setLoadError(true);
         }
-
-        // Fallback to any active vendor if queryPhone wasn't matched
-        if (!targetVendor) {
-          const allRes = await fetch('/api/db', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ table: 'vendors', action: 'select', filters: {} })
-          });
-          const allData = await allRes.json();
-          if (allData.data && allData.data.length > 0) {
-            targetVendor = allData.data[0];
-          }
-        }
-
-        setVendor(targetVendor);
       } catch (e) {
         console.error('Failed to load vendor session:', e);
         setLoadError(true);
@@ -130,11 +121,11 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
         setLoading(false);
       }
     })();
-  }, [vendorPhone]);
+  }, [sessionVendorId]);
 
-  // Stable ref so refetchVendor always reads current phone without stale closure
-  const vendorPhoneRef = useRef(vendorPhone);
-  vendorPhoneRef.current = vendorPhone;
+  // Stable ref so refetchVendor always reads the current session id without a stale closure
+  const sessionVendorIdRef = useRef(sessionVendorId);
+  sessionVendorIdRef.current = sessionVendorId;
 
   // Stable ref so the socket effect below can read current vendor fields
   // (zip_code, id) without needing `vendor` itself in its dependency array —
@@ -144,11 +135,12 @@ export function Vendor({ onExit, vendorPhone }: { onExit: () => void; vendorPhon
 
   const refetchVendor = async () => {
     try {
-      const qPhone = vendorPhoneRef.current || '';
+      const id = sessionVendorIdRef.current || '';
+      if (!id) return;
       const res = await fetch('/api/db', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table: 'vendors', action: 'select', filters: qPhone ? { phone: qPhone } : {} })
+        body: JSON.stringify({ table: 'vendors', action: 'select', filters: { id } })
       });
       const d = await res.json();
       if (d.data && d.data.length > 0) {
