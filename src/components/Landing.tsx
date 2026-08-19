@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import {
   UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
   ShoppingBag, Store, X, MapPin, ChevronRight,
-  ChevronLeft, Hash, User, CheckCircle, Globe,
-  Package, Users as UsersIcon, TrendingUp, Star, UserPlus, Maximize2, FileText
+  ChevronLeft, Hash, User, CheckCircle,
+  TrendingUp, Star, UserPlus, Maximize2, FileText, Search
 } from 'lucide-react';
 import { Spinner, LanguageSelector, useSyncedLanguage, onImgError, type Language } from './ui';
+import { supabase, type TopTrending } from '../lib/supabase';
 
 type Role = 'landing' | 'login' | 'signup' | 'super_admin' | 'sub_admin' | 'vendor' | 'client';
 
@@ -76,7 +77,16 @@ export const translations = {
     verifiedVendorsOnboard: "Verified vendors already onboard",
     startingPlanCancel: "Starting plan — cancel anytime",
     joinViaWhatsapp: "Join via WhatsApp →",
-    alreadyHaveAccount: "Already have an account? Login →"
+    alreadyHaveAccount: "Already have an account? Login →",
+
+    // Top Trending carousel (super-admin-curated vendor spotlight)
+    trendingEyebrow: "Trending Now",
+    topTrendingTitle: "Top Trending",
+    topTrendingSubtitle: "Handpicked kitchens the community is loving right now",
+    viewShop: "WhatsApp",
+    callShop: "Call",
+    trendingSearchPlaceholder: "Search kitchens by name, city, or category…",
+    trendingNoMatch: "No kitchens match your search."
   },
   hi: {
     plans: "प्लान्स",
@@ -144,7 +154,15 @@ export const translations = {
     verifiedVendorsOnboard: "सत्यापित विक्रेता जुड़े हुए हैं",
     startingPlanCancel: "शुरुआती प्लान — कभी भी रद्द करें",
     joinViaWhatsapp: "व्हाट्सएप के जरिए जुड़ें →",
-    alreadyHaveAccount: "क्या आपके पास पहले से खाता है? लॉगिन करें →"
+    alreadyHaveAccount: "क्या आपके पास पहले से खाता है? लॉगिन करें →",
+
+    trendingEyebrow: "अभी ट्रेंडिंग",
+    topTrendingTitle: "टॉप ट्रेंडिंग",
+    topTrendingSubtitle: "समुदाय को अभी पसंद आ रहे चुनिंदा किचन",
+    viewShop: "व्हाट्सएप",
+    callShop: "कॉल",
+    trendingSearchPlaceholder: "नाम, शहर या श्रेणी से किचन खोजें…",
+    trendingNoMatch: "आपकी खोज से मेल खाता कोई किचन नहीं।"
   },
   mr: {
     plans: "प्लॅन्स",
@@ -212,7 +230,15 @@ export const translations = {
     verifiedVendorsOnboard: "पडताळणी केलेले विक्रेते जोडले गेले आहेत",
     startingPlanCancel: "सुरुवातीचा प्लॅन — कधीही रद्द करा",
     joinViaWhatsapp: "व्हाट्सॲप द्वारे सामील व्हा →",
-    alreadyHaveAccount: "आधीपासून खाते आहे का? लॉगिन करा →"
+    alreadyHaveAccount: "आधीपासून खाते आहे का? लॉगिन करा →",
+
+    trendingEyebrow: "आत्ता ट्रेंडिंग",
+    topTrendingTitle: "टॉप ट्रेंडिंग",
+    topTrendingSubtitle: "समुदायाला सध्या आवडत असलेली निवडक किचन",
+    viewShop: "व्हाट्सॲप",
+    callShop: "कॉल",
+    trendingSearchPlaceholder: "नाव, शहर किंवा श्रेणीने किचन शोधा…",
+    trendingNoMatch: "तुमच्या शोधाशी जुळणारे कोणतेही किचन नाही."
   }
 };
 
@@ -337,6 +363,243 @@ function MarqueeTicker({ recentOrders, t, lang }: { recentOrders: any[]; t: any;
         ))}
       </div>
     </div>
+  );
+}
+
+/* ── Top Trending Carousel (super-admin-curated vendor spotlight) ────── */
+function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
+  const [items, setItems] = useState<TopTrending[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [search, setSearch] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.from('top_trending').select('*').order('sort_order', { ascending: true });
+        if (!cancelled) setItems((data as TopTrending[]) || []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Compute filtered list BEFORE any conditional/early return so the hooks below
+  // always run (Rules of Hooks — a hook cannot live after an early return).
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? items.filter((it) =>
+        (it.name || '').toLowerCase().includes(q) ||
+        (it.city || '').toLowerCase().includes(q) ||
+        (it.category || '').toLowerCase().includes(q))
+    : items;
+
+  // Auto-rotate the featured card every ~3.5s in discovery mode (empty search).
+  // Skipped when only one card exists, while the user hovers, or in search mode.
+  useEffect(() => {
+    if (q) return;
+    if (paused) return;
+    if (filtered.length <= 1) return;
+    const id = setInterval(() => {
+      setActiveIndex((cur) => (cur + 1) % filtered.length);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [q, paused, filtered.length]);
+
+  // Keep activeIndex in range when the filtered list shrinks (e.g. after admin delete).
+  useEffect(() => {
+    if (filtered.length === 0) return;
+    if (activeIndex >= filtered.length) setActiveIndex(0);
+  }, [filtered.length, activeIndex]);
+
+  // Empty state: render nothing so the section only appears once the admin curates it.
+  if (loading || items.length === 0) return null;
+
+  const buildWa = (phone: string, name: string) => {
+    const clean = (phone || '').replace(/\D/g, '');
+    const msg = encodeURIComponent(`Hello ${name}, I saw your kitchen on Vikram Ads and wanted to enquire.`);
+    return `https://wa.me/91${clean}?text=${msg}`;
+  };
+  const buildTel = (phone: string) => `tel:+91${(phone || '').replace(/\D/g, '')}`;
+
+  const renderCard = (it: TopTrending, keySuffix = '') => (
+    <article
+      key={`${it.id}${keySuffix}`}
+      className="shrink-0 w-64 mx-3 rounded-2xl overflow-hidden bg-white/95 backdrop-blur border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default"
+    >
+      <div className="aspect-square bg-amber-50 relative overflow-hidden">
+        {it.image_url ? (
+          <img src={it.image_url} alt={it.name} onError={onImgError} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-[#C5A059]/40"><TrendingUp size={44} /></div>
+        )}
+        <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-[#4A0E17]/90 text-[#C5A059] text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">
+          {getItemTranslation(it.category, lang)}
+        </span>
+      </div>
+      <div className="p-4">
+        <h3 className="font-extrabold text-[#2B2B2B] text-sm leading-tight truncate">{it.name}</h3>
+        <p className="text-xs text-[#6E6B65] flex items-center gap-1 mt-1 truncate"><MapPin size={11} className="shrink-0" /> {it.city}</p>
+        <p className="mt-2 text-lg font-extrabold text-[#4A0E17]" style={{ fontFamily: "'Playfair Display', serif" }}>
+          ₹{Number(it.price).toLocaleString('en-IN')}
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <a
+            href={buildWa(it.phone, it.name)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1ebe5a] text-white text-xs font-bold transition-colors"
+          >
+            <MessageCircle size={13} /> {t.viewShop || 'WhatsApp'}
+          </a>
+          <a
+            href={buildTel(it.phone)}
+            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#4A0E17] hover:bg-[#6d1324] text-[#C5A059] text-xs font-bold transition-colors"
+          >
+            <Phone size={13} /> {t.callShop || 'Call'}
+          </a>
+        </div>
+      </div>
+    </article>
+  );
+
+  const goPrev = () => setActiveIndex((cur) => (cur - 1 + filtered.length) % filtered.length);
+  const goNext = () => setActiveIndex((cur) => (cur + 1) % filtered.length);
+
+  // Compute the shortest signed offset from active to each card on the ring —
+  // e.g. with 5 cards and activeIndex 4, card 0 is +1 (right) not -4 (far left).
+  const signedOffset = (i: number) => {
+    const n = filtered.length;
+    let d = i - activeIndex;
+    if (d > n / 2) d -= n;
+    if (d < -n / 2) d += n;
+    return d;
+  };
+
+  return (
+    <section className="max-w-7xl mx-auto px-6 py-12">
+      <div className="text-center mb-6 reveal">
+        <h2 className="text-2xl md:text-3xl font-extrabold text-[#2B2B2B]" style={{ fontFamily: "'Playfair Display', serif" }}>
+          {t.topTrendingTitle || 'Top Trending'}
+        </h2>
+        <p className="text-sm text-[#6E6B65] mt-2 max-w-xl mx-auto">{t.topTrendingSubtitle || ''}</p>
+      </div>
+
+      {/* Search bar — empty query keeps the marquee running (discovery), a typed query
+          freezes the animation and swaps in a static grid so matches don't scroll away. */}
+      <div className="max-w-xl mx-auto mb-6 reveal">
+        <div className="relative">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E6B65] pointer-events-none" />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-[#6E6B65] hover:text-[#4A0E17] hover:bg-[#C5A059]/10 transition-colors cursor-pointer"
+              aria-label="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.trendingSearchPlaceholder || 'Search kitchens by name, city, or category…'}
+            className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white border border-[#C5A059]/30 text-sm text-[#2B2B2B] placeholder:text-[#6E6B65]/70 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 outline-none shadow-sm transition-all"
+          />
+        </div>
+      </div>
+
+      {q ? (
+        // Search mode: static responsive grid of matches, no marquee animation
+        filtered.length === 0 ? (
+          <div className="text-center py-10 text-[#6E6B65] text-sm reveal">{t.trendingNoMatch || 'No kitchens match your search.'}</div>
+        ) : (
+          <div className="reveal flex flex-wrap justify-center gap-4 py-2">
+            {filtered.map((it) => renderCard(it))}
+          </div>
+        )
+      ) : (
+        // Discovery mode: coverflow — one active card at full size in the center,
+        // adjacent cards visible behind it (scaled down + faded). Auto-rotates on
+        // an interval; hover pauses it; arrow buttons step manually.
+        <div
+          className="relative reveal select-none"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          <div className="relative mx-auto h-[440px] w-full max-w-4xl overflow-hidden">
+            {filtered.map((it, i) => {
+              const d = signedOffset(i);
+              const abs = Math.abs(d);
+              // Hide cards more than 2 slots away from center — keeps the composition clean.
+              const hidden = abs > 2;
+              // Fanned-out horizontal offsets (px) + progressive scale/opacity for depth.
+              const translatePx = d * 210;
+              const scale = abs === 0 ? 1 : abs === 1 ? 0.82 : 0.68;
+              const opacity = hidden ? 0 : abs === 0 ? 1 : abs === 1 ? 0.75 : 0.4;
+              const zIndex = 30 - abs;
+              const blur = abs >= 2 ? 'blur-[1px]' : '';
+              return (
+                <div
+                  key={it.id}
+                  className={`absolute top-1/2 left-1/2 transition-all duration-700 ease-out ${blur} ${hidden ? 'pointer-events-none' : 'cursor-pointer'}`}
+                  style={{
+                    transform: `translate(-50%, -50%) translateX(${translatePx}px) scale(${scale})`,
+                    opacity,
+                    zIndex,
+                  }}
+                  onClick={() => { if (!hidden && abs !== 0) setActiveIndex(i); }}
+                  role={hidden ? undefined : 'button'}
+                  tabIndex={hidden ? -1 : 0}
+                  onKeyDown={(e) => { if (!hidden && abs !== 0 && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setActiveIndex(i); } }}
+                  aria-hidden={hidden}
+                >
+                  {renderCard(it)}
+                </div>
+              );
+            })}
+          </div>
+
+          {filtered.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={goPrev}
+                className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/95 border border-[#C5A059]/40 shadow-lg text-[#4A0E17] hover:bg-[#C5A059] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                aria-label="Previous kitchen"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/95 border border-[#C5A059]/40 shadow-lg text-[#4A0E17] hover:bg-[#C5A059] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                aria-label="Next kitchen"
+              >
+                <ChevronRight size={20} />
+              </button>
+
+              <div className="flex items-center justify-center gap-2 mt-4">
+                {filtered.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setActiveIndex(i)}
+                    className={`h-2 rounded-full transition-all cursor-pointer ${i === activeIndex ? 'w-8 bg-[#4A0E17]' : 'w-2 bg-[#C5A059]/40 hover:bg-[#C5A059]/70'}`}
+                    aria-label={`Show kitchen ${i + 1}`}
+                    aria-current={i === activeIndex}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1385,6 +1648,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       <HowItWorks t={t} />
       <Testimonials t={t} />
       <VendorJoinSection onNavigate={onNavigate} t={t} />
+      <TopTrendingCarousel t={t} lang={language} />
 
       <footer id="contact" className="border-t border-[#C5A059]/30 bg-[#1C0609] text-[#F7F4EF] mt-12">
         <div className="max-w-7xl mx-auto px-6 py-14">
@@ -1418,13 +1682,6 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
                 ))}
               </ul>
 
-              <div className="mt-6 pt-5 border-t border-[#C5A059]/20">
-                <p className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest mb-2">Co-Founders</p>
-                <ul className="space-y-1.5 text-sm text-[#F7F4EF]/80">
-                  <li>Pratibha Satere — 9689784930</li>
-                  <li>Sonam Mutke</li>
-                </ul>
-              </div>
             </div>
 
             <div className="reveal reveal-right">
