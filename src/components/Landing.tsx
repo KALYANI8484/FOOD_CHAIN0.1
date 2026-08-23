@@ -86,7 +86,13 @@ export const translations = {
     viewShop: "WhatsApp",
     callShop: "Call",
     trendingSearchPlaceholder: "Search kitchens by name, city, or category…",
-    trendingNoMatch: "No kitchens match your search."
+    trendingNoMatch: "No kitchens match your search.",
+    trendingAllCategories: "All Categories",
+    trendingAllCities: "All Cities",
+    trendingTop3Row: "Top 3 in this bucket",
+    trendingRestRow: "More kitchens",
+    trendingFeaturedFallback: "Featured picks curated by our team",
+    trendingNoExactMatchFallback: "No exact matches for this filter — featuring curated picks above."
   },
   hi: {
     plans: "प्लान्स",
@@ -162,7 +168,13 @@ export const translations = {
     viewShop: "व्हाट्सएप",
     callShop: "कॉल",
     trendingSearchPlaceholder: "नाम, शहर या श्रेणी से किचन खोजें…",
-    trendingNoMatch: "आपकी खोज से मेल खाता कोई किचन नहीं।"
+    trendingNoMatch: "आपकी खोज से मेल खाता कोई किचन नहीं।",
+    trendingAllCategories: "सभी श्रेणियां",
+    trendingAllCities: "सभी शहर",
+    trendingTop3Row: "इस श्रेणी के टॉप 3",
+    trendingRestRow: "और किचन",
+    trendingFeaturedFallback: "हमारी टीम द्वारा चुने गए विशेष विकल्प",
+    trendingNoExactMatchFallback: "इस फ़िल्टर से कोई सीधा मेल नहीं — ऊपर क्यूरेटेड विकल्प दिखाए जा रहे हैं।"
   },
   mr: {
     plans: "प्लॅन्स",
@@ -238,7 +250,13 @@ export const translations = {
     viewShop: "व्हाट्सॲप",
     callShop: "कॉल",
     trendingSearchPlaceholder: "नाव, शहर किंवा श्रेणीने किचन शोधा…",
-    trendingNoMatch: "तुमच्या शोधाशी जुळणारे कोणतेही किचन नाही."
+    trendingNoMatch: "तुमच्या शोधाशी जुळणारे कोणतेही किचन नाही.",
+    trendingAllCategories: "सर्व श्रेणी",
+    trendingAllCities: "सर्व शहरे",
+    trendingTop3Row: "या श्रेणीतील टॉप 3",
+    trendingRestRow: "आणखी किचन",
+    trendingFeaturedFallback: "आमच्या टीमने निवडलेले खास पर्याय",
+    trendingNoExactMatchFallback: "या फिल्टरशी थेट जुळणी नाही — वर क्युरेटेड निवडी दाखवत आहोत."
   }
 };
 
@@ -367,12 +385,45 @@ function MarqueeTicker({ recentOrders, t, lang }: { recentOrders: any[]; t: any;
 }
 
 /* ── Top Trending Carousel (super-admin-curated vendor spotlight) ────── */
+// Category-driven gradient used when a card has no image_url. Keys are compared
+// case-insensitively against the entry's category. Unknown categories fall
+// through to the brand default.
+const TT_CATEGORY_GRADIENTS: Record<string, string> = {
+  tiffin: 'linear-gradient(135deg, #7A2E1F 0%, #4A0E17 100%)',
+  thali: 'linear-gradient(135deg, #6d1324 0%, #360910 100%)',
+  bakery: 'linear-gradient(135deg, #8B5E2B 0%, #4A2C10 100%)',
+  sweets: 'linear-gradient(135deg, #7A1E3E 0%, #4A0E24 100%)',
+  snacks: 'linear-gradient(135deg, #7B4A0F 0%, #3E2508 100%)',
+  beverages: 'linear-gradient(135deg, #2E5F6E 0%, #123240 100%)',
+  'dairy & milk': 'linear-gradient(135deg, #5A6B4A 0%, #2E3B22 100%)',
+};
+const TT_DEFAULT_GRADIENT = 'linear-gradient(135deg, #4A0E17 0%, #360910 100%)';
+const gradientForCategory = (cat: string | null | undefined) =>
+  TT_CATEGORY_GRADIENTS[(cat || '').trim().toLowerCase()] || TT_DEFAULT_GRADIENT;
+
+const ttNorm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+
+// Discovery mode = no filter active. Only in this mode does the coverflow
+// rotate; the moment the user engages a pill / city / search we switch to a
+// static grid so results the user is actively scanning don't slide away.
+const ROTATE_INTERVAL_MS = 3500;
+
 function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   const [items, setItems] = useState<TopTrending[]>([]);
   const [loading, setLoading] = useState(true);
-  const [paused, setPaused] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [activeCity, setActiveCity] = useState<string>('All');
   const [search, setSearch] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  // Two independent pause sources combined so hover and tab-visibility can
+  // each pause the rotation without stomping on each other's state.
+  const [hoverPaused, setHoverPaused] = useState(false);
+  const [hiddenPaused, setHiddenPaused] = useState(false);
+  const paused = hoverPaused || hiddenPaused;
+  const touchStartX = useRef<number | null>(null);
+  // Bumped every time a new interval fires, so the progress bar's CSS
+  // animation re-triggers from 0 rather than resuming mid-fill.
+  const [progressTick, setProgressTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -387,36 +438,150 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Compute filtered list BEFORE any conditional/early return so the hooks below
-  // always run (Rules of Hooks — a hook cannot live after an early return).
-  const q = search.trim().toLowerCase();
-  const filtered = q
-    ? items.filter((it) =>
-        (it.name || '').toLowerCase().includes(q) ||
-        (it.city || '').toLowerCase().includes(q) ||
-        (it.category || '').toLowerCase().includes(q))
-    : items;
-
-  // Auto-rotate the featured card every ~3.5s in discovery mode (empty search).
-  // Skipped when only one card exists, while the user hovers, or in search mode.
+  // Pause when the tab is hidden — otherwise the interval keeps firing
+  // against an unfocused tab and burns state changes for no one.
   useEffect(() => {
-    if (q) return;
+    const onVis = () => setHiddenPaused(document.hidden);
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  const discoveryMode = activeCategory === 'All' && activeCity === 'All' && search.trim() === '';
+  // In discovery mode, all items pass (no filter). Length is items.length.
+  const discoveryLen = discoveryMode ? items.length : 0;
+
+  // Auto-advance the coverflow. Skips when paused, when there's nothing to
+  // rotate through, or when the user prefers reduced motion.
+  useEffect(() => {
+    if (!discoveryMode) return;
     if (paused) return;
-    if (filtered.length <= 1) return;
+    if (discoveryLen <= 1) return;
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const id = setInterval(() => {
-      setActiveIndex((cur) => (cur + 1) % filtered.length);
-    }, 3500);
+      setActiveIndex((i) => (i + 1) % discoveryLen);
+      setProgressTick((n) => n + 1);
+    }, ROTATE_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [q, paused, filtered.length]);
+  }, [discoveryMode, paused, discoveryLen]);
 
-  // Keep activeIndex in range when the filtered list shrinks (e.g. after admin delete).
+  // Keep activeIndex in range when the underlying list shrinks (admin delete)
+  // or when we leave and re-enter discovery mode.
   useEffect(() => {
-    if (filtered.length === 0) return;
-    if (activeIndex >= filtered.length) setActiveIndex(0);
-  }, [filtered.length, activeIndex]);
+    if (discoveryLen === 0) return;
+    if (activeIndex >= discoveryLen) setActiveIndex(0);
+  }, [discoveryLen, activeIndex]);
 
   // Empty state: render nothing so the section only appears once the admin curates it.
   if (loading || items.length === 0) return null;
+
+  // Build the pill / dropdown option lists. Trim + normalize keys so "Pune"
+  // and "pune " collapse into one option; keep the first-seen casing as the
+  // display label.
+  const distinctBy = (field: 'city' | 'category', max: number): string[] => {
+    const seen = new Map<string, string>();
+    for (const it of items) {
+      const raw = (it[field] || '').trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      if (!seen.has(key)) seen.set(key, raw);
+    }
+    const list = Array.from(seen.values());
+    if (list.length > max && typeof console !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.warn(`[TopTrending] ${field} count ${list.length} exceeds cap ${max}; extras dropped from filter row`);
+    }
+    return list.slice(0, max);
+  };
+  const categoryList = distinctBy('category', 12);
+  const cityList = distinctBy('city', 50);
+
+  const q = search.trim().toLowerCase();
+
+  const matchesSearch = (it: TopTrending): boolean => {
+    if (!q) return true;
+    return (
+      ttNorm(it.name).includes(q) ||
+      ttNorm(it.city).includes(q) ||
+      ttNorm(it.category).includes(q) ||
+      ttNorm(it.phone).includes(q) ||
+      ttNorm(getItemTranslation(it.category || '', lang)).includes(q)
+    );
+  };
+
+  const passes = (it: TopTrending): boolean => {
+    if (activeCategory !== 'All') {
+      const catMatchesRaw = ttNorm(it.category) === ttNorm(activeCategory);
+      const catMatchesTranslated = ttNorm(getItemTranslation(it.category || '', lang)) === ttNorm(activeCategory);
+      if (!catMatchesRaw && !catMatchesTranslated) return false;
+    }
+    if (activeCity !== 'All' && ttNorm(it.city) !== ttNorm(activeCity)) return false;
+    return matchesSearch(it);
+  };
+
+  const passing = items.filter(passes);
+
+  // Bucket mode is when the effective filter narrows results to a single
+  // (city, category). Two paths:
+  //   explicit — the user picked a specific pill AND a specific city;
+  //   inferred — search alone collapses the passing set to one city + one
+  //   category (e.g. typing "Pune" in a corpus where only Pune has Tiffin
+  //   entries, or matching a single kitchen name that resolves to one bucket).
+  const explicitBucket = activeCategory !== 'All' && activeCity !== 'All';
+  const inferredBucket = !explicitBucket && passing.length > 0 && (() => {
+    const cities = new Set(passing.map((e) => ttNorm(e.city)).filter(Boolean));
+    const cats = new Set(passing.map((e) => ttNorm(e.category)).filter(Boolean));
+    return cities.size === 1 && cats.size === 1;
+  })();
+  const bucketMode = explicitBucket || inferredBucket;
+  const top3 = bucketMode
+    ? passing.filter((e) => e.rank === 1 || e.rank === 2 || e.rank === 3).sort((a, b) => (a.rank || 0) - (b.rank || 0))
+    : [];
+  const rest = bucketMode
+    ? passing.filter((e) => e.rank == null).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    : passing.slice().sort((a, b) => {
+        // Pinned entries float, then sort_order.
+        const ra = a.rank == null ? 99 : a.rank;
+        const rb = b.rank == null ? 99 : b.rank;
+        if (ra !== rb) return ra - rb;
+        return (a.sort_order || 0) - (b.sort_order || 0);
+      });
+
+  // Whenever the user has engaged any filter (pill / city / search) we ALWAYS
+  // want to surface the super-admin's curated Top 3 — even if the current
+  // (city, category) has no direct matches. Falls back through three levels:
+  //   1) pins inside the exact bucket (bucketMode + top3),
+  //   2) pins for the selected city (any category) or the selected category
+  //      (any city), whichever the filter narrowed on,
+  //   3) site-wide pins so there's always something curated to look at.
+  const anyFilterActive = activeCategory !== 'All' || activeCity !== 'All' || q !== '';
+  const featuredTop3 = (() => {
+    if (!anyFilterActive) return [];
+    const pinned = items.filter((e) => e.rank === 1 || e.rank === 2 || e.rank === 3);
+    const byRank = (a: TopTrending, b: TopTrending) =>
+      (a.rank || 0) - (b.rank || 0) || (a.sort_order || 0) - (b.sort_order || 0);
+    // Prefer pins in the exact bucket first.
+    if (bucketMode && top3.length > 0) return top3;
+    // Then narrow to whichever of city / category the user picked.
+    if (activeCity !== 'All') {
+      const cityPins = pinned.filter((e) => ttNorm(e.city) === ttNorm(activeCity)).sort(byRank);
+      if (cityPins.length > 0) return cityPins.slice(0, 3);
+    }
+    if (activeCategory !== 'All') {
+      const catPins = pinned.filter((e) =>
+        ttNorm(e.category) === ttNorm(activeCategory) ||
+        ttNorm(getItemTranslation(e.category || '', lang)) === ttNorm(activeCategory)
+      ).sort(byRank);
+      if (catPins.length > 0) return catPins.slice(0, 3);
+    }
+    return pinned.sort(byRank).slice(0, 3);
+  })();
+  // Label to explain why the featured row is showing — helps when the pins
+  // come from a broader fallback rather than the exact bucket the user picked.
+  const featuredFallbackLabel = (() => {
+    if (!featuredTop3.length) return '';
+    if (bucketMode && top3.length > 0) return t.trendingTop3Row || 'Top 3 in this bucket';
+    return t.trendingFeaturedFallback || 'Featured picks curated by our team';
+  })();
 
   const buildWa = (phone: string, name: string) => {
     const clean = (phone || '').replace(/\D/g, '');
@@ -425,59 +590,74 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   };
   const buildTel = (phone: string) => `tel:+91${(phone || '').replace(/\D/g, '')}`;
 
-  const renderCard = (it: TopTrending, keySuffix = '') => (
+  const renderCard = (it: TopTrending, opts: { showRank?: boolean } = {}) => (
     <article
-      key={`${it.id}${keySuffix}`}
-      className="shrink-0 w-64 mx-3 rounded-2xl overflow-hidden bg-white/95 backdrop-blur border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default"
+      key={it.id}
+      className="relative overflow-hidden rounded-2xl border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default w-full max-w-[280px] min-h-[240px]"
     >
-      <div className="aspect-square bg-amber-50 relative overflow-hidden">
+      {/* Background layer: blurred image if available, else category gradient. */}
+      <div className="absolute inset-0 -z-0">
         {it.image_url ? (
-          <img src={it.image_url} alt={it.name} onError={onImgError} className="w-full h-full object-cover" loading="lazy" />
+          <img
+            src={it.image_url}
+            alt=""
+            onError={onImgError}
+            aria-hidden="true"
+            className="w-full h-full object-cover scale-110 blur-[6px] opacity-40"
+            loading="lazy"
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#C5A059]/40"><TrendingUp size={44} /></div>
+          <div className="w-full h-full" style={{ background: gradientForCategory(it.category) }} />
         )}
-        <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-[#4A0E17]/90 text-[#C5A059] text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">
-          {getItemTranslation(it.category, lang)}
-        </span>
+        {/* Dark gradient overlay to keep text legible on any image. */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(30,10,10,0.55) 0%, rgba(30,10,10,0.42) 45%, rgba(30,10,10,0.72) 100%)' }} />
       </div>
-      <div className="p-4">
-        <h3 className="font-extrabold text-[#2B2B2B] text-sm leading-tight truncate">{it.name}</h3>
-        <p className="text-xs text-[#6E6B65] flex items-center gap-1 mt-1 truncate"><MapPin size={11} className="shrink-0" /> {it.city}</p>
-        <p className="mt-2 text-lg font-extrabold text-[#4A0E17]" style={{ fontFamily: "'Playfair Display', serif" }}>
-          ₹{Number(it.price).toLocaleString('en-IN')}
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <a
-            href={buildWa(it.phone, it.name)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1ebe5a] text-white text-xs font-bold transition-colors"
-          >
-            <MessageCircle size={13} /> {t.viewShop || 'WhatsApp'}
-          </a>
-          <a
-            href={buildTel(it.phone)}
-            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#4A0E17] hover:bg-[#6d1324] text-[#C5A059] text-xs font-bold transition-colors"
-          >
-            <Phone size={13} /> {t.callShop || 'Call'}
-          </a>
+
+      {/* Content */}
+      <div className="relative z-10 p-5 text-white">
+        <h3
+          className="font-black text-lg leading-tight tracking-tight drop-shadow-md flex items-baseline gap-2"
+          style={{ fontFamily: "'Playfair Display', serif" }}
+        >
+          {opts.showRank && it.rank && (
+            // Inline rank chip so it never overlaps the name or the CTA row.
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#C5A059] text-[#4A0E17] text-[10px] font-black shadow-sm shrink-0 self-center">
+              #{it.rank}
+            </span>
+          )}
+          <span className="truncate">{it.name}</span>
+        </h3>
+        <div className="mt-3 space-y-1">
+          {it.city && <p className="text-sm text-white/95 drop-shadow">{it.city}</p>}
+          {it.category && <p className="text-sm text-white/90 drop-shadow">{getItemTranslation(it.category, lang)}</p>}
+          {it.price != null && (
+            <p className="text-base font-extrabold text-[#F4D67A] drop-shadow" style={{ fontFamily: "'Playfair Display', serif" }}>
+              ₹{Number(it.price).toLocaleString('en-IN')}
+            </p>
+          )}
+          {it.phone && <p className="text-xs font-mono text-white/85 drop-shadow">{it.phone}</p>}
         </div>
+        {it.phone && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <a
+              href={buildWa(it.phone, it.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1ebe5a] text-white text-xs font-bold transition-colors"
+            >
+              <MessageCircle size={13} /> {t.viewShop || 'WhatsApp'}
+            </a>
+            <a
+              href={buildTel(it.phone)}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#4A0E17] hover:bg-[#6d1324] text-[#C5A059] text-xs font-bold transition-colors"
+            >
+              <Phone size={13} /> {t.callShop || 'Call'}
+            </a>
+          </div>
+        )}
       </div>
     </article>
   );
-
-  const goPrev = () => setActiveIndex((cur) => (cur - 1 + filtered.length) % filtered.length);
-  const goNext = () => setActiveIndex((cur) => (cur + 1) % filtered.length);
-
-  // Compute the shortest signed offset from active to each card on the ring —
-  // e.g. with 5 cards and activeIndex 4, card 0 is +1 (right) not -4 (far left).
-  const signedOffset = (i: number) => {
-    const n = filtered.length;
-    let d = i - activeIndex;
-    if (d > n / 2) d -= n;
-    if (d < -n / 2) d += n;
-    return d;
-  };
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-12">
@@ -488,114 +668,244 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
         <p className="text-sm text-[#6E6B65] mt-2 max-w-xl mx-auto">{t.topTrendingSubtitle || ''}</p>
       </div>
 
-      {/* Search bar — empty query keeps the marquee running (discovery), a typed query
-          freezes the animation and swaps in a static grid so matches don't scroll away. */}
-      <div className="max-w-xl mx-auto mb-6 reveal">
-        <div className="relative">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E6B65] pointer-events-none" />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-[#6E6B65] hover:text-[#4A0E17] hover:bg-[#C5A059]/10 transition-colors cursor-pointer"
-              aria-label="Clear search"
-            >
-              <X size={14} />
-            </button>
-          )}
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t.trendingSearchPlaceholder || 'Search kitchens by name, city, or category…'}
-            className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white border border-[#C5A059]/30 text-sm text-[#2B2B2B] placeholder:text-[#6E6B65]/70 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 outline-none shadow-sm transition-all"
-          />
+      {/* Category pills — adaptive width so a few pills stretch and 12 pills wrap uniformly. */}
+      <div className="max-w-4xl mx-auto mb-4 reveal">
+        <div className="flex flex-wrap justify-center gap-2">
+          {(['All', ...categoryList]).map((cat) => {
+            const isActive = ttNorm(activeCategory) === ttNorm(cat) || (activeCategory === 'All' && cat === 'All');
+            const label = cat === 'All' ? (t.trendingAllCategories || 'All Categories') : getItemTranslation(cat, lang);
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className={`px-4 py-2 rounded-full text-xs font-extrabold transition-all cursor-pointer border active:scale-95 flex-1 min-w-[110px] max-w-[180px] ${
+                  isActive
+                    ? 'bg-[#4A0E17] text-[#C5A059] border-[#C5A059] shadow-md scale-[1.02]'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-amber-300 hover:bg-amber-50'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {q ? (
-        // Search mode: static responsive grid of matches, no marquee animation
-        filtered.length === 0 ? (
-          <div className="text-center py-10 text-[#6E6B65] text-sm reveal">{t.trendingNoMatch || 'No kitchens match your search.'}</div>
-        ) : (
-          <div className="reveal flex flex-wrap justify-center gap-4 py-2">
-            {filtered.map((it) => renderCard(it))}
-          </div>
-        )
-      ) : (
-        // Discovery mode: coverflow — one active card at full size in the center,
-        // adjacent cards visible behind it (scaled down + faded). Auto-rotates on
-        // an interval; hover pauses it; arrow buttons step manually.
-        <div
-          className="relative reveal select-none"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          <div className="relative mx-auto h-[440px] w-full max-w-4xl overflow-hidden">
-            {filtered.map((it, i) => {
-              const d = signedOffset(i);
-              const abs = Math.abs(d);
-              // Hide cards more than 2 slots away from center — keeps the composition clean.
-              const hidden = abs > 2;
-              // Fanned-out horizontal offsets (px) + progressive scale/opacity for depth.
-              const translatePx = d * 210;
-              const scale = abs === 0 ? 1 : abs === 1 ? 0.82 : 0.68;
-              const opacity = hidden ? 0 : abs === 0 ? 1 : abs === 1 ? 0.75 : 0.4;
-              const zIndex = 30 - abs;
-              const blur = abs >= 2 ? 'blur-[1px]' : '';
-              return (
-                <div
-                  key={it.id}
-                  className={`absolute top-1/2 left-1/2 transition-all duration-700 ease-out ${blur} ${hidden ? 'pointer-events-none' : 'cursor-pointer'}`}
-                  style={{
-                    transform: `translate(-50%, -50%) translateX(${translatePx}px) scale(${scale})`,
-                    opacity,
-                    zIndex,
-                  }}
-                  onClick={() => { if (!hidden && abs !== 0) setActiveIndex(i); }}
-                  role={hidden ? undefined : 'button'}
-                  tabIndex={hidden ? -1 : 0}
-                  onKeyDown={(e) => { if (!hidden && abs !== 0 && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setActiveIndex(i); } }}
-                  aria-hidden={hidden}
-                >
-                  {renderCard(it)}
-                </div>
-              );
-            })}
-          </div>
-
-          {filtered.length > 1 && (
-            <>
+      {/* City selector + search row */}
+      <div className="max-w-2xl mx-auto mb-6 reveal">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            value={activeCity}
+            onChange={(e) => setActiveCity(e.target.value)}
+            className="sm:w-56 px-4 py-3 rounded-2xl bg-white border border-[#C5A059]/30 text-sm text-[#2B2B2B] focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 outline-none shadow-sm transition-all cursor-pointer"
+          >
+            <option value="All">{t.trendingAllCities || 'All Cities'}</option>
+            {cityList.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E6B65] pointer-events-none" />
+            {search && (
               <button
                 type="button"
-                onClick={goPrev}
-                className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/95 border border-[#C5A059]/40 shadow-lg text-[#4A0E17] hover:bg-[#C5A059] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
-                aria-label="Previous kitchen"
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-[#6E6B65] hover:text-[#4A0E17] hover:bg-[#C5A059]/10 transition-colors cursor-pointer"
+                aria-label="Clear search"
               >
-                <ChevronLeft size={20} />
+                <X size={14} />
               </button>
-              <button
-                type="button"
-                onClick={goNext}
-                className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/95 border border-[#C5A059]/40 shadow-lg text-[#4A0E17] hover:bg-[#C5A059] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
-                aria-label="Next kitchen"
-              >
-                <ChevronRight size={20} />
-              </button>
+            )}
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t.trendingSearchPlaceholder || 'Search kitchens by name, city, or category…'}
+              className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white border border-[#C5A059]/30 text-sm text-[#2B2B2B] placeholder:text-[#6E6B65]/70 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 outline-none shadow-sm transition-all"
+            />
+          </div>
+        </div>
+      </div>
 
-              <div className="flex items-center justify-center gap-2 mt-4">
-                {filtered.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setActiveIndex(i)}
-                    className={`h-2 rounded-full transition-all cursor-pointer ${i === activeIndex ? 'w-8 bg-[#4A0E17]' : 'w-2 bg-[#C5A059]/40 hover:bg-[#C5A059]/70'}`}
-                    aria-label={`Show kitchen ${i + 1}`}
-                    aria-current={i === activeIndex}
-                  />
-                ))}
+      {passing.length === 0 && featuredTop3.length === 0 ? (
+        // Drop the `reveal` class here so the empty-state doesn't flash invisible
+        // for ~a frame while the IntersectionObserver catches up after a filter change.
+        <div className="text-center py-10 text-[#6E6B65] text-sm">{t.trendingNoMatch || 'No kitchens match your search.'}</div>
+      ) : discoveryMode ? (
+        (() => {
+          // discoveryList already ordered [rank asc nulls last, sort_order asc]
+          // so pinned entries appear first in the rotation. Reuses `rest` — in
+          // discovery mode bucketMode is false so `rest` holds every item.
+          const discoveryList = rest;
+          const n = discoveryList.length;
+          // Shortest signed distance around the ring so, e.g., with n=5 and
+          // activeIndex=4, card 0 sits at +1 (right) not -4 (far left).
+          const signedOffset = (i: number) => {
+            let d = i - activeIndex;
+            if (d > n / 2) d -= n;
+            if (d < -n / 2) d += n;
+            return d;
+          };
+          const goPrev = () => setActiveIndex((cur) => (cur - 1 + n) % n);
+          const goNext = () => setActiveIndex((cur) => (cur + 1) % n);
+          const jumpTo = (i: number) => setActiveIndex(((i % n) + n) % n);
+          const onTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+          const onTouchEnd = (e: React.TouchEvent) => {
+            if (touchStartX.current == null) return;
+            const dx = e.changedTouches[0].clientX - touchStartX.current;
+            touchStartX.current = null;
+            if (Math.abs(dx) < 40) return;
+            // Swipe left (dx < 0) advances to the next card.
+            if (dx < 0) goNext(); else goPrev();
+          };
+          const activeItem = discoveryList[activeIndex];
+          return (
+            <div
+              className="relative reveal select-none"
+              onMouseEnter={() => setHoverPaused(true)}
+              onMouseLeave={() => setHoverPaused(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
+                if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
+              }}
+              tabIndex={0}
+            >
+              <div
+                className="relative mx-auto h-[440px] w-full max-w-4xl overflow-hidden"
+                onTouchStart={onTouchStart}
+                onTouchEnd={onTouchEnd}
+              >
+                {/* Fade masks on the frame edges so side cards fade into the
+                    background rather than clipping. */}
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-16 z-30" style={{ background: 'linear-gradient(90deg, #F7F4EF 0%, rgba(247,244,239,0) 100%)' }} />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-16 z-30" style={{ background: 'linear-gradient(270deg, #F7F4EF 0%, rgba(247,244,239,0) 100%)' }} />
+                {discoveryList.map((it, i) => {
+                  const d = signedOffset(i);
+                  const abs = Math.abs(d);
+                  const hidden = abs > 2;
+                  const translatePx = d * 210;
+                  const scale = abs === 0 ? 1 : abs === 1 ? 0.82 : 0.68;
+                  const opacity = hidden ? 0 : abs === 0 ? 1 : abs === 1 ? 0.75 : 0.4;
+                  const zIndex = 30 - abs;
+                  const blur = abs >= 2 ? 'blur-[1px]' : '';
+                  const isFront = abs === 0;
+                  return (
+                    <div
+                      key={it.id}
+                      className={`absolute top-1/2 left-1/2 transition-all duration-700 ease-out ${blur} ${hidden ? 'pointer-events-none' : isFront ? 'cursor-default' : 'cursor-pointer'}`}
+                      style={{
+                        transform: `translate(-50%, -50%) translateX(${translatePx}px) scale(${scale})`,
+                        opacity,
+                        zIndex,
+                      }}
+                      onClick={() => { if (!hidden && !isFront) jumpTo(i); }}
+                      onKeyDown={(e) => { if (!hidden && !isFront && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); jumpTo(i); } }}
+                      role={hidden ? undefined : isFront ? undefined : 'button'}
+                      tabIndex={hidden || isFront ? -1 : 0}
+                      aria-hidden={hidden}
+                    >
+                      <div className="relative">
+                        {renderCard(it, { showRank: true })}
+                        {isFront && !paused && n > 1 && (
+                          // Progress bar for the auto-advance interval. Re-mounts
+                          // (via progressTick key) on each tick so the CSS animation
+                          // restarts from 0 instead of continuing.
+                          <div
+                            key={`prog-${activeIndex}-${progressTick}`}
+                            className="absolute left-0 right-0 bottom-0 h-1 bg-[#C5A059]/25 overflow-hidden rounded-b-2xl z-20"
+                          >
+                            <div
+                              className="h-full bg-[#F4D67A]"
+                              style={{ animation: `ttProgress ${ROTATE_INTERVAL_MS}ms linear forwards` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </>
+
+              {n > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/95 border border-[#C5A059]/40 shadow-lg text-[#4A0E17] hover:bg-[#C5A059] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                    aria-label="Previous kitchen"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/95 border border-[#C5A059]/40 shadow-lg text-[#4A0E17] hover:bg-[#C5A059] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                    aria-label="Next kitchen"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    {discoveryList.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => jumpTo(i)}
+                        className={`h-2 rounded-full transition-all cursor-pointer ${i === activeIndex ? 'w-8 bg-[#4A0E17]' : 'w-2 bg-[#C5A059]/40 hover:bg-[#C5A059]/70'}`}
+                        aria-label={`Show kitchen ${i + 1}`}
+                        aria-current={i === activeIndex}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {activeItem && (
+                <p className="text-center mt-3 text-xs italic text-[#6E6B65]">
+                  {activeItem.name} · {activeIndex + 1} / {n}
+                </p>
+              )}
+            </div>
+          );
+        })()
+      ) : (
+        <div className="space-y-8">
+          {featuredTop3.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4 justify-center">
+                <TrendingUp size={16} className="text-[#C5A059]" />
+                <span className="text-xs font-black uppercase tracking-widest text-[#4A0E17]">
+                  {featuredFallbackLabel}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center">
+                {featuredTop3.map((it) => renderCard(it, { showRank: true }))}
+              </div>
+            </div>
+          )}
+
+          {rest.length > 0 ? (
+            <div>
+              {bucketMode && top3.length > 0 && (
+                <div className="flex items-center gap-2 mb-4 justify-center">
+                  <span className="text-xs font-black uppercase tracking-widest text-[#6E6B65]">
+                    {t.trendingRestRow || 'More kitchens'}
+                  </span>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
+                {rest.map((it) => renderCard(it, { showRank: !bucketMode }))}
+              </div>
+            </div>
+          ) : (
+            // Filter yielded no direct matches, but featuredTop3 is showing above.
+            // Explain the fallback so the user knows why the cards are unrelated.
+            passing.length === 0 && featuredTop3.length > 0 && (
+              <p className="text-center text-xs text-[#6E6B65] italic">
+                {t.trendingNoExactMatchFallback || 'No exact matches for this filter — featuring curated picks above.'}
+              </p>
+            )
           )}
         </div>
       )}

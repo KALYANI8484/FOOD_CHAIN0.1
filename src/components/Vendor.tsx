@@ -1197,11 +1197,17 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
   // that powers the "radar" nav item's live notification dot)
   const activeRadarCount = radarOrders.filter(o => o.client_zip === vendor.zip_code).length;
 
-  const kpis = [
+  const kpis: Array<{
+    label: string; value: string | number; desc: string;
+    icon: any; color: string; bg: string;
+    tab?: Tab;
+  }> = [
     { label: t.totalCompletedOrders, value: vendorCompletedOrders.length, desc: t.totalOverallCompletedDesc, icon: ShoppingBag, color: 'text-green-600', bg: 'bg-green-500/10' },
     { label: t.nearbyPinBroadcasts, value: pinMatchCount, desc: `${t.nearbyPinBroadcastsDesc} ${vendor.zip_code}`, icon: Navigation, color: 'text-amber-600', bg: 'bg-amber-500/10' },
     { label: t.totalOverallEarnings, value: `₹${totalVendorEarnings.toLocaleString()}`, desc: t.totalEarnedDesc, icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-500/10' },
-    { label: t.activeRadarOpportunities, value: activeRadarCount, desc: t.activeRadarOpportunitiesDesc, icon: Radar, color: 'text-purple-600', bg: 'bg-purple-500/10' },
+    // Clicking this KPI jumps to the "Broadcast Order Radar" panel where the vendor
+    // can accept these live incoming client orders.
+    { label: t.activeRadarOpportunities, value: activeRadarCount, desc: t.activeRadarOpportunitiesDesc, icon: Radar, color: 'text-purple-600', bg: 'bg-purple-500/10', tab: 'radar' },
   ];
 
   return (
@@ -1247,16 +1253,30 @@ function VendorDashboard({ vendor, onTab, radarOrders }: { vendor: VendorType; o
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 stagger">
-        {kpis.map((k) => (
-          <SpotlightCard key={k.label} className="card p-6 bg-surface border border-border hover-lift">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${k.bg} ${k.color}`}>
-              <k.icon size={20} />
-            </div>
-            <p className="text-3xl font-extrabold mt-4 text-text">{k.value}</p>
-            <p className="text-sm text-text font-bold mt-1">{k.label}</p>
-            <p className="text-xs text-muted mt-0.5">{k.desc}</p>
-          </SpotlightCard>
-        ))}
+        {kpis.map((k) => {
+          const clickable = !!k.tab && !!onTab;
+          const handleClick = clickable ? () => onTab!(k.tab!) : undefined;
+          return (
+            <SpotlightCard
+              key={k.label}
+              className={`card p-6 bg-surface border border-border hover-lift ${clickable ? 'cursor-pointer hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40' : ''}`}
+              onClick={handleClick}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onKeyDown={clickable ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick!(); }
+              } : undefined}
+              aria-label={clickable ? `${k.label} — open Broadcast Order Radar` : undefined}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${k.bg} ${k.color}`}>
+                <k.icon size={20} />
+              </div>
+              <p className="text-3xl font-extrabold mt-4 text-text">{k.value}</p>
+              <p className="text-sm text-text font-bold mt-1">{k.label}</p>
+              <p className="text-xs text-muted mt-0.5">{k.desc}</p>
+            </SpotlightCard>
+          );
+        })}
       </div>
 
       {/* Multi-Plan Validity Timeline */}

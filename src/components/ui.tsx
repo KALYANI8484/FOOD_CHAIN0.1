@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode, type MouseEvent, type SyntheticEvent } from 'react';
+import { useEffect, useState, useRef, type ReactNode, type MouseEvent, type SyntheticEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 // Neutral amber placeholder (matches the app's existing "no image" empty-state color,
 // e.g. Landing.tsx's bg-amber-50 fallback div) shown when a content image's src 404s —
@@ -374,14 +374,31 @@ export function EmptyState({ icon, title, subtitle }: { icon: ReactNode; title: 
   );
 }
 
-export function SpotlightCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+type SpotlightCardProps = {
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLDivElement>) => void;
+  role?: string;
+  tabIndex?: number;
+  'aria-label'?: string;
+};
+export function SpotlightCard({ children, className = '', onClick, onKeyDown, role, tabIndex, 'aria-label': ariaLabel }: SpotlightCardProps) {
   const handleMove = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     e.currentTarget.style.setProperty('--mx', `${e.clientX - rect.left}px`);
     e.currentTarget.style.setProperty('--my', `${e.clientY - rect.top}px`);
   };
   return (
-    <div onMouseMove={handleMove} className={`spotlight relative overflow-hidden ${className}`}>
+    <div
+      onMouseMove={handleMove}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      role={role}
+      tabIndex={tabIndex}
+      aria-label={ariaLabel}
+      className={`spotlight relative overflow-hidden ${className}`}
+    >
       {children}
     </div>
   );

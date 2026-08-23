@@ -4940,13 +4940,22 @@ const topTrendingTrans = {
     colCategory: 'Category',
     colPrice: 'Price',
     colOrder: 'Order',
+    colRank: 'Rank',
     colActions: 'Actions',
     fldName: 'Name / Shop Name',
-    fldCity: 'City',
-    fldPhone: 'Phone Number',
-    fldCategory: 'Category',
-    fldPrice: 'Category Price (₹)',
+    fldCity: 'City (optional)',
+    fldPhone: 'Phone Number (optional)',
+    fldCategory: 'Category (optional)',
+    fldPrice: 'Category Price ₹ (optional)',
     fldOrder: 'Sort Order (lower = shown first)',
+    fldRank: 'Top-3 Rank in this City × Category',
+    fldRankHelp: 'Pinned entries appear in the top-3 row on the landing. Requires city and category.',
+    rankNone: '— None (falls into "rest") —',
+    rank1st: '#1',
+    rank2nd: '#2',
+    rank3rd: '#3',
+    rankDupError: (city: string, category: string, rank: number) => `${city} + ${category} already has a #${rank} pinned entry. Clear it first, or pick another slot.`,
+    rankNeedsBucket: 'Rank can only be set when both City and Category are filled.',
     fldImage: 'Card Image',
     uploadHelp: 'JPG, PNG, or WebP · up to 15 MB · compressed automatically',
     uploading: 'Uploading…',
@@ -4959,7 +4968,7 @@ const topTrendingTrans = {
     toastCreated: (name: string) => `Trending card "${name}" added`,
     toastUpdated: (name: string) => `Trending card "${name}" updated`,
     toastRemoved: (name: string) => `Trending card "${name}" removed`,
-    validationRequired: 'Name, city, phone, category and price are required',
+    validationRequired: 'Name is required',
   },
   hi: {
     title: 'टॉप ट्रेंडिंग किचन',
@@ -4975,13 +4984,22 @@ const topTrendingTrans = {
     colCategory: 'श्रेणी',
     colPrice: 'क़ीमत',
     colOrder: 'क्रम',
+    colRank: 'रैंक',
     colActions: 'कार्रवाई',
     fldName: 'नाम / शॉप का नाम',
-    fldCity: 'शहर',
-    fldPhone: 'फ़ोन नंबर',
-    fldCategory: 'श्रेणी',
-    fldPrice: 'श्रेणी क़ीमत (₹)',
+    fldCity: 'शहर (वैकल्पिक)',
+    fldPhone: 'फ़ोन नंबर (वैकल्पिक)',
+    fldCategory: 'श्रेणी (वैकल्पिक)',
+    fldPrice: 'श्रेणी क़ीमत ₹ (वैकल्पिक)',
     fldOrder: 'क्रम (कम = पहले दिखे)',
+    fldRank: 'इस शहर × श्रेणी में टॉप-3 रैंक',
+    fldRankHelp: 'पिन किए गए कार्ड लैंडिंग के टॉप-3 पंक्ति में दिखते हैं। शहर और श्रेणी दोनों आवश्यक हैं।',
+    rankNone: '— कोई नहीं (शेष में दिखेगा) —',
+    rank1st: '#1',
+    rank2nd: '#2',
+    rank3rd: '#3',
+    rankDupError: (city: string, category: string, rank: number) => `${city} + ${category} में पहले से एक #${rank} पिन किया हुआ है। पहले उसे हटाएं या दूसरा स्लॉट चुनें।`,
+    rankNeedsBucket: 'रैंक तभी सेट करें जब शहर और श्रेणी दोनों भरे हों।',
     fldImage: 'कार्ड चित्र',
     uploadHelp: 'JPG, PNG या WebP · 15 MB तक · स्वतः संकुचित',
     uploading: 'अपलोड हो रहा है…',
@@ -4994,7 +5012,7 @@ const topTrendingTrans = {
     toastCreated: (name: string) => `ट्रेंडिंग कार्ड "${name}" जोड़ा गया`,
     toastUpdated: (name: string) => `ट्रेंडिंग कार्ड "${name}" अपडेट किया गया`,
     toastRemoved: (name: string) => `ट्रेंडिंग कार्ड "${name}" हटाया गया`,
-    validationRequired: 'नाम, शहर, फ़ोन, श्रेणी और क़ीमत आवश्यक हैं',
+    validationRequired: 'नाम आवश्यक है',
   },
   mr: {
     title: 'टॉप ट्रेंडिंग किचन',
@@ -5010,13 +5028,22 @@ const topTrendingTrans = {
     colCategory: 'श्रेणी',
     colPrice: 'किंमत',
     colOrder: 'क्रम',
+    colRank: 'रँक',
     colActions: 'कृती',
     fldName: 'नाव / शॉपचे नाव',
-    fldCity: 'शहर',
-    fldPhone: 'फोन नंबर',
-    fldCategory: 'श्रेणी',
-    fldPrice: 'श्रेणी किंमत (₹)',
+    fldCity: 'शहर (वैकल्पिक)',
+    fldPhone: 'फोन नंबर (वैकल्पिक)',
+    fldCategory: 'श्रेणी (वैकल्पिक)',
+    fldPrice: 'श्रेणी किंमत ₹ (वैकल्पिक)',
     fldOrder: 'क्रम (कमी = आधी दिसेल)',
+    fldRank: 'या शहर × श्रेणीतील टॉप-3 रँक',
+    fldRankHelp: 'पिन केलेले कार्ड लँडिंगच्या टॉप-3 रांगेत दिसतात. शहर आणि श्रेणी दोन्ही आवश्यक.',
+    rankNone: '— काहीही नाही (उर्वरितमध्ये दिसेल) —',
+    rank1st: '#1',
+    rank2nd: '#2',
+    rank3rd: '#3',
+    rankDupError: (city: string, category: string, rank: number) => `${city} + ${category} मध्ये आधीच एक #${rank} पिन केलेला आहे. आधी तो काढा किंवा दुसरा स्लॉट निवडा.`,
+    rankNeedsBucket: 'रँक तेव्हाच सेट करा जेव्हा शहर आणि श्रेणी दोन्ही भरलेले असतील.',
     fldImage: 'कार्ड चित्र',
     uploadHelp: 'JPG, PNG किंवा WebP · 15 MB पर्यंत · स्वयंचलित संकुचित',
     uploading: 'अपलोड होत आहे…',
@@ -5029,7 +5056,7 @@ const topTrendingTrans = {
     toastCreated: (name: string) => `ट्रेंडिंग कार्ड "${name}" जोडले`,
     toastUpdated: (name: string) => `ट्रेंडिंग कार्ड "${name}" अद्ययावत केले`,
     toastRemoved: (name: string) => `ट्रेंडिंग कार्ड "${name}" काढले`,
-    validationRequired: 'नाव, शहर, फोन, श्रेणी आणि किंमत आवश्यक आहेत',
+    validationRequired: 'नाव आवश्यक आहे',
   },
 };
 
@@ -5037,10 +5064,11 @@ type TopTrendingForm = {
   name: string; city: string; phone: string;
   category: string; price: string; sort_order: string;
   image_url: string;
+  rank: '' | '1' | '2' | '3';
 };
 
 const emptyTopTrendingForm = (): TopTrendingForm => ({
-  name: '', city: '', phone: '', category: '', price: '', sort_order: '0', image_url: ''
+  name: '', city: '', phone: '', category: '', price: '', sort_order: '0', image_url: '', rank: ''
 });
 
 function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
@@ -5108,26 +5136,51 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
       city: item.city || '',
       phone: item.phone || '',
       category: item.category || '',
-      price: String(item.price ?? ''),
+      price: item.price == null ? '' : String(item.price),
       sort_order: String(item.sort_order ?? 0),
-      image_url: item.image_url || ''
+      image_url: item.image_url || '',
+      rank: item.rank == null ? '' : (String(item.rank) as '1' | '2' | '3')
     });
     setModal(true);
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.city.trim() || !form.phone.trim() || !form.category.trim() || form.price === '') {
+    if (!form.name.trim()) {
       show(t.validationRequired, 'error');
       return;
     }
+    const cityVal = form.city.trim();
+    const categoryVal = form.category.trim();
+    const rankNum = form.rank === '' ? null : Number(form.rank) as 1 | 2 | 3;
+    // A pinned slot only makes sense inside a (city, category) bucket.
+    if (rankNum != null && (!cityVal || !categoryVal)) {
+      show(t.rankNeedsBucket, 'error');
+      return;
+    }
+    // Reject duplicate (city, category, rank) — matched case-insensitively so
+    // "Pune" and "pune " don't accidentally coexist.
+    if (rankNum != null) {
+      const norm = (s: string) => (s || '').trim().toLowerCase();
+      const clash = items.find((it) =>
+        it.id !== editingId &&
+        it.rank === rankNum &&
+        norm(it.city || '') === norm(cityVal) &&
+        norm(it.category || '') === norm(categoryVal)
+      );
+      if (clash) {
+        show(t.rankDupError(cityVal, categoryVal, rankNum), 'error');
+        return;
+      }
+    }
     const payload = {
       name: form.name.trim(),
-      city: form.city.trim(),
-      phone: form.phone.trim(),
-      category: form.category.trim(),
-      price: Number(form.price) || 0,
+      city: cityVal || null,
+      phone: form.phone.trim() || null,
+      category: categoryVal || null,
+      price: form.price === '' ? null : Number(form.price),
       sort_order: Number(form.sort_order) || 0,
       image_url: form.image_url || null,
+      rank: rankNum,
       updated_at: new Date().toISOString()
     };
     if (editingId) {
@@ -5193,11 +5246,12 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
       ) : (
         <div className="card overflow-hidden bg-surface border border-border">
           <div className="w-full overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse min-w-[860px]">
+            <table className="w-full text-left text-sm border-collapse min-w-[920px]">
               <thead>
                 <tr className="bg-surface-2 text-xs font-bold text-muted uppercase tracking-wider">
                   <th className="px-6 py-4">{t.colImage}</th>
                   <th className="px-6 py-4">{t.colName}</th>
+                  <th className="px-6 py-4">{t.colRank}</th>
                   <th className="px-6 py-4">{t.colCity}</th>
                   <th className="px-6 py-4">{t.colPhone}</th>
                   <th className="px-6 py-4">{t.colCategory}</th>
@@ -5217,10 +5271,17 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
                       )}
                     </td>
                     <td className="px-6 py-4 font-bold text-text">{it.name}</td>
-                    <td className="px-6 py-4 text-muted">{it.city}</td>
-                    <td className="px-6 py-4 text-muted font-mono text-xs">{it.phone}</td>
-                    <td className="px-6 py-4"><Badge>{it.category}</Badge></td>
-                    <td className="px-6 py-4 font-semibold">₹{Number(it.price).toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4">
+                      {it.rank ? (
+                        <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/40 text-[#4A0E17] text-xs font-black">#{it.rank}</span>
+                      ) : (
+                        <span className="text-muted text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-muted">{it.city || <span className="text-muted/60">—</span>}</td>
+                    <td className="px-6 py-4 text-muted font-mono text-xs">{it.phone || <span className="text-muted/60">—</span>}</td>
+                    <td className="px-6 py-4">{it.category ? <Badge>{it.category}</Badge> : <span className="text-muted/60">—</span>}</td>
+                    <td className="px-6 py-4 font-semibold">{it.price == null ? <span className="text-muted/60">—</span> : `₹${Number(it.price).toLocaleString('en-IN')}`}</td>
                     <td className="px-6 py-4 text-xs text-muted">{it.sort_order ?? 0}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="inline-flex items-center gap-1.5">
@@ -5252,35 +5313,34 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
         <div className="space-y-4">
           <Input label={t.fldName} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label={t.fldCity} value={form.city} onChange={(v) => setForm({ ...form, city: v })} required />
-            <Input label={t.fldPhone} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required />
+            <Input label={t.fldCity} value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
+            <Input label={t.fldPhone} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label={t.fldCategory} value={form.category} onChange={(v) => setForm({ ...form, category: v })} required />
-            <Input label={t.fldPrice} type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} required />
+            <Input label={t.fldCategory} value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
+            <Input label={t.fldPrice} type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} />
           </div>
-          <Input label={t.fldOrder} type="number" value={form.sort_order} onChange={(v) => setForm({ ...form, sort_order: v })} />
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider block">{t.fldImage}</label>
-            <div className="flex items-center gap-3">
-              {form.image_url ? (
-                <img src={form.image_url} alt="Preview" onError={onImgError} className="w-16 h-16 rounded-lg object-cover border border-border" />
-              ) : (
-                <div className="w-16 h-16 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-muted"><Upload size={18} /></div>
-              )}
-              <label className="flex-1 cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text hover:border-accent transition-colors">
-                <Upload size={14} />
-                <span>{uploading ? t.uploading : t.fldImage}</span>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
-              </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label={t.fldOrder} type="number" value={form.sort_order} onChange={(v) => setForm({ ...form, sort_order: v })} />
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider block">{t.fldRank}</label>
+              <select
+                value={form.rank}
+                onChange={(e) => setForm({ ...form, rank: e.target.value as '' | '1' | '2' | '3' })}
+                className="w-full px-3 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
+              >
+                <option value="">{t.rankNone}</option>
+                <option value="1">{t.rank1st}</option>
+                <option value="2">{t.rank2nd}</option>
+                <option value="3">{t.rank3rd}</option>
+              </select>
+              <p className="text-[11px] text-muted">{t.fldRankHelp}</p>
             </div>
-            <p className="text-[11px] text-muted">{t.uploadHelp}</p>
           </div>
 
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
             <Button variant="outline" onClick={() => { setModal(false); setEditingId(null); setForm(emptyTopTrendingForm()); }}>{t.cancel}</Button>
-            <Button onClick={handleSave} disabled={uploading}>{t.save}</Button>
+            <Button onClick={handleSave}>{t.save}</Button>
           </div>
         </div>
       </Modal>
@@ -5296,13 +5356,18 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted"><TrendingUp size={48} /></div>
                 )}
-                <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#4A0E17]/90 text-[#C5A059] text-[10px] font-black uppercase tracking-wider">{viewing.category}</span>
+                {viewing.category && (
+                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#4A0E17]/90 text-[#C5A059] text-[10px] font-black uppercase tracking-wider">{viewing.category}</span>
+                )}
+                {viewing.rank && (
+                  <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-[#C5A059] text-[#4A0E17] text-[10px] font-black">#{viewing.rank}</span>
+                )}
               </div>
               <div className="p-4">
                 <h3 className="font-extrabold text-lg text-[#2B2B2B]">{viewing.name}</h3>
-                <p className="text-xs text-[#6E6B65] flex items-center gap-1 mt-0.5"><MapPin size={11} /> {viewing.city}</p>
-                <p className="mt-2 text-xl font-extrabold text-[#4A0E17]">₹{Number(viewing.price).toLocaleString('en-IN')}</p>
-                <p className="text-[11px] text-muted font-mono mt-1">{viewing.phone}</p>
+                {viewing.city && <p className="text-xs text-[#6E6B65] flex items-center gap-1 mt-0.5"><MapPin size={11} /> {viewing.city}</p>}
+                {viewing.price != null && <p className="mt-2 text-xl font-extrabold text-[#4A0E17]">₹{Number(viewing.price).toLocaleString('en-IN')}</p>}
+                {viewing.phone && <p className="text-[11px] text-muted font-mono mt-1">{viewing.phone}</p>}
               </div>
             </div>
             <div className="flex gap-2 justify-end pt-2">
