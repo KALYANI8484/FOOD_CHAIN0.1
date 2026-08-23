@@ -500,11 +500,17 @@ const clientSchema = new mongoose.Schema({
 const topTrendingSchema = new mongoose.Schema({
   _id: { type: String, default: () => crypto.randomUUID() },
   name: { type: String, required: true },
-  city: { type: String, required: true },
-  phone: { type: String, required: true },
-  category: { type: String, required: true },
-  price: { type: Number, required: true, default: 0 },
+  city: { type: String, default: null },
+  phone: { type: String, default: null },
+  category: { type: String, default: null },
+  price: { type: Number, default: null },
   image_url: { type: String, default: null },
+  // Pinned top-3 slot inside the (city, category) bucket on the landing.
+  // null = not pinned; falls into the "rest" list below the top-3 row.
+  // Mongoose's enum validator doesn't accept null in the list on older
+  // versions, so we constrain with min/max and rely on the admin form
+  // to only ever pass 1, 2, 3, or null.
+  rank: { type: Number, min: 1, max: 3, default: null },
   sort_order: { type: Number, default: 0 },
   created_at: { type: String, default: () => new Date().toISOString() },
   updated_at: { type: String, default: () => new Date().toISOString() }

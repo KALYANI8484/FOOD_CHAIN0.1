@@ -185,11 +185,12 @@ export type ClientProfile = {
 export type TopTrending = {
   id: string;
   name: string;
-  city: string;
-  phone: string;
-  category: string;
-  price: number;
+  city: string | null;
+  phone: string | null;
+  category: string | null;
+  price: number | null;
   image_url: string | null;
+  rank: 1 | 2 | 3 | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
