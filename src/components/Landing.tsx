@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  UtensilsCrossed, ArrowRight, Phone, Mail, MessageCircle,
+  UtensilsCrossed, ArrowRight, Phone, MessageCircle,
   ShoppingBag, Store, X, MapPin, ChevronRight,
   ChevronLeft, Hash, User, CheckCircle,
   TrendingUp, Star, UserPlus, Maximize2, FileText, Search
@@ -288,15 +288,30 @@ interface VendorItem  { id: string; item_name: string; price: number; quantity: 
 
 /* ── Scroll Reveal ──────────────────────────────── */
 function useScrollReveal() {
+  // Runs ONCE per mount. Previously this had no deps and re-created the
+  // IntersectionObserver + re-scanned every `.reveal` node after every render,
+  // which made typing in filter/search inputs noticeably janky. Now we set the
+  // observer up once and use a MutationObserver on document.body to pick up
+  // any `.reveal` nodes that mount later (e.g. when the Top Trending section
+  // flips between coverflow and static grid on filter changes).
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal, .reveal-left, .reveal-right');
     const io = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
       { threshold: 0.12 }
     );
-    els.forEach(el => io.observe(el));
-    return () => io.disconnect();
-  });
+    const observed = new WeakSet<Element>();
+    const scan = () => {
+      document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach((el) => {
+        if (observed.has(el)) return;
+        observed.add(el);
+        io.observe(el);
+      });
+    };
+    scan();
+    const mo = new MutationObserver(() => scan());
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => { mo.disconnect(); io.disconnect(); };
+  }, []);
 }
 
 /* ── Count-Up ───────────────────────────────────── */
@@ -485,7 +500,11 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
       const key = raw.toLowerCase();
       if (!seen.has(key)) seen.set(key, raw);
     }
-    const list = Array.from(seen.values());
+    // Locale-aware, case-insensitive alphabetical sort so the city dropdown and
+    // category pills always appear A→Z regardless of insertion order. New entries
+    // added later by the super admin drop into the right alphabetical slot on the
+    // next render automatically since this recomputes from `items` each time.
+    const list = Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     if (list.length > max && typeof console !== 'undefined') {
       // eslint-disable-next-line no-console
       console.warn(`[TopTrending] ${field} count ${list.length} exceeds cap ${max}; extras dropped from filter row`);
@@ -669,7 +688,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
       </div>
 
       {/* Category pills — adaptive width so a few pills stretch and 12 pills wrap uniformly. */}
-      <div className="max-w-4xl mx-auto mb-4 reveal">
+      <div className="max-w-4xl mx-auto mb-4">
         <div className="flex flex-wrap justify-center gap-2">
           {(['All', ...categoryList]).map((cat) => {
             const isActive = ttNorm(activeCategory) === ttNorm(cat) || (activeCategory === 'All' && cat === 'All');
@@ -693,7 +712,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
       </div>
 
       {/* City selector + search row */}
-      <div className="max-w-2xl mx-auto mb-6 reveal">
+      <div className="max-w-2xl mx-auto mb-6">
         <div className="flex flex-col sm:flex-row gap-2">
           <select
             value={activeCity}
@@ -762,7 +781,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
           const activeItem = discoveryList[activeIndex];
           return (
             <div
-              className="relative reveal select-none"
+              className="relative select-none"
               onMouseEnter={() => setHoverPaused(true)}
               onMouseLeave={() => setHoverPaused(false)}
               onKeyDown={(e) => {
@@ -1974,24 +1993,27 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
             <div className="reveal">
               <h3 className="font-bold text-[#C5A059] text-sm mb-5 uppercase tracking-widest">{t.getInTouch}</h3>
-              <ul className="space-y-3">
+              <ul className="space-y-5">
                 {[
-                  { href: 'tel:+919175537373', icon: Phone, label: '+91 91755 37373' },
-                  { href: 'https://wa.me/919175537373?text=Hello%20Vikram%20Ads%2C%20I%20have%20an%20inquiry.', icon: MessageCircle, label: t.whatsAppUs },
-                  { href: 'mailto:vikram271@rediffmail.com', icon: Mail, label: 'vikram271@rediffmail.com' },
-                ].map(({ href, icon: Icon, label }) => (
-                  <li key={label}>
-                    <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
-                      className="flex items-center gap-3 text-sm text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors group">
-                      <div className="w-9 h-9 rounded-xl bg-[#360910] border border-[#C5A059]/30 group-hover:bg-[#4A0E17] flex items-center justify-center transition-colors shadow-sm">
-                        <Icon size={15} className="text-[#C5A059]" />
-                      </div>
-                      {label}
+                  { name: 'Vikram Kashinath Mutke', phone: '9175537373', location: 'Sangamner, Ahilyanagar' },
+                  { name: 'Pratibha Vinod Satere', phone: '9689784930', location: 'Ulwe, Navi Mumbai' },
+                ].map((p) => (
+                  <li key={p.name}>
+                    <p className="text-sm font-bold text-[#F7F4EF]">{p.name}</p>
+                    <a
+                      href={`tel:+91${p.phone}`}
+                      className="flex items-center gap-2 text-xs text-[#F7F4EF]/80 hover:text-[#C5A059] transition-colors mt-1.5"
+                    >
+                      <Phone size={12} className="text-[#C5A059] shrink-0" />
+                      {p.phone}
                     </a>
+                    <p className="flex items-center gap-2 text-xs text-[#F7F4EF]/80 mt-1">
+                      <MapPin size={12} className="text-[#C5A059] shrink-0" />
+                      {p.location}
+                    </p>
                   </li>
                 ))}
               </ul>
-
             </div>
 
             <div className="reveal reveal-right">
