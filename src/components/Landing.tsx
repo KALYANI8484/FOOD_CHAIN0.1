@@ -511,8 +511,8 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     }
     return list.slice(0, max);
   };
-  const categoryList = distinctBy('category', 12);
-  const cityList = distinctBy('city', 50);
+  const categoryList = distinctBy('category', 200);
+  const cityList = distinctBy('city', 500);
 
   const q = search.trim().toLowerCase();
 
@@ -657,7 +657,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
           {it.category && <p className="text-sm text-white/90 drop-shadow">{getItemTranslation(it.category, lang)}</p>}
           {it.price != null && (
             <p className="text-xl font-normal text-[#F4D67A] drop-shadow" style={{ fontFamily: "'Playfair Display', serif" }}>
-              ₹{Number(it.price).toLocaleString('en-IN')}
+              ₹-{Number(it.price).toLocaleString('en-IN')}
             </p>
           )}
           {it.phone && <p className="text-xs font-mono text-white/85 drop-shadow">{it.phone}</p>}
@@ -934,6 +934,52 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+/* ── Vendor Join Section ────────────────────────── */
+function VendorJoinSection({ onNavigate, t }: { onNavigate: (r: any) => void; t: any }) {
+  return (
+    <section className="max-w-7xl mx-auto px-6 pb-16 pt-4">
+      <div className="reveal relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#4A0E17] via-[#360910] to-[#1C0609] border border-[#C5A059]/30 p-10 md:p-14 text-white shadow-2xl shadow-[#4A0E17]/30">
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#C5A059]/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-black/30 blur-3xl pointer-events-none" />
+        <div className="relative z-10 grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-extrabold mb-4 leading-tight" style={{ fontFamily:"'Playfair Display', serif" }}>{t.areYouAVendor || 'Do You Run a Kitchen?'}</h2>
+            <p className="text-white/70 text-sm leading-relaxed mb-6">{t.vendorJoinDesc || 'Join 200+ verified kitchens already earning through our platform. Get instant access to nearby wholesale orders, manage your menu, and grow your business — setup takes minutes.'}</p>
+            <ul className="space-y-2.5">
+              {[
+                ['🎯', t.vendorBenefit1 || 'Nearby order radar — get matched automatically'],
+                ['📦', t.vendorBenefit2 || 'Manage inventory by category with item limits'],
+                ['💰', t.vendorBenefit3 || 'Subscription plans starting from ₹199/mo'],
+                ['📊', t.vendorBenefit4 || 'Track earnings & orders in real-time'],
+                ['✅', t.vendorBenefit5 || 'Verified badge builds instant client trust'],
+              ].map(([icon, text]) => (
+                <li key={text} className="text-sm text-white/80 flex items-start gap-2">
+                  <span className="shrink-0 text-base">{icon}</span><span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="bg-white/10 border border-white/20 rounded-2xl p-6 backdrop-blur-sm text-center">
+              <p className="text-4xl font-extrabold text-[#C5A059] mb-1" style={{ fontFamily:"'Playfair Display', serif" }}>200+</p>
+              <p className="text-white/70 text-sm font-semibold">{t.verifiedVendorsOnboard || 'Verified kitchens already onboard'}</p>
+              <div className="my-4 h-px bg-white/10" />
+              <p className="text-2xl font-extrabold text-white mb-1">₹199<span className="text-base font-semibold text-white/60">/mo</span></p>
+              <p className="text-white/60 text-xs">{t.startingPlanCancel || 'Starting plan — cancel anytime'}</p>
+            </div>
+            <button
+              onClick={() => onNavigate('signup')}
+              className="flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-[#C5A059] hover:bg-[#D4B36E] text-[#4A0E17] font-extrabold text-base transition-all shadow-lg shadow-[#C5A059]/30 active:scale-95 btn-shine cursor-pointer"
+            >
+              <UserPlus size={18} /> Register Kitchen Online &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
@@ -1768,7 +1814,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0 px-3.5 py-1.5 rounded-2xl bg-[#360910] border border-[#C5A059]/40 shadow-sm">
             <img src="/logo.png" alt="Vikram Ads" className="h-9 sm:h-11 w-auto object-contain shrink-0 filter drop-shadow-sm" />
-            <span className="font-black text-lg sm:text-xl tracking-tight text-[#C5A059] drop-shadow-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Vikram Ads</span>
+            <span className="font-black text-lg sm:text-xl tracking-tight text-white drop-shadow-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Vikram Ads</span>
           </div>
           <nav className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <LanguageSelector />
@@ -1785,7 +1831,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
           <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full bg-black/30 blur-3xl" />
         </div>
         <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 md:py-20 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/30 text-[#C5A059] text-xs font-black mb-6 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/30 text-white text-xs font-black mb-6 animate-fade-in">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" />
             'Poli-Bhaji' is available in every village, town, and metropolitan area across Maharashtra.
           </div>
@@ -1874,13 +1920,14 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
       </main>
 
       <TopTrendingCarousel t={t} lang={language} />
+      <VendorJoinSection onNavigate={onNavigate} t={t} />
 
       <footer id="contact" className="border-t border-[#C5A059]/30 bg-[#1C0609] text-[#F7F4EF] mt-12">
         <div className="max-w-7xl mx-auto px-6 py-14">
           <div className="grid md:grid-cols-3 gap-12 items-start">
             <div className="reveal reveal-left">
               <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 rounded-2xl bg-[#360910] border border-[#C5A059]/40 shadow-sm">
-                <span className="font-black text-xl tracking-tight text-[#C5A059]" style={{ fontFamily: "'Playfair Display', serif" }}>
+                <span className="font-black text-xl tracking-tight text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Vikram Ads
                 </span>
               </div>
@@ -1889,7 +1936,7 @@ export function Landing({ onNavigate }: { onNavigate: (role: Role) => void }) {
 
             <div className="reveal">
               <h3 className="font-bold text-[#C5A059] text-sm mb-3 uppercase tracking-widest">{t.getInTouch}</h3>
-              <p className="font-black text-lg text-[#C5A059] mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Vikram Ads</p>
+              <p className="font-black text-lg text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Vikram Ads</p>
               <h4 className="font-bold text-[#C5A059]/80 text-xs mb-4 uppercase tracking-widest">Partners:</h4>
               <ul className="space-y-5">
                 {[
