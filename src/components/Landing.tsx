@@ -463,8 +463,13 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
+  // Robust detector for image banner cards — checks explicit is_image_card flag,
+  // sentinel name 'Image Card', or cards that have an image but no text fields.
+  const isTrendingImageCard = (it: TopTrending): boolean =>
+    Boolean(it.is_image_card || it.name === 'Image Card' || (!it.city && !it.phone && !it.category && it.image_url));
+
   // Compute item split early so discoveryLen can use regularItemsEarly.length (safe: items=[] while loading).
-  const regularItemsEarly = items.filter((it) => !it.is_image_card);
+  const regularItemsEarly = items.filter((it) => !isTrendingImageCard(it));
   const discoveryMode = activeCategory === 'All' && activeCity === 'All' && search.trim() === '';
   const discoveryLen = discoveryMode ? regularItemsEarly.length : 0;
 
@@ -495,8 +500,8 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   // Split into regular kitchen cards and image-only banner cards.
   // Filters (category / city / search) operate only on regularItems.
   // imageCardItems are always shown after all regular cards, unaffected by filters.
-  const regularItems = items.filter((it) => !it.is_image_card);
-  const imageCardItems = items.filter((it) => it.is_image_card);
+  const regularItems = items.filter((it) => !isTrendingImageCard(it));
+  const imageCardItems = items.filter((it) => isTrendingImageCard(it));
 
   // Build the pill / dropdown option lists. Trim + normalize keys so "Pune"
   // and "pune " collapse into one option; keep the first-seen casing as the

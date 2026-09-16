@@ -5297,7 +5297,7 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
                     </td>
                     <td className="px-6 py-4 font-bold text-text">
                       <span>{it.name}</span>
-                      {it.is_image_card && (
+                      {Boolean(it.is_image_card || it.name === 'Image Card' || (!it.city && !it.phone && !it.category && it.image_url)) && (
                         <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#C5A059]/40 text-[#4A0E17] text-[10px] font-black">
                           {t.imageCardBadge || '📷 Image Card'}
                         </span>
