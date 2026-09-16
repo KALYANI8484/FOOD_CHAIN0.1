@@ -5104,6 +5104,9 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
 
   useEffect(() => { load(); }, []);
 
+  const existingCities = Array.from(new Set(items.map(it => (it.city || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const existingCategories = Array.from(new Set(items.map(it => (it.category || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -5424,18 +5427,59 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
             </label>
           </div>
 
-          {/* ── TEXT FIELDS ─────────────────────────────────────────── */}
-          <div className={`space-y-4 ${form.is_image_card ? 'opacity-60' : ''}`}>
-            {form.is_image_card && (
-              <p className="text-[11px] text-muted italic px-1">All fields below are optional for image cards.</p>
-            )}
-            <Input label={form.is_image_card ? `${t.fldName} (optional)` : t.fldName} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required={!form.is_image_card} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label={t.fldCity} value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
-              <Input label={t.fldPhone} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+          {/* ── CITY & CATEGORY FILTER TAGS ─────────────────────────── */}
+          <div className={`rounded-2xl border p-4 space-y-3 transition-colors ${form.is_image_card ? 'border-[#C5A059] bg-[#FBF7EE]/90 shadow-sm' : 'border-border bg-surface-2/30'}`}>
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black text-[#4A0E17] uppercase tracking-wider">📍 Filter Linking</span>
+                <span className="text-[11px] font-semibold text-muted">
+                  {form.is_image_card ? '(City & Category — Optional)' : '(Optional)'}
+                </span>
+              </div>
+              {form.is_image_card && (
+                <span className="text-[10px] font-bold text-[#C5A059] bg-[#4A0E17] px-2 py-0.5 rounded-full">
+                  Landing Filter Link
+                </span>
+              )}
             </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label={t.fldCategory} value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
+              <Input
+                label={t.fldCity}
+                value={form.city}
+                onChange={(v) => setForm({ ...form, city: v })}
+                list="tt-city-options"
+                placeholder="e.g. Pune, Mumbai, Nashik..."
+              />
+              <Input
+                label={t.fldCategory}
+                value={form.category}
+                onChange={(v) => setForm({ ...form, category: v })}
+                list="tt-category-options"
+                placeholder="e.g. Tiffin, Poli Bhaji, Modak..."
+              />
+            </div>
+
+            <p className="text-[11px] text-muted leading-relaxed">
+              💡 <strong>Landing Page Linking:</strong> When visitors select this City or Category on the landing page, this {form.is_image_card ? 'image' : 'kitchen'} card will appear in the filtered results. Leave blank to show on all cities/categories.
+            </p>
+          </div>
+
+          <datalist id="tt-city-options">
+            {existingCities.map((c) => <option key={c} value={c} />)}
+          </datalist>
+          <datalist id="tt-category-options">
+            {existingCategories.map((c) => <option key={c} value={c} />)}
+          </datalist>
+
+          {/* ── OTHER CARD FIELDS ────────────────────────────────────── */}
+          <div className={`space-y-4 ${form.is_image_card ? 'opacity-70' : ''}`}>
+            {form.is_image_card && (
+              <p className="text-[11px] text-muted italic px-1">Other details below are optional for image banner cards.</p>
+            )}
+            <Input label={form.is_image_card ? `${t.fldName} (optional label)` : t.fldName} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required={!form.is_image_card} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label={t.fldPhone} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
               <Input label={t.fldPrice} type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -498,26 +498,21 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   if (loading || items.length === 0) return null;
 
   // Split into regular kitchen cards and image-only banner cards.
-  // Filters (category / city / search) operate only on regularItems.
-  // imageCardItems are always shown after all regular cards, unaffected by filters.
   const regularItems = items.filter((it) => !isTrendingImageCard(it));
   const imageCardItems = items.filter((it) => isTrendingImageCard(it));
 
-  // Build the pill / dropdown option lists. Trim + normalize keys so "Pune"
-  // and "pune " collapse into one option; keep the first-seen casing as the
-  // display label.
+  // Build the pill / dropdown option lists across all curated items (including tagged image cards).
+  // Trim + normalize keys so "Pune" and "pune " collapse into one option; keep first-seen casing.
   const distinctBy = (field: 'city' | 'category', max: number): string[] => {
     const seen = new Map<string, string>();
-    for (const it of regularItems) {
+    for (const it of items) {
       const raw = (it[field] || '').trim();
       if (!raw) continue;
       const key = raw.toLowerCase();
       if (!seen.has(key)) seen.set(key, raw);
     }
     // Locale-aware, case-insensitive alphabetical sort so the city dropdown and
-    // category pills always appear A→Z regardless of insertion order. New entries
-    // added later by the super admin drop into the right alphabetical slot on the
-    // next render automatically since this recomputes from `regularItems` each time.
+    // category pills always appear A→Z regardless of insertion order.
     const list = Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     if (list.length > max && typeof console !== 'undefined') {
       // eslint-disable-next-line no-console
@@ -552,6 +547,41 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   };
 
   const passing = regularItems.filter(passes);
+
+  // Dynamic filter for image banner cards — matches Category, City, and Search query.
+  // If an image card specifies a Category, it must match the active category.
+  // If an image card specifies a City, it must match the active city.
+  // If an image card has neither, it acts as a universal banner.
+  const passesImageCard = (it: TopTrending): boolean => {
+    // 1. Category check
+    if (activeCategory !== 'All') {
+      if (it.category) {
+        const catMatchesRaw = ttNorm(it.category) === ttNorm(activeCategory);
+        const catMatchesTranslated = ttNorm(getItemTranslation(it.category || '', lang)) === ttNorm(activeCategory);
+        if (!catMatchesRaw && !catMatchesTranslated) return false;
+      }
+    }
+
+    // 2. City check
+    if (activeCity !== 'All') {
+      if (it.city) {
+        if (ttNorm(it.city) !== ttNorm(activeCity)) return false;
+      }
+    }
+
+    // 3. Search query check
+    if (q) {
+      const matchName = ttNorm(it.name).includes(q);
+      const matchCity = ttNorm(it.city).includes(q);
+      const matchCat = ttNorm(it.category).includes(q);
+      const matchCatTrans = ttNorm(getItemTranslation(it.category || '', lang)).includes(q);
+      if (!matchName && !matchCity && !matchCat && !matchCatTrans) return false;
+    }
+
+    return true;
+  };
+
+  const filteredImageCards = imageCardItems.filter(passesImageCard);
 
   // Bucket mode is when the effective filter narrows results to a single
   // (city, category). Two paths:
@@ -950,10 +980,10 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
       )}
 
       {/* ── Image-Only Banner Cards ─────────────────────────────────
-           Always rendered after all regular kitchen cards.
-           Not affected by category/city/search filters.
+           Rendered after all regular kitchen cards.
+           Dynamically filtered by Category, City, and Search.
            Click → full-screen lightbox.                            */}
-      {imageCardItems.length > 0 && (
+      {filteredImageCards.length > 0 && (
         <div className="mt-10">
           <div className="flex items-center gap-3 mb-5 justify-center">
             <div className="h-px flex-1 bg-[#C5A059]/20 max-w-[80px]" />
@@ -961,7 +991,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
             <div className="h-px flex-1 bg-[#C5A059]/20 max-w-[80px]" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
-            {imageCardItems.map((it) => (
+            {filteredImageCards.map((it) => (
               <article
                 key={it.id}
                 onClick={() => it.image_url && setLightboxUrl(it.image_url)}

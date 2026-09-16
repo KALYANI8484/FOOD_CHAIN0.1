@@ -291,6 +291,7 @@ export function Input({
   placeholder,
   required,
   maxLength,
+  list,
 }: {
   label?: string;
   value: string;
@@ -299,6 +300,7 @@ export function Input({
   placeholder?: string;
   required?: boolean;
   maxLength?: number;
+  list?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -311,6 +313,7 @@ export function Input({
         type={type}
         value={value}
         maxLength={maxLength}
+        list={list}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
