@@ -192,6 +192,8 @@ export type TopTrending = {
   image_url: string | null;
   rank: 1 | 2 | 3 | null;
   sort_order: number;
+  /** When true this entry is an image-only banner card shown after all regular cards. */
+  is_image_card: boolean;
   created_at: string;
   updated_at: string;
 };

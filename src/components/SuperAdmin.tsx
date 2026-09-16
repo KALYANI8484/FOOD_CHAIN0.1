@@ -4969,6 +4969,10 @@ const topTrendingTrans = {
     toastUpdated: (name: string) => `Trending card "${name}" updated`,
     toastRemoved: (name: string) => `Trending card "${name}" removed`,
     validationRequired: 'Name is required',
+    imageCardRequiresImage: 'Please upload an image — image cards require a photo.',
+    fldImageCard: 'Image-Only Card',
+    imageCardHelp: 'Toggle ON to create a pure image banner. All text fields become optional. The card will appear after all regular kitchen cards on the landing page and opens a full-screen view when clicked.',
+    imageCardBadge: '📷 Image Card',
   },
   hi: {
     title: 'टॉप ट्रेंडिंग किचन',
@@ -5013,6 +5017,10 @@ const topTrendingTrans = {
     toastUpdated: (name: string) => `ट्रेंडिंग कार्ड "${name}" अपडेट किया गया`,
     toastRemoved: (name: string) => `ट्रेंडिंग कार्ड "${name}" हटाया गया`,
     validationRequired: 'नाम आवश्यक है',
+    imageCardRequiresImage: 'कृपया एक छवि अपलोड करें — इमेज कार्ड के लिए फ़ोटो आवश्यक है।',
+    fldImageCard: 'केवल-छवि कार्ड',
+    imageCardHelp: 'चालू करें — एक शुद्ध छवि बैनर बनाएं। सभी टेक्स्ट फ़ील्ड वैकल्पिक हो जाती हैं। कार्ड सभी नियमित किचन कार्ड के बाद दिखेगा और क्लिक करने पर पूर्ण-स्क्रीन में खुलेगा।',
+    imageCardBadge: '📷 इमेज कार्ड',
   },
   mr: {
     title: 'टॉप ट्रेंडिंग किचन',
@@ -5057,6 +5065,10 @@ const topTrendingTrans = {
     toastUpdated: (name: string) => `ट्रेंडिंग कार्ड "${name}" अद्ययावत केले`,
     toastRemoved: (name: string) => `ट्रेंडिंग कार्ड "${name}" काढले`,
     validationRequired: 'नाव आवश्यक आहे',
+    imageCardRequiresImage: 'कृपया एक छायाचित्र अपलोड करा — इमेज कार्डसाठी फोटो आवश्यक आहे.',
+    fldImageCard: 'केवळ-छायाचित्र कार्ड',
+    imageCardHelp: 'चालू करा — एक शुद्ध छायाचित्र बॅनर तयार करा. सर्व मजकूर फील्ड ऐच्छिक होतील. कार्ड सर्व नियमित किचन कार्डनंतर दाखवले जाईल आणि क्लिक केल्यावर पूर्ण-स्क्रीनमध्ये उघडेल.',
+    imageCardBadge: '📷 इमेज कार्ड',
   },
 };
 
@@ -5065,10 +5077,11 @@ type TopTrendingForm = {
   category: string; price: string; sort_order: string;
   image_url: string;
   rank: '' | '1' | '2' | '3';
+  is_image_card: boolean;
 };
 
 const emptyTopTrendingForm = (): TopTrendingForm => ({
-  name: '', city: '', phone: '', category: '', price: '', sort_order: '0', image_url: '', rank: ''
+  name: '', city: '', phone: '', category: '', price: '', sort_order: '0', image_url: '', rank: '', is_image_card: false
 });
 
 function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 'info') => void }) {
@@ -5139,16 +5152,27 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
       price: item.price == null ? '' : String(item.price),
       sort_order: String(item.sort_order ?? 0),
       image_url: item.image_url || '',
-      rank: item.rank == null ? '' : (String(item.rank) as '1' | '2' | '3')
+      rank: item.rank == null ? '' : (String(item.rank) as '1' | '2' | '3'),
+      is_image_card: !!item.is_image_card,
     });
     setModal(true);
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) {
-      show(t.validationRequired, 'error');
-      return;
+    // Image-only cards: name is optional — auto-fill "Image Card" if blank.
+    // Image-only cards: image_url is required.
+    if (form.is_image_card) {
+      if (!form.image_url) {
+        show(t.imageCardRequiresImage || 'Please upload an image for the image card.', 'error');
+        return;
+      }
+    } else {
+      if (!form.name.trim()) {
+        show(t.validationRequired, 'error');
+        return;
+      }
     }
+    const nameVal = form.is_image_card && !form.name.trim() ? 'Image Card' : form.name.trim();
     const cityVal = form.city.trim();
     const categoryVal = form.category.trim();
     const rankNum = form.rank === '' ? null : Number(form.rank) as 1 | 2 | 3;
@@ -5173,7 +5197,7 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
       }
     }
     const payload = {
-      name: form.name.trim(),
+      name: nameVal,
       city: cityVal || null,
       phone: form.phone.trim() || null,
       category: categoryVal || null,
@@ -5181,6 +5205,7 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
       sort_order: Number(form.sort_order) || 0,
       image_url: form.image_url || null,
       rank: rankNum,
+      is_image_card: form.is_image_card,
       updated_at: new Date().toISOString()
     };
     if (editingId) {
@@ -5240,7 +5265,7 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
       </div>
 
       {items.length === 0 ? (
-        <EmptyState icon={<TrendingUp size={40} />} title={t.empty} description={t.emptyHelp} />
+        <EmptyState icon={<TrendingUp size={40} />} title={t.empty} subtitle={t.emptyHelp} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-muted text-sm">{t.noMatch}</div>
       ) : (
@@ -5270,7 +5295,14 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
                         <div className="w-12 h-12 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-muted"><TrendingUp size={16} /></div>
                       )}
                     </td>
-                    <td className="px-6 py-4 font-bold text-text">{it.name}</td>
+                    <td className="px-6 py-4 font-bold text-text">
+                      <span>{it.name}</span>
+                      {it.is_image_card && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#C5A059]/40 text-[#4A0E17] text-[10px] font-black">
+                          {t.imageCardBadge || '📷 Image Card'}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       {it.rank ? (
                         <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/40 text-[#4A0E17] text-xs font-black">#{it.rank}</span>
@@ -5311,30 +5343,117 @@ function TopTrendingTab({ show }: { show: (m: string, t?: 'success' | 'error' | 
         title={editingId ? t.edit : t.create}
       >
         <div className="space-y-4">
-          <Input label={t.fldName} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label={t.fldCity} value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
-            <Input label={t.fldPhone} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label={t.fldCategory} value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
-            <Input label={t.fldPrice} type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label={t.fldOrder} type="number" value={form.sort_order} onChange={(v) => setForm({ ...form, sort_order: v })} />
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider block">{t.fldRank}</label>
-              <select
-                value={form.rank}
-                onChange={(e) => setForm({ ...form, rank: e.target.value as '' | '1' | '2' | '3' })}
-                className="w-full px-3 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
+
+          {/* ── IMAGE UPLOAD — always at top, highly visible ────────── */}
+          <div className={`rounded-2xl border-2 p-4 space-y-3 ${form.is_image_card ? 'border-[#C5A059] bg-[#FBF7EE]' : 'border-dashed border-[#C5A059]/40 bg-[#FBF7EE]/50'}`}>
+            {/* Upload area */}
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Preview box */}
+              <div
+                className="w-24 h-24 rounded-xl border-2 border-dashed border-[#C5A059]/50 bg-white flex items-center justify-center overflow-hidden shrink-0 cursor-pointer relative group"
+                onClick={() => { if (!uploading) document.getElementById('tt-img-upload')?.click(); }}
               >
-                <option value="">{t.rankNone}</option>
-                <option value="1">{t.rank1st}</option>
-                <option value="2">{t.rank2nd}</option>
-                <option value="3">{t.rank3rd}</option>
-              </select>
-              <p className="text-[11px] text-muted">{t.fldRankHelp}</p>
+                {form.image_url ? (
+                  <>
+                    <img src={form.image_url} alt="preview" onError={onImgError} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">Change</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-[#C5A059]/70">
+                    <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M4 16l4-4 4 4 4-6 4 6"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                    <span className="text-[10px] font-bold">Click to add</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload button + info */}
+              <div className="flex-1 min-w-[150px]">
+                <label
+                  htmlFor="tt-img-upload"
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-colors shadow-sm ${uploading ? 'bg-surface-2 text-muted cursor-not-allowed' : 'bg-[#4A0E17] text-[#C5A059] hover:bg-[#6d1324] active:scale-95'}`}
+                >
+                  {uploading ? '⏳ Uploading…' : form.image_url ? '↺ Replace Image' : '📷 Upload Image'}
+                </label>
+                <input
+                  id="tt-img-upload"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/pjpeg"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={handleImageUpload}
+                />
+                <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
+                  JPG · PNG · WebP · PJPEG<br />Up to 15 MB — auto-compressed
+                </p>
+                {form.image_url && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, image_url: '' }))}
+                    className="text-[11px] text-red-400 hover:text-red-600 mt-1 cursor-pointer block"
+                  >
+                    ✕ Remove image
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Image-only card toggle */}
+            <label className="flex items-center gap-3 cursor-pointer select-none pt-2 border-t border-[#C5A059]/20">
+              <div className="relative shrink-0">
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={form.is_image_card}
+                  onChange={(e) => setForm({ ...form, is_image_card: e.target.checked })}
+                />
+                <div className={`w-10 h-5 rounded-full transition-colors ${form.is_image_card ? 'bg-[#4A0E17]' : 'bg-[#C5A059]/30'}`} />
+                <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.is_image_card ? 'translate-x-5' : 'translate-x-0'}`} />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-[#4A0E17]">
+                  {form.is_image_card ? '✅ Image-Only Card (text fields optional)' : '📷 Make this an Image-Only Card'}
+                </span>
+                <p className="text-[11px] text-muted mt-0.5">
+                  {form.is_image_card
+                    ? 'This card shows only the image on the landing page. Click to expand.'
+                    : 'Toggle ON to show just the image — no text fields needed.'}
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* ── TEXT FIELDS ─────────────────────────────────────────── */}
+          <div className={`space-y-4 ${form.is_image_card ? 'opacity-60' : ''}`}>
+            {form.is_image_card && (
+              <p className="text-[11px] text-muted italic px-1">All fields below are optional for image cards.</p>
+            )}
+            <Input label={form.is_image_card ? `${t.fldName} (optional)` : t.fldName} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required={!form.is_image_card} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label={t.fldCity} value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
+              <Input label={t.fldPhone} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label={t.fldCategory} value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
+              <Input label={t.fldPrice} type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label={t.fldOrder} type="number" value={form.sort_order} onChange={(v) => setForm({ ...form, sort_order: v })} />
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted uppercase tracking-wider block">{t.fldRank}</label>
+                <select
+                  value={form.rank}
+                  onChange={(e) => setForm({ ...form, rank: e.target.value as '' | '1' | '2' | '3' })}
+                  className="w-full px-3 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-text focus:border-accent outline-none"
+                >
+                  <option value="">{t.rankNone}</option>
+                  <option value="1">{t.rank1st}</option>
+                  <option value="2">{t.rank2nd}</option>
+                  <option value="3">{t.rank3rd}</option>
+                </select>
+                <p className="text-[11px] text-muted">{t.fldRankHelp}</p>
+              </div>
             </div>
           </div>
 

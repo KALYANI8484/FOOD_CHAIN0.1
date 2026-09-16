@@ -439,6 +439,8 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   // Bumped every time a new interval fires, so the progress bar's CSS
   // animation re-triggers from 0 rather than resuming mid-fill.
   const [progressTick, setProgressTick] = useState(0);
+  // Lightbox for image-only cards.
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -461,9 +463,10 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
+  // Compute item split early so discoveryLen can use regularItemsEarly.length (safe: items=[] while loading).
+  const regularItemsEarly = items.filter((it) => !it.is_image_card);
   const discoveryMode = activeCategory === 'All' && activeCity === 'All' && search.trim() === '';
-  // In discovery mode, all items pass (no filter). Length is items.length.
-  const discoveryLen = discoveryMode ? items.length : 0;
+  const discoveryLen = discoveryMode ? regularItemsEarly.length : 0;
 
   // Auto-advance the coverflow. Skips when paused, when there's nothing to
   // rotate through, or when the user prefers reduced motion.
@@ -489,12 +492,18 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   // Empty state: render nothing so the section only appears once the admin curates it.
   if (loading || items.length === 0) return null;
 
+  // Split into regular kitchen cards and image-only banner cards.
+  // Filters (category / city / search) operate only on regularItems.
+  // imageCardItems are always shown after all regular cards, unaffected by filters.
+  const regularItems = items.filter((it) => !it.is_image_card);
+  const imageCardItems = items.filter((it) => it.is_image_card);
+
   // Build the pill / dropdown option lists. Trim + normalize keys so "Pune"
   // and "pune " collapse into one option; keep the first-seen casing as the
   // display label.
   const distinctBy = (field: 'city' | 'category', max: number): string[] => {
     const seen = new Map<string, string>();
-    for (const it of items) {
+    for (const it of regularItems) {
       const raw = (it[field] || '').trim();
       if (!raw) continue;
       const key = raw.toLowerCase();
@@ -503,7 +512,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     // Locale-aware, case-insensitive alphabetical sort so the city dropdown and
     // category pills always appear A→Z regardless of insertion order. New entries
     // added later by the super admin drop into the right alphabetical slot on the
-    // next render automatically since this recomputes from `items` each time.
+    // next render automatically since this recomputes from `regularItems` each time.
     const list = Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     if (list.length > max && typeof console !== 'undefined') {
       // eslint-disable-next-line no-console
@@ -537,7 +546,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     return matchesSearch(it);
   };
 
-  const passing = items.filter(passes);
+  const passing = regularItems.filter(passes);
 
   // Bucket mode is when the effective filter narrows results to a single
   // (city, category). Two paths:
@@ -575,7 +584,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   const anyFilterActive = activeCategory !== 'All' || activeCity !== 'All' || q !== '';
   const featuredTop3 = (() => {
     if (!anyFilterActive) return [];
-    const pinned = items.filter((e) => e.rank === 1 || e.rank === 2 || e.rank === 3);
+    const pinned = regularItems.filter((e) => e.rank === 1 || e.rank === 2 || e.rank === 3);
     const byRank = (a: TopTrending, b: TopTrending) =>
       (a.rank || 0) - (b.rank || 0) || (a.sort_order || 0) - (b.sort_order || 0);
     // Prefer pins in the exact bucket first.
@@ -753,7 +762,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
         </div>
       </div>
 
-      {passing.length === 0 && featuredTop3.length === 0 ? (
+      {passing.length === 0 && featuredTop3.length === 0 && regularItems.length > 0 ? (
         // Drop the `reveal` class here so the empty-state doesn't flash invisible
         // for ~a frame while the IntersectionObserver catches up after a filter change.
         <div className="text-center py-10 text-[#6E6B65] text-sm">{t.trendingNoMatch || 'No kitchens match your search.'}</div>
@@ -932,6 +941,81 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
               </p>
             )
           )}
+        </div>
+      )}
+
+      {/* ── Image-Only Banner Cards ─────────────────────────────────
+           Always rendered after all regular kitchen cards.
+           Not affected by category/city/search filters.
+           Click → full-screen lightbox.                            */}
+      {imageCardItems.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center gap-3 mb-5 justify-center">
+            <div className="h-px flex-1 bg-[#C5A059]/20 max-w-[80px]" />
+            <span className="text-xs font-black uppercase tracking-widest text-[#6E6B65]">📷 Featured Images</span>
+            <div className="h-px flex-1 bg-[#C5A059]/20 max-w-[80px]" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
+            {imageCardItems.map((it) => (
+              <article
+                key={it.id}
+                onClick={() => it.image_url && setLightboxUrl(it.image_url)}
+                className="relative overflow-hidden rounded-2xl border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full max-w-[280px] group"
+                aria-label={it.name || 'Featured image'}
+              >
+                {it.image_url ? (
+                  <>
+                    <img
+                      src={it.image_url}
+                      alt={it.name || 'Featured banner'}
+                      onError={onImgError}
+                      className="w-full h-auto object-cover block"
+                      loading="lazy"
+                    />
+                    {/* Expand icon hint on hover */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2 shadow-lg">
+                        <Maximize2 size={18} className="text-[#4A0E17]" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-[#4A0E17] to-[#360910] text-[#C5A059]/50">
+                    <TrendingUp size={40} />
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox ─────────────────────────────────────────────── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/92 flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setLightboxUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image expanded view"
+        >
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Close image"
+          >
+            <X size={20} />
+          </button>
+          {/* Full image */}
+          <img
+            src={lightboxUrl}
+            alt="Expanded view"
+            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            onError={onImgError}
+          />
         </div>
       )}
     </section>
