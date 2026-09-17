@@ -439,6 +439,8 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   // Bumped every time a new interval fires, so the progress bar's CSS
   // animation re-triggers from 0 rather than resuming mid-fill.
   const [progressTick, setProgressTick] = useState(0);
+  // Lightbox for image-only cards.
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -461,9 +463,16 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
+  // All items are treated uniformly — no longer split into regular vs image-only.
+  // The isTrendingImageCard detector is retained only for data compatibility but
+  // cards are no longer separated into two sections.
+  const isTrendingImageCard = (it: TopTrending): boolean =>
+    Boolean(it.is_image_card || it.name === 'Image Card' || (!it.city && !it.phone && !it.category && it.image_url));
+
+  // Use all items for discovery mode (no split).
+  const regularItemsEarly = items;
   const discoveryMode = activeCategory === 'All' && activeCity === 'All' && search.trim() === '';
-  // In discovery mode, all items pass (no filter). Length is items.length.
-  const discoveryLen = discoveryMode ? items.length : 0;
+  const discoveryLen = discoveryMode ? regularItemsEarly.length : 0;
 
   // Auto-advance the coverflow. Skips when paused, when there's nothing to
   // rotate through, or when the user prefers reduced motion.
@@ -489,9 +498,11 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   // Empty state: render nothing so the section only appears once the admin curates it.
   if (loading || items.length === 0) return null;
 
-  // Build the pill / dropdown option lists. Trim + normalize keys so "Pune"
-  // and "pune " collapse into one option; keep the first-seen casing as the
-  // display label.
+  // All items are in one unified list — no separate image card section.
+  const regularItems = items;
+
+  // Build the pill / dropdown option lists across all curated items (including tagged image cards).
+  // Trim + normalize keys so "Pune" and "pune " collapse into one option; keep first-seen casing.
   const distinctBy = (field: 'city' | 'category', max: number): string[] => {
     const seen = new Map<string, string>();
     for (const it of items) {
@@ -501,9 +512,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
       if (!seen.has(key)) seen.set(key, raw);
     }
     // Locale-aware, case-insensitive alphabetical sort so the city dropdown and
-    // category pills always appear A→Z regardless of insertion order. New entries
-    // added later by the super admin drop into the right alphabetical slot on the
-    // next render automatically since this recomputes from `items` each time.
+    // category pills always appear A→Z regardless of insertion order.
     const list = Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     if (list.length > max && typeof console !== 'undefined') {
       // eslint-disable-next-line no-console
@@ -537,7 +546,8 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
     return matchesSearch(it);
   };
 
-  const passing = items.filter(passes);
+  const passing = regularItems.filter(passes);
+
 
   // Bucket mode is when the effective filter narrows results to a single
   // (city, category). Two paths:
@@ -575,7 +585,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   const anyFilterActive = activeCategory !== 'All' || activeCity !== 'All' || q !== '';
   const featuredTop3 = (() => {
     if (!anyFilterActive) return [];
-    const pinned = items.filter((e) => e.rank === 1 || e.rank === 2 || e.rank === 3);
+    const pinned = regularItems.filter((e) => e.rank === 1 || e.rank === 2 || e.rank === 3);
     const byRank = (a: TopTrending, b: TopTrending) =>
       (a.rank || 0) - (b.rank || 0) || (a.sort_order || 0) - (b.sort_order || 0);
     // Prefer pins in the exact bucket first.
@@ -618,69 +628,34 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   const renderCard = (it: TopTrending, opts: { showRank?: boolean } = {}) => (
     <article
       key={it.id}
-      className="relative overflow-hidden rounded-2xl border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default w-full max-w-[280px] min-h-[240px]"
+      onClick={() => it.image_url && setLightboxUrl(it.image_url)}
+      className="relative overflow-hidden rounded-2xl border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full max-w-[280px] group"
+      data-name={it.name || ''}
+      data-city={it.city || ''}
+      data-category={it.category || ''}
+      aria-label={it.name || 'Image card'}
     >
-      {/* Background layer: blurred image if available, else category gradient. */}
-      <div className="absolute inset-0 -z-0">
-        {it.image_url ? (
+      {it.image_url ? (
+        <>
           <img
             src={it.image_url}
-            alt=""
+            alt={it.name || 'Card image'}
             onError={onImgError}
-            aria-hidden="true"
-            className="w-full h-full object-cover scale-110 blur-[6px] opacity-40"
+            className="w-full h-auto object-cover block"
             loading="lazy"
           />
-        ) : (
-          <div className="w-full h-full" style={{ background: gradientForCategory(it.category) }} />
-        )}
-        {/* Dark gradient overlay to keep text legible on any image. */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(30,10,10,0.55) 0%, rgba(30,10,10,0.42) 45%, rgba(30,10,10,0.72) 100%)' }} />
-      </div>
-
-      {/* Content */}
-      <div className="relative z-10 p-5 text-white">
-        <h3
-          className="font-medium text-2xl leading-tight tracking-tight drop-shadow-md flex items-baseline gap-2"
-          style={{ fontFamily: "'Playfair Display', serif" }}
-        >
-          {opts.showRank && it.rank && (
-            // Inline rank chip so it never overlaps the name or the CTA row.
-            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#C5A059] text-[#4A0E17] text-[10px] font-black shadow-sm shrink-0 self-center">
-              #{it.rank}
-            </span>
-          )}
-          <span className="truncate">{it.name}</span>
-        </h3>
-        <div className="mt-3 space-y-1">
-          {it.city && <p className="text-sm text-white/95 drop-shadow">{it.city}</p>}
-          {it.category && <p className="text-sm text-white/90 drop-shadow">{getItemTranslation(it.category, lang)}</p>}
-          {it.price != null && (
-            <p className="text-xl font-normal text-[#F4D67A] drop-shadow" style={{ fontFamily: "'Playfair Display', serif" }}>
-              ₹-{Number(it.price).toLocaleString('en-IN')}
-            </p>
-          )}
-          {it.phone && <p className="text-xs font-mono text-white/85 drop-shadow">{it.phone}</p>}
-        </div>
-        {it.phone && (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <a
-              href={buildWa(it.phone, it.name)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1ebe5a] text-white text-xs font-bold transition-colors"
-            >
-              <MessageCircle size={13} /> {t.viewShop || 'WhatsApp'}
-            </a>
-            <a
-              href={buildTel(it.phone)}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#4A0E17] hover:bg-[#6d1324] text-[#C5A059] text-xs font-bold transition-colors"
-            >
-              <Phone size={13} /> {t.callShop || 'Call'}
-            </a>
+          {/* Expand icon hint on hover */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2 shadow-lg">
+              <Maximize2 size={18} className="text-[#4A0E17]" />
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-[#4A0E17] to-[#360910] text-[#C5A059]/50">
+          <TrendingUp size={40} />
+        </div>
+      )}
     </article>
   );
 
@@ -753,7 +728,7 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
         </div>
       </div>
 
-      {passing.length === 0 && featuredTop3.length === 0 ? (
+      {passing.length === 0 && featuredTop3.length === 0 && regularItems.length > 0 ? (
         // Drop the `reveal` class here so the empty-state doesn't flash invisible
         // for ~a frame while the IntersectionObserver catches up after a filter change.
         <div className="text-center py-10 text-[#6E6B65] text-sm">{t.trendingNoMatch || 'No kitchens match your search.'}</div>
@@ -932,6 +907,35 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
               </p>
             )
           )}
+        </div>
+      )}
+
+      {/* ── Lightbox ─────────────────────────────────────────────── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/92 flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setLightboxUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image expanded view"
+        >
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Close image"
+          >
+            <X size={20} />
+          </button>
+          {/* Full image */}
+          <img
+            src={lightboxUrl}
+            alt="Expanded view"
+            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            onError={onImgError}
+          />
         </div>
       )}
     </section>

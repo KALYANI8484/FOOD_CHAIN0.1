@@ -512,6 +512,9 @@ const topTrendingSchema = new mongoose.Schema({
   // to only ever pass 1, 2, 3, or null.
   rank: { type: Number, min: 1, max: 3, default: null },
   sort_order: { type: Number, default: 0 },
+  // When true this entry is an image-only banner card. Name is auto-set to
+  // "Image Card" if blank, and all other text fields are optional.
+  is_image_card: { type: Boolean, default: false },
   created_at: { type: String, default: () => new Date().toISOString() },
   updated_at: { type: String, default: () => new Date().toISOString() }
 }, schemaOptions);
