@@ -625,39 +625,95 @@ function TopTrendingCarousel({ t, lang }: { t: any; lang: Language }) {
   };
   const buildTel = (phone: string) => `tel:+91${(phone || '').replace(/\D/g, '')}`;
 
-  const renderCard = (it: TopTrending, opts: { showRank?: boolean } = {}) => (
-    <article
-      key={it.id}
-      onClick={() => it.image_url && setLightboxUrl(it.image_url)}
-      className="relative overflow-hidden rounded-2xl border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full max-w-[280px] group"
-      data-name={it.name || ''}
-      data-city={it.city || ''}
-      data-category={it.category || ''}
-      aria-label={it.name || 'Image card'}
-    >
-      {it.image_url ? (
-        <>
+  const renderCard = (it: TopTrending, opts: { showRank?: boolean } = {}) => {
+    // If this item has an image, render it as an image card:
+    // Only the image is shown, text fields (name, city, category) are hidden,
+    // and clicking opens the full image in the lightbox popup.
+    if (it.image_url) {
+      return (
+        <article
+          key={it.id}
+          onClick={() => it.image_url && setLightboxUrl(it.image_url)}
+          className="relative overflow-hidden rounded-2xl border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full max-w-[280px] h-[240px] group bg-[#1C0609]"
+          data-name={it.name || ''}
+          data-city={it.city || ''}
+          data-category={it.category || ''}
+          aria-label={it.name || 'Image card'}
+        >
           <img
             src={it.image_url}
             alt={it.name || 'Card image'}
             onError={onImgError}
-            className="w-full h-auto object-cover block"
+            className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
-          {/* Expand icon hint on hover */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2 shadow-lg">
+          {/* Hover overlay hint */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2.5 shadow-lg">
               <Maximize2 size={18} className="text-[#4A0E17]" />
             </div>
           </div>
-        </>
-      ) : (
-        <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-[#4A0E17] to-[#360910] text-[#C5A059]/50">
-          <TrendingUp size={40} />
+        </article>
+      );
+    }
+
+    // Otherwise render standard vendor card with name, city, category, price, phone, and action buttons
+    return (
+      <article
+        key={it.id}
+        className="relative overflow-hidden rounded-2xl border border-[#C5A059]/25 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default w-full max-w-[280px] min-h-[240px]"
+      >
+        {/* Background layer */}
+        <div className="absolute inset-0 -z-0">
+          <div className="w-full h-full" style={{ background: gradientForCategory(it.category) }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(30,10,10,0.55) 0%, rgba(30,10,10,0.42) 45%, rgba(30,10,10,0.72) 100%)' }} />
         </div>
-      )}
-    </article>
-  );
+
+        {/* Content */}
+        <div className="relative z-10 p-5 text-white">
+          <h3
+            className="font-medium text-2xl leading-tight tracking-tight drop-shadow-md flex items-baseline gap-2"
+            style={{ fontFamily: "'Playfair Display', serif" }}
+          >
+            {opts.showRank && it.rank && (
+              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#C5A059] text-[#4A0E17] text-[10px] font-black shadow-sm shrink-0 self-center">
+                #{it.rank}
+              </span>
+            )}
+            <span className="truncate">{it.name}</span>
+          </h3>
+          <div className="mt-3 space-y-1">
+            {it.city && <p className="text-sm text-white/95 drop-shadow">{it.city}</p>}
+            {it.category && <p className="text-sm text-white/90 drop-shadow">{getItemTranslation(it.category, lang)}</p>}
+            {it.price != null && (
+              <p className="text-xl font-normal text-[#F4D67A] drop-shadow" style={{ fontFamily: "'Playfair Display', serif" }}>
+                ₹-{Number(it.price).toLocaleString('en-IN')}
+              </p>
+            )}
+            {it.phone && <p className="text-xs font-mono text-white/85 drop-shadow">{it.phone}</p>}
+          </div>
+          {it.phone && (
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <a
+                href={buildWa(it.phone, it.name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1ebe5a] text-white text-xs font-bold transition-colors"
+              >
+                <MessageCircle size={13} /> {t.viewShop || 'WhatsApp'}
+              </a>
+              <a
+                href={buildTel(it.phone)}
+                className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#4A0E17] hover:bg-[#6d1324] text-[#C5A059] text-xs font-bold transition-colors"
+              >
+                <Phone size={13} /> {t.callShop || 'Call'}
+              </a>
+            </div>
+          )}
+        </div>
+      </article>
+    );
+  };
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-12">
